@@ -1,0 +1,178 @@
+<section class="max-w-5xl mx-auto pawn-detail"
+         x-data="app.userPawnDetail('{{ pawn_public_id }}')"
+         x-init="init()">
+
+  <!-- Pasek tytułowy -->
+  <div class="flex items-center gap-2 mb-4">
+    <a class="btn btn-ghost" href="/me/pawns" hx-boost="true" hx-target="#app-root" hx-push-url="true">← Wróć</a>
+    <h1 class="text-2xl font-semibold">Zastaw</h1>
+    <span class="ml-auto text-xs">ID: <span class="font-mono" x-text="pawn?.public_id || '—'"></span></span>
+  </div>
+
+  <!-- Skeleton / błąd -->
+  <template x-if="loading"><div class="h-28 rounded-lg elevated-panel animate-pulse"></div></template>
+  <template x-if="err"><div class="alert alert-error my-3" x-text="err"></div></template>
+
+  <!-- Dane -->
+  <template x-if="pawn">
+    <div class="space-y-6">
+
+      <!-- Podsumowanie (gold + progress) -->
+      <div class="gold-panel">
+        <div class="card-body grid md:grid-cols-3 gap-3">
+
+          <!-- Kolumna: status + daty + postęp -->
+          <div class="md:col-span-2 space-y-3">
+            <div class="flex items-start gap-2 flex-wrap">
+              <div class="text-sm opacity-70">Status</div>
+              <div class="ml-2 badge"
+                   :class="{
+                     'badge-success': pawn?.is_active,
+                     'badge-info'   : pawn?.status==='REDEEMED',
+                     'badge-warning': pawn?.status==='FORFEITED' || expired,
+                     'badge-ghost'  : !pawn?.status
+                   }"
+                   x-text="({ACTIVE:'Aktywny', REDEEMED:'Wykupiony', FORFEITED:'Przepadek', EXPIRED:'Wygasły'}[pawn?.status] || (pawn?.status || '—'))">
+              </div>
+            </div>
+
+            <div class="grid sm:grid-cols-3 gap-2">
+              <div>
+                <div class="text-xs opacity-70">Kapitał (pożyczka)</div>
+                <div class="font-semibold" x-text="app.moneyText(pawn.principal)"></div>
+              </div>
+              <div>
+                <div class="text-xs opacity-70">Wycena łączna</div>
+                <div class="font-medium" x-text="app.moneyText(pawn.appraisal_total)"></div>
+              </div>
+              <div>
+                <div class="text-xs opacity-70">Okres</div>
+                <div class="font-medium">
+                  <span x-text="new Date(pawn.start_date).toLocaleDateString('pl-PL')"></span>
+                  <span class="opacity-60">→</span>
+                  <span x-text="new Date(pawn.due_date).toLocaleDateString('pl-PL')"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pasek postępu + info o dniach -->
+            <div class="space-y-1">
+              <div class="w-full h-2 rounded-full overflow-hidden elevated-panel--soft">
+                <div class="h-full"
+                     style="background:linear-gradient(90deg, color-mix(in oklab, oklch(var(--p)) 70%, #000 0%), color-mix(in oklab, oklch(var(--p)) 92%, #000 0%))"
+                     :style="{
+                       width: (() => {
+                         const s = new Date(pawn.start_date).getTime();
+                         const d = new Date(pawn.due_date).getTime();
+                         const now = Date.now();
+                         if (!isFinite(s) || !isFinite(d) || d<=s) return '0%';
+                         const pct = Math.max(0, Math.min(100, ((now - s) / (d - s)) * 100));
+                         return pct.toFixed(0) + '%';
+                       })()
+                     }">
+                </div>
+              </div>
+              <div class="text-xs opacity-80">
+                <template x-if="active && !expired">
+                  <span>Pozostało <b x-text="Math.max(0, Math.ceil((new Date(pawn.due_date) - new Date()) / 86400000))"></b> dni.</span>
+                </template>
+                <template x-if="expired && pawn.status!=='REDEEMED' && pawn.status!=='FORFEITED'">
+                  <span class="text-warning">Po terminie o <b x-text="Math.max(1, Math.ceil((new Date() - new Date(pawn.due_date)) / 86400000))"></b> dni.</span>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- Kolumna: akcje (przedłużenia online) -->
+          <div class="space-y-2 md:text-right">
+            <div class="text-sm font-medium">Przedłuż zastaw</div>
+            <div class="join md:justify-end">
+              <button class="btn btn-sm join-item btn-outline" :disabled="extending || !active" @click="startExtension(7)">+7 dni</button>
+              <button class="btn btn-sm join-item btn-outline" :disabled="extending || !active" @click="startExtension(14)">+14 dni</button>
+              <button class="btn btn-sm join-item btn-primary btn-gold" :disabled="extending || !active" @click="startExtension(30)">+30 dni</button>
+            </div>
+            <div class="text-xs opacity-70" x-show="!active">Przedłużenie niedostępne (zastaw nieaktywny).</div>
+            <div class="text-xs opacity-70" x-show="extending">Tworzenie przedłużenia…</div>
+
+            <!-- Klient -->
+            <div class="mt-3 text-left md:text-right">
+              <div class="text-xs opacity-70">Klient</div>
+              <div class="text-sm">
+                <span x-text="(pawn.customer_snapshot?.first_name||'') + ' ' + (pawn.customer_snapshot?.last_name||'')"></span>
+              </div>
+              <div class="text-xs opacity-70" x-text="pawn.customer_snapshot?.email || '—'"></div>
+              <div class="text-xs opacity-70">Tel: <span x-text="pawn.customer_snapshot?.phone || '—'"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Przedmioty (bez zdjęć, atrybuty per pozycja) -->
+      <div class="elevated-panel p-5">
+        <div class="font-medium mb-2">Przedmioty</div>
+
+        <div class="space-y-2" x-show="pawn.lines?.length">
+          <template x-for="ln in pawn.lines" :key="ln.public_id || ln.id">
+            <div class="list-row p-3">
+              <div class="font-medium truncate" x-text="ln.title || ln.item_snapshot?.set_name || 'Pozycja'"></div>
+
+              <div class="text-sm opacity-80 mt-0.5">
+                Ilość: <span x-text="ln.quantity || 1"></span>
+                <template x-if="ln.appraisal_value">
+                  <span> · Wycena: <b x-text="app.moneyText(ln.appraisal_value)"></b></span>
+                </template>
+              </div>
+
+              <div class="text-xs opacity-70" x-show="ln.item_snapshot?.type_path">
+                Kategoria: <span x-text="ln.item_snapshot.type_path"></span>
+              </div>
+
+              <div class="attr-pills mt-2">
+                <template x-for="pair in attrPairsFor(ln).slice(0,12)" :key="pair[0] + uiNonce">
+                  <span class="attr-pill" :title="pair[0] + ': ' + String(pair[1])">
+                    <span class="k" x-text="pair[0] + ':'"></span>
+                    <span class="v" x-text="String(pair[1])"></span>
+                  </span>
+                </template>
+                <span class="text-[11px] opacity-60" x-show="attrPairsFor(ln).length === 0">brak atrybutów</span>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <template x-if="!pawn.lines?.length">
+          <div class="text-sm opacity-70">Brak pozycji.</div>
+        </template>
+      </div>
+
+      <!-- Historia przedłużeń -->
+      <div class="elevated-panel p-5">
+        <div class="font-medium mb-2">Historia przedłużeń</div>
+
+        <div class="space-y-2" x-show="pawn.extensions?.length">
+          <template x-for="ex in pawn.extensions" :key="ex.public_id">
+            <div class="list-row p-3 flex items-center justify-between text-sm">
+              <div>
+                <div>Dni: <b x-text="ex.days"></b></div>
+                <div class="text-xs opacity-70">
+                  Termin: <span x-text="new Date(ex.previous_due).toLocaleDateString('pl-PL')"></span>
+                  <span class="opacity-60">→</span>
+                  <span x-text="new Date(ex.new_due).toLocaleDateString('pl-PL')"></span>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs opacity-70">Opłata</div>
+                <div class="font-medium" x-text="app.moneyText(ex.fee)"></div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <template x-if="!pawn.extensions?.length">
+          <div class="text-sm opacity-70">Brak przedłużeń.</div>
+        </template>
+      </div>
+
+    </div>
+  </template>
+</section>

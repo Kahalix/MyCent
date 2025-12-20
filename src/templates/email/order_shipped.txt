@@ -1,0 +1,7 @@
+Cześć {{ first_name }}!
+
+Twoje zamówienie {{ order.public_id }} zostało wysłane.
+Sprawdź szczegóły: {{ order_url }}
+
+Dziękujemy za zakupy w {{ site_name }}!
+— Zespół {{ site_name }}

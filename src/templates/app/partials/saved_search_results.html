@@ -1,0 +1,36 @@
+<section class="max-w-5xl mx-auto"
+         x-data="app.savedSearchResultsPage({ publicId: '{{ saved_public_id }}' })"
+         x-init="init()" data-protected>
+
+  <div class="mb-3 flex items-center gap-2">
+    <a class="btn btn-ghost btn-sm"
+       href="/saved" hx-boost="true" hx-target="#app-root" hx-push-url="true">← Powrót</a>
+    <h1 class="text-xl font-semibold">Nowe wyniki</h1>
+    <span class="ml-auto"></span>
+    <a class="btn btn-outline btn-sm"
+       :href="offersUrl()" hx-boost="true" hx-target="#app-root" hx-push-url="true">W ogłoszeniach</a>
+    <button class="btn btn-sm" :disabled="busy" @click="refreshNow()">Odśwież</button>
+    <button class="btn btn-primary btn-sm btn-gold" :disabled="busy" @click="markSeen()">Oznacz przeczytane</button>
+  </div>
+
+  <template x-if="headErr"><div class="alert alert-error mb-3" x-text="headErr"></div></template>
+
+  <div class="space-y-2" x-show="results.length">
+    <template x-for="it in results" :key="it.public_id || it.id">
+      <div class="p-3 rounded-lg border flex items-start gap-3">
+        <img :src="img(it)" class="list-thumb object-cover rounded border" alt="">
+        <div class="grow min-w-0">
+          <div class="font-medium truncate" x-text="it.set_name || '(bez nazwy)'"></div>
+          <div class="text-sm opacity-70">
+            <span x-text="priceText(it)"></span> · <span x-text="it.type?.path || '—'"></span>
+          </div>
+        </div>
+        <button class="btn btn-xs" @click="gotoItem(it)">Szczegóły</button>
+      </div>
+    </template>
+  </div>
+
+  <template x-if="!results.length && !headErr">
+    <div class="text-sm opacity-70">Brak nowych wyników.</div>
+  </template>
+</section>

@@ -1,0 +1,19 @@
+<section class="max-w-md mx-auto">
+  <h1 class="text-2xl font-semibold mb-4">Reset hasła</h1>
+
+  <form x-data="app.forgotForm()" @submit.prevent="submit"
+        hx-boost="false" novalidate autocomplete="off">
+
+    <label class="form-control w-full mb-2">
+      <span class="label"><span class="label-text">E-mail</span></span>
+      <input class="input input-bordered w-full" type="email" inputmode="email"
+             x-model="email" placeholder="E-mail">
+      <span class="label text-error text-xs" x-text="emailErr"></span>
+    </label>
+
+    <button class="btn btn-primary btn-gold w-full" :disabled="busy" x-text="busy?'Wysyłanie…':'Wyślij link resetu'"></button>
+
+    <p class="text-success text-sm mt-2" x-text="ok"></p>
+    <p class="text-error text-sm mt-2" x-text="err"></p>
+  </form>
+</section>

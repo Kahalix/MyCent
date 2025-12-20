@@ -1,0 +1,13 @@
+{% extends "email/_base.html" %}
+{% block content %}
+<p style="margin:0 0 16px;color:#374151;">Cześć {{ first_name }}!</p>
+<p style="margin:0 0 16px;color:#374151;">
+  Kliknij w przycisk poniżej, aby aktywować swoje konto. Link jest ważny {{ valid_for_hours }} godz.
+</p>
+<p style="margin:0 0 16px;">
+  <a href="{{ action_url }}" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#111827;color:#ffffff;text-decoration:none;font-weight:600;">
+    Aktywuj konto
+  </a>
+</p>
+<p style="margin:0;color:#6b7280;word-break:break-all;">Jeśli przycisk nie działa, skopiuj ten adres: <br>{{ action_url }}</p>
+{% endblock %}

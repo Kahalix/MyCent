@@ -1,0 +1,124 @@
+/* ==== Simple Schema Form (themed + responsive + right-aligned „Wymagane”) ==== */
+.ssf-container{
+  background: var(--frame-bg);
+  border: 1px solid var(--frame-border);
+  border-radius: .75rem;
+  padding: .75rem;
+}
+
+/* Układ: [etykieta 220px | kontrolka] */
+.ssf-field{
+  display: grid;
+  grid-template-columns: 220px minmax(0,1fr);
+  align-items: center;
+  gap: .5rem 12px;
+  padding: .5rem 0;
+}
+
+/* Etykieta: [tekst | badge] — tekst zawija się i nie znika */
+.ssf-label{
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center;
+  gap: .5rem;
+  font-weight: 600;
+  color: oklch(var(--bc));
+  min-height: 2.25rem;
+}
+.ssf-label__text{
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* Pastylka „Wymagane” — czytelna w light/dark, zawsze po prawej */
+.ssf-label .req-badge{
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  flex-shrink: 0;
+  gap: .35rem;
+
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: .18rem .5rem;
+  border-radius: .55rem;
+
+  background: var(--frame-bg);
+  border: 1.25px solid var(--frame-border);
+  color: oklch(var(--bc));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.06),
+    0 0 0 1px color-mix(in oklab, oklch(var(--b3)) 30%, transparent);
+}
+.ssf-label .req-badge::before{
+  content: "";
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: 9999px;
+  background: oklch(var(--p));
+  box-shadow: 0 0 8px color-mix(in oklab, oklch(var(--p)) 55%, transparent);
+  transform: translateY(.5px);
+}
+
+/* Jeśli gdzieś zostanie fallbackowa gwiazdka — chowamy */
+.ssf-label .ssf-required{ display: none !important; }
+
+/* Kontrolki */
+.ssf-input{ width: 100%; min-width: 0; }
+
+/* Pomoc pod polem (pod kolumną kontrolek) */
+.ssf-help{
+  grid-column: 2 / -1;
+  margin: .25rem 0 0;
+  font-size: 12px;
+  color: color-mix(in oklab, oklch(var(--bc)) 60%, transparent);
+}
+
+/* Mobile: etykieta nad polem */
+@media (max-width: 640px){
+  .ssf-field{ grid-template-columns: 1fr; }
+  .ssf-help{ grid-column: 1 / -1; margin-left: 0; }
+}
+
+/* „DaisyUI look” dla surowych SSF inputów (fallback) */
+.ssf-field input[type="text"].ssf-input,
+.ssf-field input[type="number"].ssf-input{
+  background-color: oklch(var(--b1));
+  color: oklch(var(--bc));
+  border: 1px solid var(--frame-border);
+  border-radius: .5rem;
+  padding: .5rem .75rem;
+  line-height: 1.25rem;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+}
+.ssf-field select.ssf-input{
+  background-color: oklch(var(--b1));
+  color: oklch(var(--bc));
+  border: 1px solid var(--frame-border);
+  border-radius: .5rem;
+  padding: .5rem 2rem .5rem .75rem;
+  appearance: none;
+  background-image:
+    url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' fill='%23d4af37' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.5 7.5l4.5 4.5 4.5-4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right .75rem center;
+  background-size: 16px 16px;
+}
+.ssf-field input[type="text"].ssf-input:focus,
+.ssf-field input[type="number"].ssf-input:focus,
+.ssf-field select.ssf-input:focus{
+  outline: none;
+  border-color: oklch(var(--p));
+  box-shadow: 0 0 0 3px color-mix(in oklab, oklch(var(--p)) 26%, transparent), inset 0 1px 0 rgba(255,255,255,.08);
+}
+
+/* Dark theme tuning */
+:root[data-theme="lownDark"] .ssf-label .req-badge{
+  background: color-mix(in oklab, oklch(var(--b2)) 84%, black 16%);
+  border-color: color-mix(in oklab, oklch(var(--b3)) 62%, #fff 26%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.04),
+    0 0 0 1px color-mix(in oklab, oklch(var(--b3)) 48%, transparent);
+}

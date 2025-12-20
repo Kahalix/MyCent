@@ -1,0 +1,312 @@
+<meta name="stripe-pk" content="{{ STRIPE_PUBLISHABLE_KEY|default_if_none:'' }}" hx-head="true">
+<section class="max-w-3xl mx-auto" data-protected>
+  <h1 class="text-2xl font-semibold mb-4">Płatność</h1>
+
+  <div
+    x-data="app.payPage({
+      txPublicId: '{{ tx_public_id|default:'' }}'
+    })"
+    x-init="init()"
+  >
+    <template x-if="loading">
+      <div class="h-24 rounded-lg border animate-pulse bg-base-300/40"></div>
+    </template>
+
+    <template x-if="err"><div class="alert alert-error my-3 whitespace-pre-line" x-text="err"></div></template>
+    <template x-if="ok"><div class="alert alert-success my-3" x-text="ok"></div></template>
+
+    <template x-if="!loading && !txId && !err">
+      <div class="text-sm opacity-70">Brak aktywnej transakcji do opłacenia.</div>
+    </template>
+
+    <div x-show="isDone" x-cloak class="p-6 rounded-lg border elevated-panel my-4">
+      <div class="flex items-start gap-3">
+        <div :class="isSuccess ? 'text-success' : 'text-error'">
+          <svg x-show="isSuccess" x-cloak width="28" height="28" viewBox="0 0 24 24" fill="none"
+               xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M9 12l2 2 4-4M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+          <svg x-show="!isSuccess" x-cloak width="28" height="28" viewBox="0 0 24 24" fill="none"
+               xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zm-3.5-6.5l7-7m0 7l-7-7"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </div>
+
+        <div class="flex-1">
+          <div class="text-xl font-semibold" x-text="isSuccess ? 'Płatność zakończona powodzeniem' : 'Płatność nie powiodła się'"></div>
+          <div class="text-sm opacity-70 mt-1">
+            Transakcja: <span class="font-mono" x-text="txId"></span>
+            • Status płatności: <span class="font-medium" x-text="labelPaymentStatus(payment?.status)"></span>
+          </div>
+
+          <div class="mt-3" x-show="isSuccess && awardedPoints > 0" x-cloak>
+            <div class="alert alert-success py-2">
+              Zdobyte punkty lojalnościowe: <span class="font-semibold" x-text="awardedPoints"></span>
+            </div>
+          </div>
+
+          <div class="mt-4 flex flex-wrap gap-2">
+              <a class="btn btn-primary btn-gold"
+                 href="/orders"
+                 hx-boost="true" hx-target="#app-root" hx-push-url="true">
+                Wróć do moich zamówień
+              </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div x-show="txId && !isDone" x-cloak class="space-y-6">
+      <div class="p-4 rounded-lg border elevated-panel">
+        <div class="flex items-baseline justify-between">
+          <div>
+            <div class="text-sm opacity-70">Transakcja</div>
+            <div class="font-mono text-sm" x-text="txId"></div>
+            <div class="text-xs opacity-70 mt-1">
+              Typ: <span class="font-medium" x-text="labelTxType(tx?.type)"></span>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-sm opacity-70">Do zapłaty</div>
+            <div class="text-xl font-semibold" x-text="amountStr"></div>
+          </div>
+        </div>
+        <div class="text-xs opacity-70 mt-2">
+          Status transakcji: <span class="font-medium" x-text="labelTxStatus(tx?.status)"></span>
+        </div>
+        <template x-if="couponApplied && isPurchase">
+          <div class="mt-2 alert alert-info py-2">
+            Zastosowano kupon do tej transakcji.
+            <button class="btn btn-xs ml-auto" type="button" @click="removeCoupon()">Usuń kupon</button>
+          </div>
+        </template>
+      </div>
+
+      <div class="p-4 rounded-lg border elevated-panel" x-show="ordersLoading || orders.length || ordersErr" x-cloak>
+        <div class="flex items-center gap-2 mb-2">
+          <div class="font-medium">Zamówienia w tej transakcji</div>
+          <span class="badge badge-ghost badge-sm" x-show="orders.length" x-text="orders.length + ' szt.'"></span>
+          <span class="ml-auto text-xs opacity-70" x-show="ordersLoading">Ładowanie zamówień…</span>
+        </div>
+
+        <template x-if="ordersErr">
+          <div class="alert alert-error text-sm mb-2" x-text="ordersErr"></div>
+        </template>
+
+        <div class="space-y-2" x-show="orders.length">
+          <template x-for="ord in orders" :key="ord.public_id">
+            <div class="list-row p-3 rounded border">
+              <div class="flex items-start gap-3">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <div class="font-medium truncate" x-text="ord.order_name || 'Zamówienie'"></div>
+                    <span class="badge badge-xs"
+                          :class="{
+                            'badge-success': ord.order_status==='COMPLETED',
+                            'badge-warning': ord.order_status==='PENDING',
+                            'badge-error'  : ord.order_status==='CANCELLED',
+                            'badge-info'   : ord.order_status==='REFUNDED'
+                          }"
+                          x-text="labelOrderStatus(ord.order_status)"></span>
+                  </div>
+                  <div class="text-xs opacity-70 mt-1">
+                    Data: <span x-text="ord.purchase_date || '—'"></span>
+                    · Pozycje: <span x-text="app.moneyText(ord.items_total)"></span>
+                    · Wysyłka: <span x-text="app.moneyText(ord.shipping_total)"></span>
+                    · Razem: <b x-text="app.moneyText(ord.purchase_cost)"></b>
+                  </div>
+                </div>
+                <div class="flex flex-col items-end gap-1">
+                  <a class="btn btn-ghost btn-xs"
+                     :href="'/orders/' + ord.public_id"
+                     hx-boost="true" hx-target="#app-root" hx-push-url="true">
+                    Otwórz zamówienie
+                  </a>
+                  <button class="btn btn-ghost btn-xs"
+                          type="button"
+                          @click="toggleOrder(ord.public_id)">
+                    <span x-text="isOrderExpanded(ord.public_id) ? 'Ukryj pozycje' : 'Pokaż pozycje'"></span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="mt-3 space-y-2" x-show="isOrderExpanded(ord.public_id)">
+                <template x-for="ln in ord.order_lines" :key="ln.public_id">
+                  <div class="flex items-start gap-3">
+                    <div class="cm-thumb-80">
+                      <img :src="app.imgUrl(ln.item?.cover_image_url || (ln.item?.images?.[0]?.image_path || ''))" alt="">
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium truncate"
+                           x-text="ln.item?.set_name || ln.item_snapshot?.set_name || ln.item_snapshot?.title || 'Pozycja'"></div>
+                      <div class="text-xs opacity-70">
+                        Ilość: <span x-text="ln.quantity"></span>
+                        · Cena jedn.: <b x-text="app.moneyText(ln.unit_price)"></b>
+                        · Razem: <b x-text="app.moneyText(ln.line_total)"></b>
+                      </div>
+                      <div class="text-xs opacity-70 mt-1">
+                        Wysyłka:
+                        <span x-text="shippingLabel(ord, ln)"></span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <p class="text-xs opacity-60 mt-2" x-show="!ordersLoading && !ordersErr && orders.length===0">
+          Brak zamówień powiązanych z tą transakcją.
+        </p>
+      </div>
+
+      <div class="p-4 rounded-lg border elevated-panel space-y-3" x-show="isPurchase" x-cloak>
+        <div class="grid md:grid-cols-2 gap-3">
+          <label class="form-control">
+            <span class="label-text">Kod kuponu</span>
+            <div class="join">
+              <input type="text" class="input input-bordered input-sm join-item fancy-area"
+                     x-model="couponCode" placeholder="np. WIOSNA10">
+              <button class="btn btn-sm btn-primary join-item"
+                      :disabled="!couponCode || couponApplied"
+                      @click="applyCoupon()">Zastosuj kupon</button>
+            </div>
+            <p class="text-xs opacity-70 mt-1">Podaj kod i kliknij „Zastosuj kupon”.</p>
+          </label>
+
+          <label class="form-control">
+            <span class="label-text">Moje kupony</span>
+            <div class="join">
+              <select class="select select-bordered select-sm join-item fancy-select"
+                      x-model="selectedUserCouponId"
+                      :disabled="couponsLoading || couponApplied">
+                <option value="">— wybierz kupon —</option>
+                <template x-for="uc in coupons" :key="uc.public_id">
+                  <option :value="uc.public_id" x-text="labelForUserCoupon(uc)"></option>
+                </template>
+              </select>
+              <button class="btn btn-sm btn-primary join-item"
+                      :disabled="!selectedUserCouponId || couponApplied"
+                      @click="applyCoupon()">Zastosuj kupon</button>
+            </div>
+            <p class="text-xs opacity-70 mt-1" x-show="couponsLoading">Ładowanie kuponów…</p>
+            <p class="text-xs opacity-70 mt-1" x-show="!couponsLoading && coupons.length===0">
+              Brak dostępnych kuponów dla tej transakcji.
+            </p>
+          </label>
+        </div>
+
+        <div class="text-xs opacity-70" x-show="isPurchase">
+          Najpierw zastosuj kupon (kod lub z listy), a potem utwórz płatność.
+        </div>
+      </div>
+
+      <div class="p-4 rounded-lg border elevated-panel space-y-3">
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-primary btn-gold"
+                  :disabled="creating || !txId"
+                  @click="createIntent()
+"
+                  x-text="creating ? 'Tworzenie…' : 'Utwórz płatność'"></button>
+
+          <a class="btn btn-ghost"
+               href="/orders"
+               hx-boost="true" hx-target="#app-root" hx-push-url="true">
+              Wróć do moich zamówień
+          </a>
+        </div>
+        <p class="text-xs opacity-70">
+          Domyślnie Stripe. Gdy brak klucza Stripe – użyjemy trybu symulacji.
+        </p>
+      </div>
+
+      <template x-if="payment && payment.provider==='STRIPE'">
+        <div class="p-4 rounded-lg border elevated-panel space-y-2">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm opacity-70">Płatność (<span x-text="labelProvider(payment.provider)"></span>)</div>
+              <div class="font-mono text-sm" x-text="payment.public_id"></div>
+            </div>
+            <div class="text-right">
+              <div class="text-sm opacity-70">Status</div>
+              <div class="badge" :class="badgeForPayment(payment.status)" x-text="labelPaymentStatus(payment.status)"></div>
+            </div>
+          </div>
+
+          <template x-if="stripeErr">
+              <div class="alert alert-error mt-2 flex items-start gap-2">
+                <div class="flex-1" x-text="stripeErr"></div>
+                <button class="btn btn-xs btn-primary" type="button" @click="refreshIntent()">Odśwież płatność</button>
+              </div>
+            </template>
+
+          <div class="mt-3 space-y-3">
+            <div class="stripe-frame" id="payment-element"></div>
+            <div class="flex gap-2">
+              <button class="btn btn-success"
+                      :disabled="confirming || payment.status==='SUCCEEDED'"
+                      @click="confirmStripe()"
+                      x-text="confirming ? 'Potwierdzanie…' : 'Zapłać'"></button>
+
+              <button class="btn btn-ghost"
+                      :disabled="confirming || payment.status==='SUCCEEDED' || payment.status==='FAILED'"
+                      @click="cancel()">Anuluj</button>
+            </div>
+            <p class="text-xs opacity-70">Karta testowa: <span class="font-mono">4242 4242 4242 4242</span> (dowolna data/CVC).</p>
+          </div>
+
+          <details class="mt-2">
+            <summary class="cursor-pointer text-sm opacity-70">Szczegóły (debug)</summary>
+            <div class="mt-2 text-xs font-mono whitespace-pre-wrap">
+              Dostawca: <span x-text="labelProvider(payment.provider)"></span><br>
+              provider_payment_id: <span x-text="payment.provider_payment_id || '—'"></span><br>
+              client_secret: <span x-text="payment.client_secret || '—'"></span>
+            </div>
+          </details>
+        </div>
+      </template>
+
+      <template x-if="payment && payment.provider==='SIM'">
+        <div class="p-4 rounded-lg border elevated-panel space-y-2">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm opacity-70">Płatność (<span x-text="labelProvider(payment.provider)"></span>)</div>
+              <div class="font-mono text-sm" x-text="payment.public_id"></div>
+            </div>
+            <div class="text-right">
+              <div class="text-sm opacity-70">Status</div>
+              <div class="badge" :class="badgeForPayment(payment.status)" x-text="labelPaymentStatus(payment.status)"></div>
+            </div>
+          </div>
+
+          <details class="mt-2">
+            <summary class="cursor-pointer text-sm opacity-70">Szczegóły (debug)</summary>
+            <div class="mt-2 text-xs font-mono whitespace-pre-wrap">
+              Dostawca: <span x-text="labelProvider(payment.provider)"></span><br>
+              provider_payment_id: <span x-text="payment.provider_payment_id || '—'"></span><br>
+              client_secret: <span x-text="payment.client_secret || '—'"></span>
+            </div>
+          </details>
+
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button class="btn btn-success"
+                    :disabled="confirming || payment.status==='SUCCEEDED'"
+                    @click="confirm('success')"
+                    x-text="confirming ? 'Potwierdzanie…' : 'Zapłać (symulacja sukcesu)'"></button>
+
+            <button class="btn btn-outline"
+                    :disabled="confirming || payment.status==='SUCCEEDED' || payment.status==='FAILED'"
+                    @click="confirm('fail')">Symuluj niepowodzenie</button>
+
+            <button class="btn btn-ghost"
+                    :disabled="confirming || payment.status==='SUCCEEDED' || payment.status==='FAILED'"
+                    @click="cancel()">Anuluj</button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+</section>

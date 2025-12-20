@@ -1,0 +1,89 @@
+<section
+  x-data="app.chatThread({ threadId: '{{ thread_public_id }}' })"
+  x-init="() => { init(); return () => destroy(); }"
+  class="mx-auto max-w-4xl px-3 md:px-0"
+  hx-boost="false"
+  hx-disinherit="hx-boost hx-target hx-swap hx-push-url"
+>
+  <meta name="description"
+        content="Wątek czatu o {{ item.set_name }}"
+        hx-swap-oob="true">
+
+  <!-- pasek ogłoszenia -->
+  <div class="cm-itembar mb-3" x-show="thread">
+    <div class="thumb"><img :src="itemImg()" alt=""></div>
+    <div class="meta">
+      <div class="title" x-text="thread?.item?.set_name || 'Ogłoszenie'"></div>
+      <div class="sub">
+        <span x-text="partyName()"></span>
+        <template x-if="thread?.item?.type?.path">
+          <span> · <span x-text="thread.item.type.path"></span></span>
+        </template>
+      </div>
+    </div>
+    <div class="price" x-text="itemPrice()"></div>
+    <div class="actions">
+      <a class="cm-btn"
+         :href="thread?.item?.slug ? `/i/${thread.item.slug}` : '#'"
+         hx-boost="true" hx-target="#app-root" hx-push-url="true">Szczegóły</a>
+      <template x-if="thread?.item?.seller_slug">
+        <a class="cm-btn" :href="`/shop/${encodeURIComponent(thread.item.seller_slug)}`">Sklep</a>
+      </template>
+    </div>
+  </div>
+
+  <!-- top bar rozmowy -->
+  <div class="mb-2 flex items-center gap-2">
+    <a class="cm-btn" href="/chat" hx-boost="true" hx-target="#app-root" hx-push-url="true">← Wątki</a>
+    <div class="cm-h1 truncate" x-text="partyName()"></div>
+    <span class="ml-auto text-xs cm-muted" x-show="typingOthers.size">ktoś pisze…</span>
+  </div>
+
+  <!-- okno rozmowy -->
+  <div class="cm-card p-3 h-[70vh] flex flex-col relative">
+    <div x-ref="scroller"
+         class="flex-1 overflow-y-auto cm-soft-scroll"
+         @scroll.passive="onScroll">
+      <template x-for="(m, i) in messages" :key="m.public_id">
+        <div class="mb-1.5">
+          <div class="cm-msgline"
+               :class="[{ 'cm-msgline--me': m.mine, 'is-same': sameAsPrev(i) }]">
+            <template x-if="!sameAsPrev(i)">
+              <div class="cm-avatar"><img :src="avatarFor(m)" alt=""></div>
+            </template>
+            <div class="cm-bubble" :class="m.mine ? 'cm-bubble--me' : 'cm-bubble--them'">
+              <div class="whitespace-pre-wrap break-words" x-text="m.content"></div>
+            </div>
+          </div>
+          <template x-if="(i===messages.length-1) || (messages[i+1]?.sender_pid !== m.sender_pid)">
+            <div class="cm-time" :class="m.mine ? 'text-right pr-10' : 'text-left pl-10'" x-text="dt(m.sent_at)"></div>
+          </template>
+        </div>
+      </template>
+      <div x-ref="bottom"></div>
+    </div>
+
+    <!-- pływający dymek z licznikiem nowych -->
+    <div x-show="newCount>0 && !isNearBottom"
+         x-transition.opacity
+         class="pointer-events-auto absolute left-1/2 -translate-x-1/2 bottom-16"
+         style="z-index:5">
+      <button class="cm-btn" @click="scrollBottom(); newCount=0">
+        <span x-text="`Nowa wiadomość${newCount>1? ' ('+newCount+')':''} ⬇`"></span>
+      </button>
+    </div>
+
+    <form class="mt-2 flex items-end gap-2"
+          hx-boost="false" hx-disable
+          @submit.stop.prevent="send()" novalidate>
+      <textarea class="cm-input"
+                placeholder="Napisz wiadomość…"
+                x-model="input"
+                @input="onTyping"></textarea>
+      <button type="submit"
+              class="cm-btn cm-btn--primary"
+              :disabled="sending || !trimmed()"
+              x-text="sending ? '...' : 'Wyślij'"></button>
+    </form>
+  </div>
+</section>

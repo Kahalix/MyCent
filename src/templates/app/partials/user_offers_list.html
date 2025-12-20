@@ -1,0 +1,190 @@
+<section
+  x-data="app.userOffersList()"
+  x-init="init()"
+  x-effect="() => { return () => destroy() }"
+  data-protected
+>
+  <!-- Toolbar (spójny układ) -->
+  <div class="mb-3 space-y-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <!-- Szukaj -->
+      <div class="join w-full sm:w-auto">
+        <input
+          class="input input-bordered join-item w-full sm:w-64"
+          placeholder="Szukaj…"
+          x-model="q"
+          @input="onSearchInput"
+          aria-label="Szukaj w ogłoszeniach"
+        >
+        <button class="btn join-item" @click="reload()">Szukaj</button>
+      </div>
+
+      <!-- Sortowanie -->
+      <div class="relative">
+        <label for="user-offers-ordering" class="sr-only">Sortowanie</label>
+        <select
+          id="user-offers-ordering"
+          class="select select-bordered select-sm fancy-select"
+          x-model="ordering"
+          @change="reload()"
+          aria-label="Sortowanie ogłoszeń"
+        >
+          <option value="-created_at">Najnowsze</option>
+          <option value="created_at">Najstarsze</option>
+          <option value="set_name">A–Z</option>
+          <option value="-set_name">Z–A</option>
+        </select>
+      </div>
+
+      <!-- Statusy: dropdown (identyczny skin) -->
+      <div
+        class="relative"
+        x-data="{
+          open:false,
+          pos:{top:0,left:0,width:320},
+          place(){
+            const btn = $refs.btn;
+            if(!btn) return;
+            const r = btn.getBoundingClientRect();
+            const gutter = 8;
+            const maxW = Math.min(window.innerWidth - gutter*2, 320);
+            const left  = Math.min(Math.max(gutter, r.left + window.scrollX), window.innerWidth - gutter - maxW);
+            const top   = r.bottom + window.scrollY + 8;
+            this.pos = { top, left, width: maxW };
+          }
+        }"
+        @keydown.escape.window="open=false"
+        @resize.window="open && place()"
+        @scroll.window.passive="open && place()"
+      >
+        <button
+          type="button"
+          class="btn btn-sm btn-filter"
+          x-ref="btn"
+          @click="open = !open; if(open) $nextTick(() => place())"
+          :aria-expanded="open"
+          aria-controls="user-status-dd"
+        >
+          Statusy
+          <span class="badge ml-2 btn-filter__badge" x-text="statusSel.size || 'Wszystkie'"></span>
+        </button>
+
+        <!-- Panel teleportowany poza układ -->
+        <template x-teleport=".overlay-root">
+          <div
+            id="user-status-dd"
+            x-show="open"
+            x-transition.opacity
+            @click.outside="open=false"
+            class="fixed z-[1000] dropdown-panel shadow-xl"
+            :style="`top:${pos.top}px;left:${pos.left}px;width:${pos.width}px`"
+          >
+            <div class="p-3 pb-2 border-b dropdown-panel__section flex items-center justify-between">
+              <div class="text-sm font-medium">Filtruj statusy</div>
+              <div class="flex items-center gap-1">
+                <button class="btn btn-xs btn-ghost" @click="markAllStatuses()">Zaznacz wszystkie</button>
+                <button class="btn btn-xs btn-ghost" @click="clearStatuses()">Wyczyść</button>
+              </div>
+            </div>
+
+            <div class="max-h-56 overflow-auto dd-list">
+              <template x-for="s in statusesAll" :key="s.code">
+                <label class="dd-item">
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-sm dd-check"
+                    :checked="statusSel.has(s.code)"
+                    @change="statusSel.has(s.code) ? statusSel.delete(s.code) : statusSel.add(s.code)"
+                  >
+                  <span class="text-sm" x-text="s.label"></span>
+                </label>
+              </template>
+            </div>
+
+            <div class="p-3 pt-2 border-t dropdown-panel__section flex items-center gap-2">
+              <button class="btn btn-sm btn-primary btn-gold" @click="reload(); open=false">Zastosuj</button>
+              <button class="btn btn-sm btn-ghost" @click="open=false">Anuluj</button>
+              <span class="text-xs opacity-70 ml-auto" x-text="statusSel.size ? ('Wybrano: ' + statusSel.size) : 'Wszystkie'"></span>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- CTA -->
+      <button class="btn btn-primary btn-gold ml-auto" @click="gotoNew()">+ Dodaj ogłoszenie</button>
+    </div>
+  </div>
+
+  <!-- Skeleton (mikro-odstępy) -->
+  <template x-if="loading && !items.length">
+    <div class="space-y-1">
+      <template x-for="i in 4" :key="i">
+        <div class="p-3 rounded-lg border list-row flex items-start gap-3 animate-pulse overflow-hidden">
+          <div class="list-thumb rounded bg-base-300"></div>
+          <div class="grow min-w-0">
+            <div class="h-4 w-2/3 rounded bg-base-300 mb-2"></div>
+            <div class="h-3 w-1/3 rounded bg-base-300"></div>
+          </div>
+          <div class="w-20 h-7 rounded bg-base-300"></div>
+        </div>
+      </template>
+    </div>
+  </template>
+
+  <template x-if="err">
+    <div class="alert alert-error whitespace-pre-line mt-2" x-text="err"></div>
+  </template>
+
+  <!-- Lista (mikro-odstępy + prawa „szyna” akcji) -->
+  <div class="space-y-1" x-show="!loading && items.length">
+    <template x-for="it in items" :key="it.public_id || it.id">
+      <div class="p-3 rounded-lg border list-row flex items-start gap-3">
+        <img :src="img(it)" alt="" class="list-thumb object-cover rounded border">
+        <div class="grow min-w-0">
+          <div class="font-medium truncate" x-text="it.set_name || '(bez nazwy)'"></div>
+          <div class="text-sm opacity-70">
+            <span x-text="priceText(it)"></span>
+            · <span x-text="it.type?.path || '—'"></span>
+          </div>
+          <div class="mt-0.5 text-xs">
+            <span class="badge badge-ghost" x-text="statusLabel(it.status)"></span>
+            <template x-if="it.catalog_item?.item_name">
+              <span class="badge badge-ghost ml-1" x-text="it.catalog_item.item_name"></span>
+            </template>
+          </div>
+        </div>
+
+        <div class="list-actions gap-2">
+          <!-- Akcje statusu -->
+          <template x-if="it.status === 'AVAILABLE'">
+            <div class="flex gap-2">
+              <button class="btn btn-xs btn-outline" @click="reserve(it)">Zarezerwuj</button>
+              <button class="btn btn-xs btn-outline" @click="end(it)">Zakończ</button>
+            </div>
+          </template>
+          <template x-if="it.status === 'RESERVED'">
+            <div class="flex gap-2">
+              <button class="btn btn-xs btn-outline" @click="resume(it)">Odrezerwuj</button>
+              <button class="btn btn-xs btn-outline" @click="end(it)">Zakończ</button>
+            </div>
+          </template>
+          <template x-if="it.status === 'CLOSED' || it.status === 'SUSPENDED' || it.status === 'EXPIRED'">
+            <button class="btn btn-xs btn-outline" @click="resume(it)">Wznów</button>
+          </template>
+
+          <button class="btn btn-xs" @click="gotoEdit(it.public_id || it.id)">Edytuj</button>
+          <button class="btn btn-xs btn-outline btn-error" @click="deleteItem(it)">Usuń</button>
+        </div>
+      </div>
+    </template>
+
+    <div class="pt-2 flex justify-center" x-show="next">
+      <button class="btn btn-outline btn-sm" @click="more()">Pokaż więcej</button>
+    </div>
+    <div x-ref="sentinel" class="h-2"></div>
+  </div>
+
+  <template x-if="!loading && !items.length && !err">
+    <div class="text-sm opacity-70">Brak ogłoszeń. Kliknij „Dodaj ogłoszenie”.</div>
+  </template>
+</section>

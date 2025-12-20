@@ -1,0 +1,275 @@
+<section class="max-w-5xl mx-auto" data-protected>
+  <div x-data="app.buyerOrderDetail('{{ order_public_id }}')" x-init="init()">
+
+    <!-- Pasek tytułowy -->
+    <div class="flex items-center gap-2 mb-4">
+      <a class="btn btn-ghost" href="/orders" hx-boost="true" hx-target="#app-root" hx-push-url="true">← Wróć</a>
+      <h1 class="text-2xl font-semibold">Zamówienie</h1>
+      <span class="ml-auto text-xs">ID: <span class="font-mono" x-text="order?.public_id || '—'"></span></span>
+    </div>
+
+    <!-- Skeleton / błąd -->
+    <template x-if="loading"><div class="h-28 rounded-lg elevated-panel animate-pulse"></div></template>
+    <template x-if="err"><div class="alert alert-error my-3" x-text="err"></div></template>
+
+    <template x-if="order">
+      <div class="space-y-6">
+
+        <!-- Podsumowanie (gold) -->
+        <div class="gold-panel">
+          <div class="card-body grid md:grid-cols-3 gap-3">
+            <!-- Kolumna A: status + daty -->
+            <div class="md:col-span-2 space-y-2">
+              <div class="flex items-start gap-2 flex-wrap">
+                <div class="text-sm opacity-70">Status</div>
+                <div class="ml-2 badge"
+                     :class="{
+                       'badge-success': order?.order_status==='COMPLETED',
+                       'badge-warning': order?.order_status==='PENDING',
+                       'badge-error'  : order?.order_status==='CANCELLED',
+                       'badge-info'   : order?.order_status==='SHIPPED' || order?.order_status==='DELIVERED'
+                     }"
+                     x-text="tOrderStatus(order?.order_status) || '—'"></div>
+              </div>
+
+              <div class="grid sm:grid-cols-3 gap-2">
+                <div>
+                  <div class="text-xs opacity-70">Data zakupu</div>
+                  <div class="font-medium" x-text="order.purchase_date || '—'"></div>
+                </div>
+                <div>
+                  <div class="text-xs opacity-70">Pozycje</div>
+                  <div class="font-medium" x-text="app.moneyText(order.items_total)"></div>
+                </div>
+                <div>
+                  <div class="text-xs opacity-70">Wysyłka</div>
+                  <div class="font-medium" x-text="app.moneyText(order.shipping_total)"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Kolumna B: suma -->
+            <div class="space-y-2 md:text-right">
+              <div class="text-sm opacity-70">Razem</div>
+              <div class="text-2xl font-semibold" x-text="app.moneyText(order.purchase_cost)"></div>
+
+              <div class="pt-1" x-show="order?.order_status==='PENDING'">
+                  <a class="btn btn-primary btn-gold"
+                     :href="order?.transaction_public_id ? ('/pay/' + order.transaction_public_id) : '/pay'"
+                     hx-boost="true" hx-target="#app-root" hx-push-url="true"
+                     :class="{ 'loading': payBusy }"
+                     @click.prevent.stop="onPayClick">
+                    Przejdź do płatności
+                  </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pozycje -->
+        <div class="elevated-panel p-4">
+          <div class="font-medium mb-2">Pozycje</div>
+
+          <div class="space-y-2">
+            <template x-for="ln in order.order_lines" :key="ln.public_id">
+              <div class="list-row p-3">
+                <div class="flex items-start gap-3">
+                  <div class="cm-thumb-80">
+                    <img :src="app.imgUrl(ln.item?.cover_image_url || ln.item?.images?.[0]?.image_path || '')" alt="">
+                  </div>
+
+                  <div class="min-w-0 flex-1">
+                    <div class="font-medium truncate" x-text="ln.item?.set_name || ln.item_snapshot?.set_name || 'Pozycja'"></div>
+                    <div class="text-xs opacity-70">
+                      Ilość: <span x-text="ln.quantity"></span>
+                      · Cena jedn.: <b x-text="app.moneyText(ln.unit_price)"></b>
+                      · Razem: <b x-text="app.moneyText(ln.line_total)"></b>
+                    </div>
+
+                    <!-- Badge z atrybutów (etykieta + wartość, tylko z ui_schema.badges/tags) -->
+                    <div class="attr-badges mt-1" x-show="attrBadgesFor(ln).length">
+                      <template x-for="b in attrBadgesFor(ln)" :key="b.text + uiNonce">
+                        <span class="badge"
+                              :class="{
+                                'badge-success': b.tone==='success',
+                                'badge-info'   : b.tone==='info',
+                                'badge-warning': b.tone==='warning',
+                                'badge-error'  : b.tone==='error',
+                                'badge-ghost'  : !['success','info','warning','error'].includes(b.tone)
+                              }"
+                              x-text="b.text"></span>
+                      </template>
+                    </div>
+
+                    <!-- Pigułki atrybutów (pełna lista) -->
+                    <div class="attr-pills" x-show="attrPairsFor(ln).length">
+                      <template x-for="pair in attrPairsFor(ln).slice(0,10)" :key="pair[0] + uiNonce">
+                        <span class="attr-pill" :title="pair[0] + ': ' + String(pair[1])">
+                          <span class="k" x-text="pair[0] + ':'"></span>
+                          <span class="v" x-text="pair[1]"></span>
+                        </span>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- Blok wysyłki -->
+                  <div class="text-right min-w-[220px]">
+                    <div class="text-sm opacity-70">Wysyłka</div>
+                    <div x-text="shippingByLine[ln.public_id]
+                        ? (shippingByLine[ln.public_id].package_label && shippingByLine[ln.public_id].package_label !== 'PICKUP'
+                            ? (shippingByLine[ln.public_id].package_label + ' • ' + app.moneyText(shippingByLine[ln.public_id].price))
+                            : 'Odbiór osobisty')
+                        : '—'"></div>
+
+                    <button class="btn btn-ghost btn-xs mt-1" @click="toggle(ln.public_id)">
+                      <span x-text="isExpanded(ln.public_id) ? 'Ukryj' : 'Szczegóły'"></span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Szczegóły + wybór wysyłki -->
+                <div class="mt-3" x-show="isExpanded(ln.public_id)">
+                  <!-- Opcje wysyłki -->
+                  <div class="space-y-2">
+                    <template x-if="(optionsByLine[ln.public_id]||[]).length===1 && (optionsByLine[ln.public_id][0]?.pickup===true)">
+                      <div class="alert alert-info text-sm">
+                        Ten przedmiot nie ma skonfigurowanych metod wysyłki — dostępny jest wyłącznie
+                        <strong>odbiór osobisty</strong>.
+                      </div>
+                    </template>
+
+                    <template x-for="opt in (optionsByLine[ln.public_id]||[])" :key="opt.pickup ? 'PICKUP' : (opt.typePublicId||'x')">
+                      <label class="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          class="radio radio-sm"
+                          type="radio"
+                          :name="'ship-'+ln.public_id"
+                          :value="opt.pickup ? 'PICKUP' : opt.typePublicId"
+                          :checked="isSelected(ln.public_id, opt)"
+                          :disabled="!canEditShipping() || !!lineBusy[ln.public_id]"
+                          @change="onRadioChange(ln.public_id, $event)"
+                        >
+                        <span x-text="opt.label"></span>
+                      </label>
+                    </template>
+
+                    <div>
+                      <button class="btn btn-primary btn-sm btn-gold"
+                              :disabled="!canEditShipping() || !!lineBusy[ln.public_id]"
+                              :class="{'loading': !!lineBusy[ln.public_id]}"
+                              @click="choose(ln.public_id)">
+                        Zapisz dla tej pozycji
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Dodatkowe metryki -->
+                  <div class="mt-3 p-3 rounded bg-base-200/50 border">
+                    <div class="grid md:grid-cols-3 gap-3 text-sm">
+                      <div>
+                        <div class="font-medium">Pozycja</div>
+                        <div>ID linii: <span class="font-mono" x-text="ln.public_id"></span></div>
+                        <div>Kategoria: <span x-text="ln.item_snapshot?.type_path || '—'"></span></div>
+                      </div>
+                      <div>
+                        <div class="font-medium">Parametry</div>
+                        <div>Wymiary:
+                          <span x-text="[ln.item_snapshot?.length_cm, ln.item_snapshot?.width_cm, ln.item_snapshot?.height_cm].filter(x=>x!=null).join('×') || '—'"></span>
+                        </div>
+                        <div>Waga: <span x-text="ln.item_snapshot?.weight_kg || '—'"></span> kg</div>
+                      </div>
+                      <div>
+                        <div class="font-medium">Wysyłka</div>
+                        <div>Etykieta: <span x-text="shippingByLine[ln.public_id]?.package_label || '—'"></span></div>
+                        <div>Cena: <span x-text="app.moneyText(shippingByLine[ln.public_id]?.price)"></span></div>
+                        <div x-show="shippingByLine[ln.public_id]?.shipping_status">Status:
+                          <span x-text="tShippingStatus(shippingByLine[ln.public_id]?.shipping_status)"></span>
+                        </div>
+                        <div x-show="shippingByLine[ln.public_id]?.tracking_number">Tracking:
+                          <span x-text="shippingByLine[ln.public_id]?.tracking_number"></span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- /szczegóły -->
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Adres wysyłki (gdy potrzebny) -->
+        <div class="elevated-panel p-4" x-show="needAddress()">
+          <div class="panel-head">
+            <div class="font-medium">Adres dostawy</div>
+            <span class="text-xs opacity-70">Wymagany, gdy co najmniej jedna pozycja idzie paczką.</span>
+            <button class="btn btn-ghost btn-sm ml-auto" @click="useDefaultAddress()">Użyj domyślnego adresu</button>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label class="form-control" id="addr-first_name">
+              <span class="label-text">Imię</span>
+              <input class="input input-bordered" x-model="orderAddress.first_name">
+              <p class="text-xs text-error mt-1" x-show="addrErr.first_name" x-text="addrErr.first_name"></p>
+            </label>
+            <label class="form-control" id="addr-last_name">
+              <span class="label-text">Nazwisko</span>
+              <input class="input input-bordered" x-model="orderAddress.last_name">
+              <p class="text-xs text-error mt-1" x-show="addrErr.last_name" x-text="addrErr.last_name"></p>
+            </label>
+            <label class="form-control" id="addr-phone_number">
+              <span class="label-text">Telefon</span>
+              <input class="input input-bordered" x-model="orderAddress.phone_number">
+              <p class="text-xs text-error mt-1" x-show="addrErr.phone_number" x-text="addrErr.phone_number"></p>
+            </label>
+            <label class="form-control" id="addr-email">
+              <span class="label-text">E-mail</span>
+              <input class="input input-bordered" x-model="orderAddress.email">
+              <p class="text-xs text-error mt-1" x-show="addrErr.email" x-text="addrErr.email"></p>
+            </label>
+            <label class="form-control" id="addr-street">
+              <span class="label-text">Ulica</span>
+              <input class="input input-bordered" x-model="orderAddress.street">
+              <p class="text-xs text-error mt-1" x-show="addrErr.street" x-text="addrErr.street"></p>
+            </label>
+            <label class="form-control" id="addr-house_number">
+              <span class="label-text">Nr domu / lokalu</span>
+              <input class="input input-bordered" x-model="orderAddress.house_number">
+              <p class="text-xs text-error mt-1" x-show="addrErr.house_number" x-text="addrErr.house_number"></p>
+            </label>
+            <label class="form-control" id="addr-city">
+              <span class="label-text">Miasto</span>
+              <input class="input input-bordered" x-model="orderAddress.city">
+              <p class="text-xs text-error mt-1" x-show="addrErr.city" x-text="addrErr.city"></p>
+            </label>
+            <label class="form-control" id="addr-state">
+              <span class="label-text">Województwo</span>
+              <input class="input input-bordered" x-model="orderAddress.state">
+              <p class="text-xs text-error mt-1" x-show="addrErr.state" x-text="addrErr.state"></p>
+            </label>
+            <label class="form-control" id="addr-postal_code">
+              <span class="label-text">Kod pocztowy</span>
+              <input class="input input-bordered" x-model="orderAddress.postal_code">
+              <p class="text-xs text-error mt-1" x-show="addrErr.postal_code" x-text="addrErr.postal_code"></p>
+            </label>
+            <label class="form-control" id="addr-country">
+              <span class="label-text">Kraj</span>
+              <input class="input input-bordered" x-model="orderAddress.country">
+              <p class="text-xs text-error mt-1" x-show="addrErr.country" x-text="addrErr.country"></p>
+            </label>
+          </div>
+
+          <div class="mt-3 flex items-center gap-3">
+            <button class="btn btn-primary btn-gold"
+                    :class="{'loading': savingAddr}"
+                    :disabled="savingAddr"
+                    @click="saveOrderAddress()">
+              Zapisz adres dla zamówienia
+            </button>
+            <div class="text-success text-sm" x-text="addrMsg"></div>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+</section>

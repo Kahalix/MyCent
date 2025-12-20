@@ -1,0 +1,126 @@
+<section class="max-w-6xl mx-auto">
+  <!-- Nagłówek użytkownika -->
+  <div
+    class="mb-4 p-3 rounded-xl"
+    x-data="app.userPublic({ userId: '{{ user_public_id }}' })"
+    x-init="init()"
+  >
+    <div class="flex items-center gap-3">
+      <img
+        :src="avatar()"
+        alt="Avatar użytkownika"
+        class="user-menu__avatar rounded-full w-12 h-12 object-cover"
+      >
+      <div class="min-w-0">
+        <div class="font-semibold truncate" x-text="fullName()"></div>
+        <div class="text-xs opacity-70 truncate" x-text="data?.email || '—'"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lista ogłoszeń użytkownika — layout jak public offers (z serduszkami) -->
+  <div
+    x-data="app.publicOffersList({ ownerPublicId: '{{ user_public_id }}' })"
+    x-init="init()"
+    x-effect="() => { return () => destroy() }"
+  >
+    <!-- Pasek tytułu + sort -->
+    <div class="mb-3 flex items-center gap-2 flex-wrap">
+      <h2 class="text-lg font-semibold">Ogłoszenia użytkownika</h2>
+      <span class="ml-auto"></span>
+      <div class="text-xs opacity-70">Sortowanie:</div>
+      <select class="select select-bordered select-sm fancy-select" x-model="ordering" @change="reload()">
+        <option value="-created_at">Najnowsze</option>
+        <option value="created_at">Najstarsze</option>
+        <option value="-price">Cena ⬇︎</option>
+        <option value="price">Cena ⬆︎</option>
+      </select>
+    </div>
+
+    <!-- Skeleton -->
+    <template x-if="loading && !items.length">
+      <div class="space-y-1">
+        <template x-for="i in 6" :key="i">
+          <div class="p-3 rounded-lg border list-row flex items-start gap-3 animate-pulse overflow-hidden">
+            <div class="list-thumb rounded bg-base-300"></div>
+            <div class="grow min-w-0">
+              <div class="h-4 w-2/3 rounded bg-base-300 mb-2"></div>
+              <div class="h-3 w-1/3 rounded bg-base-300"></div>
+            </div>
+            <div class="w-20 h-7 rounded bg-base-300"></div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <template x-if="err">
+      <div class="alert alert-error whitespace-pre-line mt-2" x-text="err"></div>
+    </template>
+
+    <!-- Lista (klikana, z sercem + datą; bez „sprzedawca/użytkownik”) -->
+    <div class="offers-list space-y-1" x-show="!loading && items.length">
+      <template x-for="it in items" :key="it.public_id || it.id">
+        <div
+          class="p-3 rounded-lg border list-row flex items-start gap-3 relative cursor-pointer overflow-hidden"
+          role="button"
+          tabindex="0"
+          @click="gotoItem(it)"
+          @keydown.enter.prevent="gotoItem(it)"
+          @keydown.space.prevent="gotoItem(it)"
+        >
+          <!-- Miniatura -->
+          <img :src="img(it)" alt="" class="list-thumb object-cover rounded border">
+
+          <!-- Treść -->
+          <div class="offer-body grow min-w-0">
+            <div class="font-medium truncate mb-0.5" x-text="it.set_name || '(bez nazwy)'"></div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="item-price item-price--soft" x-text="priceText(it)"></span>
+              <span class="text-sm opacity-70 truncate">
+                · <span x-text="it.type?.path || '—'"></span>
+              </span>
+            </div>
+
+            <div class="mt-1 text-xs flex flex-wrap items-center gap-1">
+              <template x-if="it.listing_type">
+                <span class="badge badge-ghost" x-text="listingTypePL(it)"></span>
+              </template>
+              <template x-if="it.catalog_item?.item_name">
+                <span class="badge badge-ghost" x-text="it.catalog_item.item_name"></span>
+              </template>
+            </div>
+          </div>
+
+          <!-- Prawa szyna: serduszko + data -->
+          <div class="offer-rail">
+            <button
+              class="btn btn-ghost btn-xs save-btn pointer-events-auto"
+              :class="it.is_saved ? 'text-error' : ''"
+              :aria-pressed="it.is_saved ? 'true' : 'false'"
+              :disabled="!!saveBusy[it.public_id]"
+              title="Zapisz / usuń z zapisanych"
+              @click.stop="toggleSave(it)"
+            >
+              <span x-show="!it.is_saved">♡</span>
+              <span x-show="it.is_saved" x-cloak>❤</span>
+            </button>
+
+            <div class="item-date" aria-label="Data utworzenia">
+              <span x-text="createdText(it)"></span>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <div class="pt-2 flex justify-center" x-show="next">
+        <button class="btn btn-outline btn-sm" @click="more()">Pokaż więcej</button>
+      </div>
+      <div x-ref="sentinel" class="h-2"></div>
+    </div>
+
+    <template x-if="!loading && !items.length && !err">
+      <div class="text-sm opacity-70">Użytkownik nie ma aktywnych ogłoszeń.</div>
+    </template>
+  </div>
+</section>

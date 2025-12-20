@@ -1,0 +1,11 @@
+Cześć {{ first_name }}!
+
+Potwierdzamy przyjęcie Twojego zamówienia.
+
+{% for it in orders -%}
+ - Zamówienie: {{ it.order.public_id }}
+   Podgląd: {{ it.order_url }}
+{% endfor %}
+
+Dziękujemy za zakupy w {{ site_name }}!
+— Zespół {{ site_name }}

@@ -1,0 +1,50 @@
+<section class="max-w-6xl mx-auto" x-data="app.userCouponCatalog()" x-init="init()" data-protected>
+  <div class="mb-4 flex flex-wrap items-center gap-2">
+    <a class="btn btn-ghost" href="/coupons" hx-boost="true" hx-target="#app-root" hx-push-url="true">← Moje kupony</a>
+    <h1 class="text-2xl font-semibold">Kupony do kupienia</h1>
+    <span class="ml-auto text-sm opacity-70" x-show="userPoints != null">Twoje punkty: <span class="font-medium" x-text="userPoints"></span></span>
+  </div>
+
+  <div class="mb-3 flex items-center gap-2">
+    <input class="input input-bordered input-sm w-full sm:w-80" placeholder="Szukaj (np. % lub kod)…" x-model="q">
+    <button class="btn btn-sm" @click="load()">Odśwież</button>
+  </div>
+
+  <template x-if="loading"><div class="h-24 rounded-lg border animate-pulse bg-base-300/40"></div></template>
+  <template x-if="err"><div class="alert alert-error my-3" x-text="err"></div></template>
+
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <template x-for="c in filtered()" :key="c.public_id">
+      <div class="p-3 rounded-lg border bg-base-100 flex flex-col">
+        <div class="text-xs opacity-70 flex items-center justify-between">
+          <span x-text="c.code ? ('Kod: '+c.code) : 'Kupon punktowy'"></span>
+          <span x-text="expiresText(c)"></span>
+        </div>
+        <div class="mt-2 text-lg font-semibold" x-text="discountText(c)"></div>
+        <div class="text-sm opacity-70" x-text="minPurchaseText(c)"></div>
+
+        <div class="mt-2 text-sm">
+          <div>Koszt: <span class="font-medium" x-text="(c.points_cost ?? '—') + ' pkt'"></span></div>
+          <div x-show="c.quantity != null">Dostępnych: <span class="font-medium" x-text="c.quantity ?? 0"></span></div>
+          <div x-show="c.quantity == null">Dostępność: <span class="font-medium">bez limitu</span></div>
+        </div>
+
+        <div class="mt-3 flex items-center gap-2">
+          <button class="btn btn-primary btn-sm"
+                  :disabled="buying===c.public_id || !canBuy(c)"
+                  @click="buy(c)"
+                  x-text="buying===c.public_id ? 'Kupuję…' : 'Kup za '+(c.points_cost||0)+' pkt'"></button>
+          <span class="text-xs opacity-70" x-show="!canBuy(c)">Niedostępny</span>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <div class="pt-3 flex justify-center" x-show="next">
+    <button class="btn btn-outline btn-sm" @click="more()">Pokaż więcej</button>
+  </div>
+
+  <template x-if="!loading && !filtered().length">
+    <div class="text-sm opacity-70 mt-4">Brak kuponów do wyświetlenia.</div>
+  </template>
+</section>

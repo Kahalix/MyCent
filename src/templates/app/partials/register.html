@@ -1,0 +1,42 @@
+<section class="max-w-md mx-auto">
+  <h1 class="text-2xl font-semibold mb-4">Rejestracja</h1>
+
+  <form x-data="app.registerForm()" @submit.prevent="submit"
+        hx-boost="false" novalidate autocomplete="off">
+
+    <label class="form-control w-full mb-2">
+      <span class="label"><span class="label-text">E-mail</span></span>
+      <input class="input input-bordered w-full" type="email" inputmode="email" x-model="email" placeholder="E-mail">
+      <span class="label text-error text-xs" x-text="emailErr"></span>
+    </label>
+
+    <div class="grid grid-cols-2 gap-2">
+      <label class="form-control">
+        <span class="label"><span class="label-text">Imię</span></span>
+        <input class="input input-bordered w-full" x-model="first_name" placeholder="Imię">
+        <span class="label text-error text-xs" x-text="firstErr"></span>
+      </label>
+      <label class="form-control">
+        <span class="label"><span class="label-text">Nazwisko</span></span>
+        <input class="input input-bordered w-full" x-model="last_name" placeholder="Nazwisko">
+        <span class="label text-error text-xs" x-text="lastErr"></span>
+      </label>
+    </div>
+
+    <label class="form-control w-full my-3">
+      <span class="label"><span class="label-text">Hasło</span></span>
+      <input class="input input-bordered w-full" type="password" x-model="password" placeholder="Hasło (min. 10 znaków)">
+      <span class="label text-error text-xs" x-text="pwdErr"></span>
+    </label>
+
+    <button class="btn btn-primary btn-gold w-full" :disabled="busy"
+            x-text="busy ? 'Rejestruję…' : 'Zarejestruj'"></button>
+
+    <!-- błąd z backendu (np. Email already registered) pod formularzem -->
+    <p class="mt-3 text-error text-sm" x-text="formErr"></p>
+
+    <div class="mt-4 text-sm text-center">
+      Masz już konto? <a class="link" href="/login">Zaloguj się</a>
+    </div>
+  </form>
+</section>

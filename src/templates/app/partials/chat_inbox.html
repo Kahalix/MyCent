@@ -1,0 +1,130 @@
+<section
+  x-data="app.chatInbox()"
+  x-init="() => { init(); return () => destroy(); }"
+  class="mx-auto max-w-5xl px-3 md:px-0"
+>
+  <div class="mb-4 flex items-center gap-2">
+    <h1 class="cm-h1">Wiadomości</h1>
+    <div class="ml-auto w-[18rem] max-w-full">
+      <input class="cm-input" placeholder="Szukaj w wątkach…" x-model.trim="q" @input="onSearchInput">
+    </div>
+  </div>
+
+  <!-- Zakładki (kubełki) -->
+  <div class="tabs-rail mb-3" role="tablist" aria-label="Filtr rozmów">
+    <!-- Wszystkie -->
+    <button
+      type="button"
+      class="tab-btn"
+      :class="{'is-active': tab==='all'}"
+      :aria-selected="(tab==='all').toString()"
+      @click="setTab('all')"
+    >
+      Wszystkie
+      <span class="tab-badge" x-show="badge('total')" x-text="badge('total')"></span>
+    </button>
+
+    <!-- Moje ogłoszenia -->
+    <button
+      type="button"
+      class="tab-btn"
+      :class="{'is-active': tab==='my_user'}"
+      :aria-selected="(tab==='my_user').toString()"
+      @click="setTab('my_user')"
+    >
+      Moje ogłoszenia
+      <span class="tab-badge" x-show="badge('my_user')" x-text="badge('my_user')"></span>
+    </button>
+
+    <!-- Inni użytkownicy -->
+    <button
+      type="button"
+      class="tab-btn"
+      :class="{'is-active': tab==='users_other'}"
+      :aria-selected="(tab==='users_other').toString()"
+      @click="setTab('users_other')"
+    >
+      Inni użytkownicy
+      <span class="tab-badge" x-show="badge('users_other')" x-text="badge('users_other')"></span>
+    </button>
+
+    <!-- Sklepy -->
+    <button
+      type="button"
+      class="tab-btn"
+      :class="{'is-active': tab==='sellers'}"
+      :aria-selected="(tab==='sellers').toString()"
+      @click="setTab('sellers')"
+    >
+      Sklepy
+      <span class="tab-badge" x-show="badge('sellers')" x-text="badge('sellers')"></span>
+    </button>
+
+    <!-- DM -->
+    <button
+      type="button"
+      class="tab-btn"
+      :class="{'is-active': tab==='dm'}"
+      :aria-selected="(tab==='dm').toString()"
+      @click="setTab('dm')"
+    >
+      DM
+      <span class="tab-badge" x-show="badge('dm')" x-text="badge('dm')"></span>
+    </button>
+  </div>
+
+  <template x-if="err">
+    <div class="alert alert-error whitespace-pre-line mt-2" x-text="err"></div>
+  </template>
+
+  <div class="space-y-1">
+    <template x-for="(th, i) in view" :key="'t-'+(th?.public_id || i)">
+      <a
+        :href="`/chat/t/${encodeURIComponent(th.public_id)}`"
+        hx-boost="true" hx-target="#app-root" hx-push-url="true"
+        class="p-3 rounded-lg border list-row flex items-start gap-3"
+      >
+        <!-- miniatura -->
+        <img :src="thumb(th)" alt="" class="list-thumb list-thumb--sm object-cover rounded border">
+
+        <!-- środek -->
+        <div class="min-w-0 grow">
+          <div class="flex items-center gap-2">
+            <div class="font-medium truncate" x-text="title(th)"></div>
+            <span class="text-xs cm-muted truncate" x-text="party(th)"></span>
+            <span class="ml-auto text-xs cm-muted" x-text="dt(th.last_message_at)"></span>
+          </div>
+
+          <div class="mt-0.5 text-sm cm-muted truncate">
+            <span class="opacity-70 mr-1">Ostatnia wiadomość:</span>
+            <span x-text="th.last_message_preview || '—'"></span>
+          </div>
+        </div>
+
+        <!-- prawa kolumna -->
+        <div class="shrink-0 flex flex-col items-end gap-1 w-24">
+          <div class="text-sm font-semibold" x-text="price(th)"></div>
+
+          <template x-if="unread(th.public_id)">
+            <span
+              class="badge badge-ghost text-xs font-medium"
+              :aria-label="`Nieprzeczytane: ${unread(th.public_id)}`"
+              x-text="`Nowe ${unread(th.public_id)}`"
+            ></span>
+          </template>
+        </div>
+      </a>
+    </template>
+
+    <div class="pt-2 flex justify-center" x-show="next">
+      <button class="btn btn-outline btn-sm" @click="more()">Pokaż więcej</button>
+    </div>
+    <div x-ref="sentinel" class="h-2"></div>
+
+    <template x-if="!loading && !view.length && !err">
+      <div class="text-sm opacity-70">
+        Brak wątków. Napisz do sprzedawcy z poziomu ogłoszenia.
+      </div>
+    </template>
+  </div>
+</section>

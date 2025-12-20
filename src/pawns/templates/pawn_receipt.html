@@ -1,0 +1,146 @@
+{% load static %}
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <title>Umowa zastawu — {{ pawn_id }}</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    html, body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; color: #111; }
+    h1, h2 { margin: 0 0 6px 0; }
+    h1 { font-size: 20px; }
+    h2 { font-size: 16px; margin-top: 14px; }
+    .muted { color: #666; }
+    .small { font-size: 11px; }
+    .right { text-align: right; }
+    .row { display: flex; justify-content: space-between; gap: 16px; }
+    .col { flex: 1 1 0; }
+    .box { border: 1px solid #ddd; border-radius: 6px; padding: 10px 12px; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px 6px; vertical-align: top; }
+    thead th { border-bottom: 1px solid #bbb; font-weight: 600; text-align: left; }
+    tbody td { border-bottom: 1px solid #eee; }
+    tfoot td { border-top: 2px solid #bbb; font-weight: 600; }
+    .num { text-align: right; white-space: nowrap; }
+    .logo { height: 40px; }
+    .hr { height: 1px; background: #e5e5e5; margin: 12px 0; }
+  </style>
+</head>
+<body>
+
+  <!-- NAGŁÓWEK -->
+  <div class="row">
+    <div class="col">
+      <h1>Umowa zastawu</h1>
+      <div class="muted small">ID: {{ pawn_id }}</div>
+      <div class="small">Data początku: {{ start_date }} • Termin wykupu: {{ due_date }}</div>
+      <div class="small">Sklep: {{ seller_name }}</div>
+      <div class="small">Status: {{ status }}</div>
+    </div>
+    <div class="col right">
+      {% if seller_logo_src %}
+        <img class="logo" src="{{ seller_logo_src }}" alt="logo">
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- KLIENT -->
+  <div class="box" style="margin-top:12px">
+    <h2>Klient</h2>
+    {% with c=customer a=customer.address %}
+      <div><strong>{{ c.first_name }} {{ c.last_name }}</strong></div>
+      {% if c.email %}<div class="small muted">{{ c.email }}</div>{% endif %}
+      {% if c.phone %}<div class="small muted">{{ c.phone }}</div>{% endif %}
+      {% if a %}
+        <div class="small" style="margin-top:6px">
+          {{ a.line1 }}{% if a.line2 %}, {{ a.line2 }}{% endif %}<br>
+          {{ a.postal_code }} {{ a.city }}{% if a.country %}, {{ a.country }}{% endif %}
+        </div>
+      {% endif %}
+      {% if c.document and c.document.number %}
+        <div class="small" style="margin-top:6px">Dokument: {{ c.document.type }} {{ c.document.number }}</div>
+      {% endif %}
+    {% endwith %}
+  </div>
+
+  <!-- POZYCJE -->
+  <h2 style="margin-top:12px">Przedmioty zastawu</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:6%">Lp.</th>
+        <th>Opis</th>
+        <th class="num" style="width:10%">Ilość</th>
+        <th class="num" style="width:16%">Wycena</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for l in lines %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td>
+          <div><strong>{{ l.title }}</strong></div>
+          {% if l.attrs_pairs %}
+              <div class="small muted">
+                {% for k,v in l.attrs_pairs %}
+                  {{ k }}={{ v }}{% if not forloop.last %} | {% endif %}
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% if l.notes %}
+            <div class="small">{{ l.notes }}</div>
+          {% endif %}
+        </td>
+        <td class="num">{{ l.qty }}</td>
+        <td class="num">{{ l.appraisal }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="muted">Brak pozycji</td></tr>
+    {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="3" class="right">Suma wycen</td>
+        <td class="num">{{ appraisal_total }}</td>
+      </tr>
+      <tr>
+        <td colspan="3" class="right">Kapitał (wypłacony)</td>
+        <td class="num">{{ principal }}</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <!-- PRZEDŁUŻENIA -->
+  {% if extensions %}
+    <h2 style="margin-top:12px">Przedłużenia</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Dni</th>
+          <th class="num">Opłata</th>
+          <th>Poprzedni termin</th>
+          <th>Nowy termin</th>
+          <th>Utworzono</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ex in extensions %}
+          <tr>
+            <td>{{ ex.days }}</td>
+            <td class="num">{{ ex.fee }}</td>
+            <td>{{ ex.previous_due }}</td>
+            <td>{{ ex.new_due }}</td>
+            <td>{{ ex.created_at|date:"Y-m-d" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+
+  <div class="hr"></div>
+  <div class="small muted">
+    Wygenerowano: {{ printed_at|date:"Y-m-d H:i" }} • Dokument nie jest fakturą VAT.
+  </div>
+</body>
+</html>

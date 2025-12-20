@@ -1,0 +1,109 @@
+<section class="max-w-5xl mx-auto" x-data="app.savedCenterPage()" x-init="init()" data-protected>
+  <h1 class="text-2xl font-semibold mb-4">Zapisane</h1>
+
+  <!-- Zakładki -->
+  <nav class="mb-4">
+    <ul class="tabs-rail" role="tablist">
+      <li><button class="tab-btn" :class="{'is-active': tab==='items'}"    @click="setTab('items')">Przedmioty</button></li>
+      <li><button class="tab-btn" :class="{'is-active': tab==='searches'}" @click="setTab('searches')">Wyszukiwania</button></li>
+    </ul>
+  </nav>
+
+  <template x-if="err"><div class="alert alert-error whitespace-pre-line mb-3" x-text="err"></div></template>
+
+  <!-- TAB: PRZEDMIOTY -->
+  <div x-show="tab==='items'" x-cloak>
+    <!-- Skeleton -->
+    <template x-if="loadingItems">
+      <div class="space-y-2">
+        <template x-for="i in 5" :key="i">
+          <div class="p-3 rounded-lg border list-row flex items-start gap-3 animate-pulse">
+            <div class="list-thumb rounded bg-base-300"></div>
+            <div class="grow min-w-0">
+              <div class="h-4 w-2/3 rounded bg-base-300 mb-2"></div>
+              <div class="h-3 w-1/3 rounded bg-base-300"></div>
+            </div>
+            <div class="w-20 h-7 rounded bg-base-300"></div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- Lista -->
+    <div class="space-y-2" x-show="!loadingItems && items.length">
+      <template x-for="it in items" :key="it.public_id">
+        <div class="p-3 rounded-lg border list-row flex items-start gap-3">
+          <img :src="img(it.item)" class="list-thumb object-cover rounded border" alt="">
+          <div class="grow min-w-0">
+            <div class="font-medium truncate" x-text="it.item?.set_name || '(bez nazwy)'"></div>
+            <div class="text-sm opacity-70">
+              <span x-text="priceText(it.item)"></span> · <span x-text="it.item?.type?.path || '—'"></span>
+            </div>
+          </div>
+          <div class="list-actions gap-2">
+            <button class="btn btn-xs" @click="gotoItem(it.item)">Szczegóły</button>
+            <button class="btn btn-xs btn-outline" :disabled="busy" @click="removeSavedItem(it)">Usuń</button>
+          </div>
+        </div>
+      </template>
+    </div>
+    <template x-if="!loadingItems && !items.length">
+      <div class="text-sm opacity-70">Brak zapisanych przedmiotów.</div>
+    </template>
+  </div>
+
+  <!-- TAB: WYSZUKIWANIA -->
+  <div x-show="tab==='searches'" x-data="{ expanded: false }" x-cloak>
+    <!-- Skeleton -->
+    <template x-if="loadingSearches">
+      <div class="space-y-2">
+        <template x-for="i in 4" :key="i">
+          <div class="p-3 rounded-lg border list-row animate-pulse h-16"></div>
+        </template>
+      </div>
+    </template>
+
+    <!-- Lista -->
+    <div class="space-y-2" x-show="!loadingSearches && searches.length">
+      <template x-for="s in searches" :key="s.public_id">
+        <div class="p-3 rounded-lg border list-row flex items-center gap-3">
+          <div class="grow min-w-0">
+            <div class="font-medium truncate" x-text="s.search_phrase || s.category_path || '(bez etykiety)'"></div>
+
+            <div class="mt-2 w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+              <template x-for="(chip, i) in (expanded ? chipsFor(s) : chipsFor(s).slice(0,8))" :key="i">
+                <span class="badge badge-ghost border border-base-300 h-auto py-2 px-2 whitespace-normal break-words leading-snug text-left">
+                  <span x-text="chip"></span>
+                </span>
+              </template>
+
+              <button class="btn btn-ghost btn-xs justify-self-start"
+                      x-show="chipsFor(s).length > 8"
+                      @click="expanded=!expanded">
+                <span x-show="!expanded">Pokaż więcej</span>
+                <span x-show="expanded" x-cloak>Pokaż mniej</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="list-actions flex-col items-end gap-2">
+            <div class="badge" :class="s.items_count>0 ? 'badge-primary' : 'badge-ghost'">
+              <span x-text="s.items_count + ' nowych'"></span>
+            </div>
+            <div class="flex gap-2">
+              <button class="btn btn-xs" @click="openResults(s)">Pokaż nowe</button>
+              <a class="btn btn-xs btn-outline"
+                 :href="'/offers?' + s.query_string"
+                 hx-boost="true" hx-target="#app-root" hx-push-url="true">W ogłoszeniach</a>
+              <button class="btn btn-xs btn-outline" :disabled="busy" @click="deleteSearch(s)">Usuń</button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <template x-if="!loadingSearches && !searches.length">
+      <div class="text-sm opacity-70">Brak zapisanych wyszukiwań.</div>
+    </template>
+  </div>
+</section>

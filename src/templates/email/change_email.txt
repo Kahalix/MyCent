@@ -1,0 +1,6 @@
+Cześć {{ first_name }}!
+
+Potwierdź zmianę e-maila na {{ new_email }} (link ważny {{ valid_for_minutes }} min):
+{{ action_url }}
+
+— {{ site_name }}

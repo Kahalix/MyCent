@@ -1,0 +1,14 @@
+.git
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.venv/
+env/
+venv/
+node_modules/
+media/
+staticfiles/
+celerybeat-schedule
+*.sqlite3
+.DS_Store

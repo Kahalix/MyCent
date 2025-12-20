@@ -1,0 +1,168 @@
+<section class="landing" x-data="app.landing()" x-init="init()">
+
+  <!-- HERO  -->
+  <div class="relative overflow-hidden rounded-2xl border border-base-300 p-8 md:p-10 mb-10 glass-card">
+    <div class="max-w-3xl relative z-10">
+      <div class="inline-flex items-center gap-2 px-2 py-1 rounded-full border border-base-300 text-xs opacity-80 mb-3">
+        Platforma lombardu blebleble TOCHANGE z zakupem online i obsługą zastawów
+      </div>
+
+<!--      <h1 class="text-4xl md:text-5xl font-extrabold leading-tight tracking-tight">-->
+<!--        Kupuj i sprzedawaj <span class="text-primary"> szybko i sprawnie</span>.-->
+<!--      </h1>-->
+<!--      <p class="mt-4 text-sm md:text-base opacity-80 max-w-2xl">-->
+<!--        Ogłoszenia od sprzedawców i osób prywatnych. Transparentne ceny, bezpieczne płatności, odbiór lub wysyłka — wszystko w jednym miejscu.-->
+<!--      </p>-->
+
+<!--      <div class="mt-6 flex gap-2 flex-wrap">-->
+<!--        <a href="/offers" class="btn btn-primary btn-lg btn-gold" >Przeglądaj ogłoszenia</a>-->
+<!--        <a href="/coupons/shop" class="btn btn-ghost btn-lg" >Kupony</a>-->
+<!--      </div>-->
+<!--    </div>-->
+
+    <!-- Dekoracje -->
+    <div class="hero-blob hero-blob--a"></div>
+    <div class="hero-blob hero-blob--b"></div>
+  </div>
+
+  <!-- KATEGORIE -->
+  <div class="mb-6 flex items-center justify-between gap-3">
+    <h2 class="text-xl font-semibold">Kategorie</h2>
+    <a class="btn btn-ghost btn-sm" href="/offers" >Wszystkie ogłoszenia →</a>
+  </div>
+
+  <!-- Skeleton kategorii -->
+  <template x-if="cats.loading && !cats.items.length">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <template x-for="i in 6" :key="'cat-sk'+i">
+        <div class="h-28 rounded-xl border animate-pulse bg-base-300/30"></div>
+      </template>
+    </div>
+  </template>
+
+  <!-- Kafle kategorii -->
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3" x-show="!cats.loading">
+    <template x-for="c in cats.items.slice(0,6)" :key="c.path">
+      <a class="cat-card group" :href="c.href" >
+        <div class="cat-card__thumb">
+          <img :src="c.img" alt="" loading="lazy">
+        </div>
+        <div class="cat-card__meta">
+          <div class="cat-card__title" x-text="c.name"></div>
+          <div class="cat-card__count" x-text="c.count !== null ? (c.count + ' ogł.') : 'Zobacz →'"></div>
+        </div>
+      </a>
+    </template>
+
+    <template x-if="!cats.items.length && !cats.loading">
+      <div class="text-sm opacity-70">Brak danych do zbudowania listy kategorii.</div>
+    </template>
+  </div>
+
+  <!-- NAJNOWSZE -->
+  <div class="mt-10 flex items-center justify-between gap-3">
+    <h2 class="text-xl font-semibold">Najnowsze ogłoszenia</h2>
+    <a class="btn btn-outline btn-sm" href="/offers?ordering=-created_at" >Zobacz wszystko</a>
+  </div>
+
+  <div class="grid grid-cards grid-autofill-240 mt-3">
+    <template x-if="latest.loading && !latest.items.length">
+      <template x-for="i in 8" :key="'new-sk'+i"><div class="prod-card skeleton"></div></template>
+    </template>
+
+    <template x-for="it in latest.items.slice(0,8)" :key="it.public_id || it.id">
+      <a class="prod-card block" :href="itemUrl(it)" >
+        <div class="prod-thumb"><img :src="img(it)" alt="" loading="lazy"></div>
+        <div class="prod-body">
+          <div class="prod-title" x-text="it.set_name || '(bez nazwy)'"></div>
+          <div class="prod-sub">
+            <span x-text="money(it)"></span>
+            <span class="mx-1">·</span>
+            <span x-text="it.type?.path || '—'"></span>
+          </div>
+        </div>
+      </a>
+    </template>
+  </div>
+
+  <!-- KUP TERAZ (online) -->
+  <div class="mt-10 flex items-center justify-between gap-3">
+    <h2 class="text-xl font-semibold">Kup teraz (online)</h2>
+    <a class="btn btn-outline btn-sm" href="/offers?listing_type=BUY&ordering=-created_at" >Zobacz wszystko</a>
+  </div>
+
+  <div class="grid grid-cards grid-autofill-240 mt-3">
+    <template x-if="buy.loading && !buy.items.length">
+      <template x-for="i in 8" :key="'buy-sk'+i"><div class="prod-card skeleton"></div></template>
+    </template>
+
+    <template x-for="it in buy.items.slice(0,8)" :key="it.public_id || it.id">
+      <a class="prod-card block" :href="itemUrl(it)" >
+        <div class="prod-thumb"><img :src="img(it)" alt="" loading="lazy"></div>
+        <div class="prod-body">
+          <div class="prod-title" x-text="it.set_name || '(bez nazwy)'"></div>
+          <div class="prod-sub">
+            <span x-text="money(it)"></span>
+            <span class="mx-1">·</span>
+            <span>Online</span>
+          </div>
+        </div>
+      </a>
+    </template>
+  </div>
+
+  <!-- SPRZEDAWCY / UŻYTKOWNICY -->
+  <div class="mt-10 grid gap-8 lg:grid-cols-2">
+    <!-- Sprzedawcy -->
+    <div>
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-xl font-semibold">Od sprzedawców</h2>
+        <a class="btn btn-outline btn-sm" href="/offers?added_by=STAFF&ordering=-created_at" >Zobacz wszystko</a>
+      </div>
+      <div class="grid grid-cards grid-autofill-240 mt-3">
+        <template x-if="staff.loading && !staff.items.length">
+          <template x-for="i in 6" :key="'staff-sk'+i"><div class="prod-card skeleton"></div></template>
+        </template>
+        <template x-for="it in staff.items.slice(0,6)" :key="it.public_id || it.id">
+          <a class="prod-card block" :href="itemUrl(it)" >
+            <div class="prod-thumb"><img :src="img(it)" alt="" loading="lazy"></div>
+            <div class="prod-body">
+              <div class="prod-title" x-text="it.set_name || '(bez nazwy)'"></div>
+              <div class="prod-sub">
+                <span x-text="money(it)"></span>
+                <span class="mx-1">·</span>
+                <span>Sprzedawca</span>
+              </div>
+            </div>
+          </a>
+        </template>
+      </div>
+    </div>
+
+    <!-- Użytkownicy -->
+    <div>
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-xl font-semibold">Od użytkowników</h2>
+        <a class="btn btn-outline btn-sm" href="/offers?added_by=USER&ordering=-created_at" >Zobacz wszystko</a>
+      </div>
+      <div class="grid grid-cards grid-autofill-240 mt-3">
+        <template x-if="user.loading && !user.items.length">
+          <template x-for="i in 6" :key="'user-sk'+i"><div class="prod-card skeleton"></div></template>
+        </template>
+        <template x-for="it in user.items.slice(0,6)" :key="it.public_id || it.id">
+          <a class="prod-card block" :href="itemUrl(it)" >
+            <div class="prod-thumb"><img :src="img(it)" alt="" loading="lazy"></div>
+            <div class="prod-body">
+              <div class="prod-title" x-text="it.set_name || '(bez nazwy)'"></div>
+              <div class="prod-sub">
+                <span x-text="money(it)"></span>
+                <span class="mx-1">·</span>
+                <span>Użytkownik</span>
+              </div>
+            </div>
+          </a>
+        </template>
+      </div>
+    </div>
+  </div>
+</section>

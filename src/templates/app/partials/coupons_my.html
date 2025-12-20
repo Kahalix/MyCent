@@ -1,0 +1,130 @@
+<section
+  class="max-w-6xl mx-auto"
+  x-data="app.userCouponsList()"
+  x-init="init()"
+  data-protected
+>
+  <div class="mb-6 space-y-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <h1 class="text-2xl font-semibold">Moje kupony</h1>
+      <a
+        class="btn btn-outline btn-sm ml-auto"
+        href="/coupons/shop"
+        hx-boost="true"
+        hx-target="#app-root"
+        hx-push-url="true"
+      >
+        Sklep kuponów
+      </a>
+    </div>
+
+    <div class="flex flex-wrap items-end gap-2">
+      <label class="form-control w-full sm:w-auto">
+        <span class="label-text text-xs uppercase tracking-wide opacity-70">Status</span>
+        <select
+          class="select select-bordered select-sm fancy-select"
+          x-model="redeemed"
+          @change="load()"
+        >
+          <option value="">Wszystkie</option>
+          <option value="false">Niewykorzystane</option>
+          <option value="true">Wykorzystane</option>
+        </select>
+      </label>
+
+      <div class="flex-1 min-w-[220px]">
+        <span class="label-text text-xs uppercase tracking-wide opacity-70 block mb-0.5">Szukaj</span>
+        <div class="join w-full">
+          <input
+            class="input input-bordered input-sm join-item w-full"
+            placeholder="kod / ID / tekst zniżki"
+            x-model="q"
+          >
+          <button class="btn btn-sm join-item" @click="load()">Szukaj</button>
+        </div>
+      </div>
+
+      <button class="btn btn-sm ml-auto" @click="load()">Odśwież</button>
+    </div>
+  </div>
+
+  <template x-if="loading">
+    <div class="space-y-2 mb-3">
+      <template x-for="i in 3" :key="i">
+        <div class="p-3 rounded-lg border list-row animate-pulse h-24"></div>
+      </template>
+    </div>
+  </template>
+
+  <template x-if="err">
+    <div class="alert alert-error my-3" x-text="err"></div>
+  </template>
+
+  <div class="mt-2 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <template x-for="uc in filtered()" :key="uc.public_id">
+      <div class="list-row p-3 flex flex-col gap-2 h-full">
+        <div class="text-xs opacity-70 flex items-center justify-between">
+          <span class="uppercase tracking-wide">Kupon</span>
+          <span class="font-mono text-[11px]" x-text="uc.public_id"></span>
+        </div>
+
+        <div class="mt-1">
+          <div class="text-lg font-semibold" x-text="discountText(uc.coupon)"></div>
+          <div class="text-sm opacity-80" x-text="minPurchaseText(uc.coupon)"></div>
+          <div class="text-xs opacity-70 mt-1" x-text="expiresText(uc.coupon)"></div>
+        </div>
+
+        <div class="mt-2 text-sm space-y-0.5">
+          <div>
+            Kod:
+            <span class="font-medium" x-text="uc.coupon?.code || '—'"></span>
+          </div>
+          <div>
+            Zapłacono punktów:
+            <span class="font-medium" x-text="uc.points_paid ?? '—'"></span>
+          </div>
+          <div x-show="uc.purchased_at">
+            Zakup:
+            <span x-text="new Date(uc.purchased_at).toLocaleString()"></span>
+          </div>
+        </div>
+
+        <div class="mt-3 flex items-center gap-2">
+          <span
+            class="badge badge-sm"
+            :class="uc.redeemed ? 'badge-neutral' : 'badge-success'"
+            x-text="uc.redeemed ? 'Wykorzystany' : 'Niewykorzystany'"
+          ></span>
+
+          <template x-if="!uc.redeemed">
+            <div class="ml-auto flex items-center gap-1">
+              <button class="btn btn-xs" @click="copy(uc.public_id)">Kopiuj ID</button>
+              <button
+                class="btn btn-ghost btn-xs"
+                @click="copy(uc.coupon?.code || '')"
+                x-show="uc.coupon?.code"
+              >
+                Kopiuj kod
+              </button>
+            </div>
+          </template>
+
+          <template x-if="uc.redeemed">
+            <div
+              class="text-[11px] opacity-70 ml-auto text-right"
+              x-text="uc.redeemed_at ? ('Wykorzystano: '+new Date(uc.redeemed_at).toLocaleString()) : ''"
+            ></div>
+          </template>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <div class="pt-3 flex justify-center" x-show="next">
+    <button class="btn btn-outline btn-sm" @click="more()">Pokaż więcej</button>
+  </div>
+
+  <template x-if="!loading && !filtered().length">
+    <div class="text-sm opacity-70 mt-4">Brak kuponów.</div>
+  </template>
+</section>

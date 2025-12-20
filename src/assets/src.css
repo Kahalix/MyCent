@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* złote obramowania/przyciski – klasy pomocnicze */
+.btn-gold { @apply btn btn-primary; }
+.card-gold { @apply card border border-primary/30; }
+.hr-gold { @apply border-t border-primary/30; }

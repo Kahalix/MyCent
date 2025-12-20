@@ -1,0 +1,120 @@
+/*!* ——— Kolory bazowe (fallback; jeśli masz DaisyUI, podepnijmy się lekko pod jej zmienne) ——— *!*/
+/*:root{*/
+/*  --c-bg:        #ffffff;*/
+/*  --c-card:      #f7f8fb;*/
+/*  --c-border:    #e6e8ee;*/
+/*  --c-text:      #0f172a;    !* slate-900 *!*/
+/*  --c-muted:     #6b7280;    !* gray-500 *!*/
+/*  --c-soft:      #f1f5f9;    !* slate-100 *!*/
+/*  --c-accent:    #d4af37;    !* złoto *!*/
+/*  --c-accent-ink:#111111;*/
+/*  --c-me:        #1f2937;    !* granat/szary dla moich bąbelków (czytelne) *!*/
+/*  --c-me-ink:    #ffffff;*/
+/*  --c-them:      #e5e7eb;    !* gray-200 *!*/
+/*  --c-them-ink:  #111827;*/
+/*}*/
+
+/*:root[data-theme="lownDark"]{*/
+/*  --c-bg:        #2b3038;*/
+/*  --c-card:      #343b45;*/
+/*  --c-border:    #3f4753;*/
+/*  --c-text:      #eef1f5;*/
+/*  --c-muted:     #a0a6b0;*/
+/*  --c-soft:      #2f3540;*/
+/*  --c-accent:    #d4af37;*/
+/*  --c-accent-ink:#101216;*/
+/*  --c-me:        #0f172a;   !* ciemniejszy dla moich bąbelków *!*/
+/*  --c-me-ink:    #e5e7eb;*/
+/*  --c-them:      #485061;*/
+/*  --c-them-ink:  #eef1f5;*/
+/*}*/
+
+/*!* Jeśli istnieją zmienne Daisy (oklch var(--p), var(--b1) itd.), użyj ich subtelnie *!*/
+/*:root{*/
+/*  --c-accent:    color-mix(in oklab, oklch(var(--p, 68% 0.1 85)) 92%, #d4af37);*/
+/*  --c-card:      color-mix(in oklab, oklch(var(--b2, 95% 0.02 250)) 90%, var(--c-card));*/
+/*  --c-border:    color-mix(in oklab, oklch(var(--b3, 90% 0.03 250)) 80%, var(--c-border));*/
+/*  --c-bg:        color-mix(in oklab, oklch(var(--b1, 100% 0 0)) 92%, var(--c-bg));*/
+/*}*/
+
+/*!* ——— Utility dla miniatur/sticky/scrollbar ——— *!*/
+/*.cm-soft-scroll{ scrollbar-width: thin; scrollbar-color: rgba(0,0,0,.2) transparent; }*/
+/*.cm-soft-scroll::-webkit-scrollbar{ width:8px; height:8px; }*/
+/*.cm-soft-scroll::-webkit-scrollbar-thumb{ background:rgba(0,0,0,.22); border-radius:9999px; }*/
+
+/*.cm-thumb{ width:64px; height:64px; border-radius:12px; overflow:hidden; background:var(--c-soft); border:1px solid var(--c-border); }*/
+/*.cm-thumb > img{ width:100%; height:100%; object-fit:cover; object-position:center; display:block; }*/
+
+/*.cm-thumb-80{ width:80px; height:80px; border-radius:14px; overflow:hidden; background:var(--c-soft); border:1px solid var(--c-border); }*/
+/*.cm-thumb-80 > img{ width:100%; height:100%; object-fit:cover; object-position:center; display:block; }*/
+
+/*.cm-media{ aspect-ratio: 4/3; background:var(--c-soft); overflow:hidden; }*/
+/*.cm-media > img{ width:100%; height:100%; object-fit:cover; object-position:center; display:block; }*/
+
+/*.cm-sticky{ position: sticky; top: 72px; }*/
+
+/*!* ——— Karty i przyciski (neutral, bez Daisy) ——— *!*/
+/*.cm-card{ background:var(--c-card); border:1px solid var(--c-border); border-radius:14px; }*/
+/*.cm-card--flat{ background:var(--c-bg); }*/
+/*.cm-btn{*/
+/*  display:inline-flex; align-items:center; justify-content:center; gap:.5rem;*/
+/*  padding:.6rem .9rem; border-radius:.7rem; font-weight:600;*/
+/*  border:1px solid var(--c-border); background:var(--c-bg); color:var(--c-text);*/
+/*  transition: .15s ease background-color, .15s ease border-color, .15s ease color, .08s ease transform;*/
+/*}*/
+/*.cm-btn:hover{ background: color-mix(in oklab, var(--c-card) 70%, var(--c-bg) 30%); }*/
+/*.cm-btn:active{ transform: translateY(.5px); }*/
+/*.cm-btn--primary{*/
+/*  background: var(--c-accent); color: var(--c-accent-ink);*/
+/*  border-color: color-mix(in oklab, var(--c-accent) 40%, var(--c-border));*/
+/*}*/
+/*.cm-btn--primary:hover{ filter: brightness(1.03); }*/
+
+/*!* ——— Pola formularza (composer) ——— *!*/
+/*.cm-input{*/
+/*  width:100%; min-height:3rem; border-radius:.8rem; padding:.65rem .85rem; resize:vertical;*/
+/*  background:var(--c-bg); border:1px solid var(--c-border); color:var(--c-text);*/
+/*  transition:.15s border-color, .15s box-shadow, .15s background-color;*/
+/*}*/
+/*.cm-input:focus{ outline:none; border-color: var(--c-accent);*/
+/*  box-shadow: 0 0 0 3px color-mix(in oklab, var(--c-accent) 25%, transparent);*/
+/*}*/
+
+/*!* ——— Bąbelki ——— *!*/
+/*.cm-msgline{ display:flex; align-items:flex-end; gap:.5rem; }*/
+/*.cm-msgline--me{ justify-content:flex-end; flex-direction: row-reverse; }*/
+/*.cm-avatar{ width:28px; height:28px; border-radius:9999px; overflow:hidden; border:1px solid var(--c-border); background:var(--c-soft); }*/
+/*.cm-avatar > img{ width:100%; height:100%; object-fit:cover; object-position:center; display:block; }*/
+
+/*.cm-bubble{*/
+/*  max-width:min(72ch, 72%); padding:.55rem .8rem; border-radius: 16px;*/
+/*  box-shadow: 0 6px 18px rgba(0,0,0,.06);*/
+/*}*/
+/*.cm-bubble--them{ background: var(--c-them); color: var(--c-them-ink); border-top-left-radius:6px; }*/
+/*.cm-bubble--me{   background: var(--c-me);   color: var(--c-me-ink);   border-top-right-radius:6px; }*/
+
+/*.cm-time{*/
+/*  font-size: 11px; color: var(--c-muted); margin-top: .25rem;*/
+/*}*/
+
+/*!* ——— Nagłówki/separatory ——— *!*/
+/*.cm-h1{ font-weight:700; font-size:1.25rem; color: var(--c-text); }*/
+/*.cm-muted{ color: var(--c-muted); }*/
+/*.cm-sep{ height:1px; background: var(--c-border); }*/
+
+/*!* Pasek nagłówka ogłoszenia nad wątkiem *!*/
+/*.cm-itembar{*/
+/*  display:flex; align-items:center; gap:.75rem;*/
+/*  background: var(--c-card);*/
+/*  border:1px solid var(--c-border);*/
+/*  border-radius: 14px;*/
+/*  padding: .5rem .6rem;*/
+/*}*/
+/*.cm-itembar .thumb{ width:48px; height:48px; border-radius:10px; overflow:hidden; background:var(--c-soft); border:1px solid var(--c-border); }*/
+/*.cm-itembar .thumb > img{ width:100%; height:100%; object-fit:cover; object-position:center; display:block; }*/
+/*.cm-itembar .meta{ min-width:0; }*/
+/*.cm-itembar .title{ font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }*/
+/*.cm-itembar .sub{ font-size:.85rem; color:var(--c-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }*/
+/*.cm-itembar .price{ font-weight:700; margin-left:auto; }*/
+/*.cm-itembar .actions{ display:flex; gap:.5rem; margin-left:.5rem; }*/
+

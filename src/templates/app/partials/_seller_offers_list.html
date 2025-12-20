@@ -1,0 +1,247 @@
+<section
+  x-data="app.sellerOffersList()"
+  x-init="init()"
+  x-effect="() => { return () => destroy() }"
+>
+  <!-- Toolbar -->
+  <div class="mb-4 space-y-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <!-- Szukaj -->
+      <div class="join w-full sm:w-auto">
+        <input
+          class="input input-bordered join-item w-full sm:w-64"
+          placeholder="Szukaj…"
+          x-model="q"
+          @input="onSearchInput"
+          aria-label="Szukaj w ofertach"
+        >
+        <button class="btn join-item" @click="reload()">Szukaj</button>
+      </div>
+
+      <!-- Sortowanie -->
+      <div class="relative">
+        <label for="offers-ordering" class="sr-only">Sortowanie</label>
+        <select
+          id="offers-ordering"
+          class="select select-bordered select-sm fancy-select"
+          x-model="ordering"
+          @change="reload()"
+          aria-label="Sortowanie ofert"
+        >
+          <option value="-created_at">Najnowsze</option>
+          <option value="created_at">Najstarsze</option>
+          <option value="-price">Cena ⬇︎</option>
+          <option value="price">Cena ⬆︎</option>
+          <option value="set_name">A–Z</option>
+          <option value="-set_name">Z–A</option>
+        </select>
+      </div>
+
+      <!-- Statusy: filtr dropdown (checkboxy) -->
+      <div
+        class="relative"
+        x-data="{
+          open:false,
+          pos:{top:0,left:0,width:320},
+          place(){
+            const btn = $refs.btn;
+            if(!btn) return;
+            const r = btn.getBoundingClientRect();
+            const gutter = 8;
+            const maxW = Math.min(window.innerWidth - gutter*2, 320);
+            const left  = Math.min(Math.max(gutter, r.left + window.scrollX), window.innerWidth - gutter - maxW);
+            const top   = r.bottom + window.scrollY + 8;
+            this.pos = { top, left, width: maxW };
+          }
+        }"
+        @keydown.escape.window="open=false"
+        @resize.window="open && place()"
+        @scroll.window.passive="open && place()"
+      >
+        <button
+          type="button"
+          class="btn btn-sm btn-filter"
+          x-ref="btn"
+          @click="open = !open; if(open) $nextTick(() => place())"
+          :aria-expanded="open"
+          aria-controls="status-dd"
+        >
+          Statusy
+          <span class="badge ml-2 btn-filter__badge" x-text="statusSel.size || 'Wszystkie'"></span>
+        </button>
+
+        <!-- Panel teleportowany poza układ -->
+        <template x-teleport=".overlay-root">
+          <div
+            id="status-dd"
+            x-show="open"
+            x-transition.opacity
+            @click.outside="open=false"
+            class="fixed z-[1000] dropdown-panel shadow-xl"
+            :style="`top:${pos.top}px;left:${pos.left}px;width:${pos.width}px`"
+          >
+            <div class="p-3 pb-2 border-b dropdown-panel__section flex items-center justify-between">
+              <div class="text-sm font-medium">Filtruj statusy</div>
+              <div class="flex items-center gap-1">
+                <button class="btn btn-xs btn-ghost" @click="markAllStatuses()">Zaznacz wszystkie</button>
+                <button class="btn btn-xs btn-ghost" @click="clearStatuses()">Wyczyść</button>
+              </div>
+            </div>
+
+            <div class="max-h-56 overflow-auto dd-list">
+              <template x-for="s in statusesAll" :key="s.code">
+                <label class="dd-item">
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-sm dd-check"
+                    :checked="statusSel.has(s.code)"
+                    @change="statusSel.has(s.code) ? statusSel.delete(s.code) : statusSel.add(s.code)"
+                  >
+                  <span class="text-sm" x-text="s.label"></span>
+                </label>
+              </template>
+            </div>
+
+            <div class="p-3 pt-2 border-t dropdown-panel__section flex items-center gap-2">
+              <button class="btn btn-sm btn-primary btn-gold" @click="reload(); open=false">Zastosuj</button>
+              <button class="btn btn-sm btn-ghost" @click="open=false">Anuluj</button>
+              <span class="text-xs opacity-70 ml-auto" x-text="statusSel.size ? ('Wybrano: ' + statusSel.size) : 'Wszystkie'"></span>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- CTA -->
+      <button class="btn btn-primary btn-gold ml-auto" @click="gotoNew()">+ Dodaj ofertę</button>
+    </div>
+  </div>
+
+  <!-- Skeleton -->
+  <template x-if="loading && !items.length">
+    <div class="space-y-1">
+      <template x-for="i in 4" :key="i">
+        <div class="p-3 rounded-lg border list-row flex items-start gap-3 animate-pulse">
+          <div class="list-thumb rounded bg-base-300"></div>
+          <div class="grow min-w-0">
+            <div class="h-4 w-2/3 rounded bg-base-300 mb-2"></div>
+            <div class="h-3 w-1/3 rounded bg-base-300"></div>
+          </div>
+          <div class="w-20 h-7 rounded bg-base-300"></div>
+        </div>
+      </template>
+    </div>
+  </template>
+
+  <template x-if="err">
+    <div class="alert alert-error whitespace-pre-line mt-2" x-text="err"></div>
+  </template>
+
+  <!-- Lista -->
+  <div class="space-y-1" x-show="!loading && items.length">
+    <template x-for="it in items" :key="it.public_id || it.id">
+      <div class="p-3 rounded-lg border list-row flex items-start gap-3">
+        <img :src="img(it)" alt="" class="list-thumb object-cover rounded border">
+        <div class="grow min-w-0">
+          <div class="font-medium truncate" x-text="it.set_name || '(bez nazwy)'"></div>
+          <div class="text-sm opacity-70">
+            <span x-text="priceText(it)"></span> ·
+            <span x-text="it.type?.path || '—'"></span>
+          </div>
+          <div class="mt-0.5 text-xs">
+            <span class="badge badge-ghost" x-text="statusLabel(it.status)"></span>
+            <template x-if="it.catalog_item?.item_name">
+              <span class="badge badge-ghost ml-1" x-text="it.catalog_item.item_name"></span>
+            </template>
+          </div>
+        </div>
+
+        <!-- Akcje -->
+        <div class="list-actions gap-2">
+          <!-- Dropdown zmiany statusu -->
+          <div
+            class="relative"
+            x-data="{
+              open:false,
+              pos:{top:0,left:0,width:220},
+              place(){
+                const btn = $refs.sbtn; if(!btn) return;
+                const r = btn.getBoundingClientRect();
+                const gutter = 8; const w = 220;
+                const left = Math.min(Math.max(gutter, r.left + window.scrollX), window.innerWidth - gutter - w);
+                const top  = r.bottom + window.scrollY + 8;
+                this.pos = { top, left, width: w };
+              }
+            }"
+            @keydown.escape.window="open=false"
+            @resize.window="open && place()"
+            @scroll.window.passive="open && place()"
+          >
+            <button
+              type="button"
+              class="btn btn-xs btn-outline btn-filter"
+              x-ref="sbtn"
+              @click="open = !open; if(open) $nextTick(() => place())"
+              :aria-expanded="open"
+              :aria-label="`Zmień status: ${statusLabel(it.status)}`"
+            >
+              Status: <span class="ml-1 font-medium" x-text="statusLabel(it.status)"></span>
+            </button>
+
+            <template x-teleport=".overlay-root">
+              <div
+                x-show="open"
+                x-transition.opacity
+                @click.outside="open=false"
+                class="fixed z-[1000] dropdown-panel shadow-xl"
+                :style="`top:${pos.top}px;left:${pos.left}px;width:${pos.width}px`"
+              >
+                <div class="p-2 border-b dropdown-panel__section">
+                  <div class="text-xs opacity-70">Zmień status ogłoszenia</div>
+                  <div class="text-sm font-medium truncate" x-text="it.set_name || '(bez nazwy)'"></div>
+                </div>
+
+                <ul class="dd-list py-1">
+                  <template x-for="code in allowedStatusTargets(it)" :key="code">
+                    <li>
+                      <button
+                        type="button"
+                        class="dd-item w-full text-left"
+                        :class="it.status===code ? 'is-current' : ''"
+                        @click="changeStatus(it, code); open=false"
+                      >
+                        <span class="inline-flex items-center gap-2">
+                          <span class="w-2 h-2 rounded-full" :class="statusDotClass(code)"></span>
+                          <span x-text="statusLabel(code)"></span>
+                        </span>
+                        <span x-show="it.status===code" class="ml-auto opacity-70">✓</span>
+                      </button>
+                    </li>
+                  </template>
+                </ul>
+
+                <div class="p-2 border-t dropdown-panel__section">
+                  <button class="btn btn-ghost btn-xs" @click="open=false">Zamknij</button>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Edycja -->
+          <button class="btn btn-xs" @click="gotoEdit(it.public_id || it.id)">Edytuj</button>
+
+          <!-- Usuń -->
+          <button class="btn btn-xs btn-outline btn-error" @click="deleteItem(it)">Usuń</button>
+        </div>
+      </div>
+    </template>
+
+    <div class="pt-2 flex justify-center" x-show="next">
+      <button class="btn btn-outline btn-sm" @click="more()">Pokaż więcej</button>
+    </div>
+    <div x-ref="sentinel" class="h-2"></div>
+  </div>
+
+  <template x-if="!loading && !items.length && !err">
+    <div class="text-sm opacity-70">Brak ofert. Kliknij „Dodaj ofertę”.</div>
+  </template>
+</section>

@@ -1,0 +1,268 @@
+<section class="max-w-4xl mx-auto"
+         x-data="app.userOfferForm({ editingId: '{{ editing_id|default:'' }}' })"
+         x-init="init()" data-protected>
+
+  <div class="mb-4 flex items-center gap-2">
+    <a class="btn btn-ghost" href="/me" hx-boost="true" hx-target="#app-root" hx-push-url="true">← Wróć</a>
+    <h1 class="text-xl font-semibold">Moje ogłoszenie</h1>
+  </div>
+
+  <div class="card card-bordered bg-base-100">
+    <form class="card-body gold-panel grid md:grid-cols-2 gap-3"
+          hx-boost="false"
+          @submit.prevent.stop="save()"
+          novalidate>
+
+      <!-- Tytuł -->
+      <div class="md:col-span-2" id="f_set_name">
+        <input class="input input-bordered fancy-area w-full"
+               :class="errors.set_name ? 'input-error' : ''"
+               placeholder="Tytuł"
+               x-model="form.set_name"
+               name="set_name"
+               required
+               @blur="_validateField('set_name')">
+        <p class="mt-1 text-xs text-error" x-show="errors.set_name" x-text="errors.set_name"></p>
+      </div>
+
+      <!-- Opis -->
+      <div class="md:col-span-2">
+        <textarea class="textarea textarea-bordered fancy-area w-full"
+                  rows="4" placeholder="Opis"
+                  x-model="form.description"></textarea>
+      </div>
+
+      <!-- Cena -->
+      <div id="f_price_str">
+        <label class="label"><span class="label-text">Cena (PLN)</span></label>
+        <input class="input input-bordered fancy-area w-full"
+               :class="errors.price_str ? 'input-error' : ''"
+               placeholder="np. 123.00"
+               x-model="form.price_str"
+               name="price_str"
+               inputmode="decimal"
+               @blur="_validateField('price_str')">
+        <p class="mt-1 text-xs text-error" x-show="errors.price_str" x-text="errors.price_str"></p>
+      </div>
+
+      <!-- Stan -->
+      <div>
+        <label class="label"><span class="label-text">Stan</span></label>
+        <select class="select select-bordered fancy-select w-full" x-model="form.condition">
+          <option value="NEW">Nowy</option>
+          <option value="USED">Używany</option>
+          <option value="REFURBISHED">Odnowiony</option>
+        </select>
+      </div>
+
+      <!-- Typ ogłoszenia -->
+      <div>
+        <label class="label"><span class="label-text">Typ ogłoszenia</span></label>
+        <select class="select select-bordered fancy-select w-full" x-model="form.listing_type">
+          <option value="LISTING">Ogłoszenie</option>
+          <option value="EXCHANGE">Wymiana</option>
+        </select>
+      </div>
+
+      <!-- ===== ILOŚĆ + WYMIARY (zwarta, responsywna siatka) ===== -->
+      <div class="md:col-span-2">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+
+          <!-- Magazyn -->
+          <div id="f_stock_quantity">
+            <label class="label"><span class="label-text">Stan magazynowy</span></label>
+            <div class="numstep numstep--md">
+              <input class="input input-bordered fancy-area w-full numstep__input"
+                     :class="errors.stock_quantity ? 'input-error' : ''"
+                     type="number" min="1" step="1"
+                     x-model.number="form.stock_quantity"
+                     name="stock_quantity"
+                     @blur="_validateField('stock_quantity')">
+              <button type="button" class="numstep__btn numstep__btn--up"   aria-label="Zwiększ"></button>
+              <button type="button" class="numstep__btn numstep__btn--down" aria-label="Zmniejsz"></button>
+            </div>
+            <p class="mt-1 text-xs text-error" x-show="errors.stock_quantity" x-text="errors.stock_quantity"></p>
+          </div>
+
+          <!-- Długość -->
+          <div>
+            <label class="label"><span class="label-text">Długość [cm]</span></label>
+            <div class="numstep numstep--md">
+              <input class="input input-bordered fancy-area w-full numstep__input"
+                     type="number" min="1" step="1"
+                     x-model.number="form.length_cm">
+              <button type="button" class="numstep__btn numstep__btn--up"   aria-label="Zwiększ"></button>
+              <button type="button" class="numstep__btn numstep__btn--down" aria-label="Zmniejsz"></button>
+            </div>
+          </div>
+
+          <!-- Szerokość -->
+          <div>
+            <label class="label"><span class="label-text">Szerokość [cm]</span></label>
+            <div class="numstep numstep--md">
+              <input class="input input-bordered fancy-area w-full numstep__input"
+                     type="number" min="1" step="1"
+                     x-model.number="form.width_cm">
+              <button type="button" class="numstep__btn numstep__btn--up"   aria-label="Zwiększ"></button>
+              <button type="button" class="numstep__btn numstep__btn--down" aria-label="Zmniejsz"></button>
+            </div>
+          </div>
+
+          <!-- Wysokość -->
+          <div>
+            <label class="label"><span class="label-text">Wysokość [cm]</span></label>
+            <div class="numstep numstep--md">
+              <input class="input input-bordered fancy-area w-full numstep__input"
+                     type="number" min="1" step="1"
+                     x-model.number="form.height_cm">
+              <button type="button" class="numstep__btn numstep__btn--up"   aria-label="Zwiększ"></button>
+              <button type="button" class="numstep__btn numstep__btn--down" aria-label="Zmniejsz"></button>
+            </div>
+          </div>
+
+          <!-- Waga -->
+          <div class="sm:col-span-1 col-span-2 lg:col-span-1">
+            <label class="label"><span class="label-text">Waga [kg]</span></label>
+            <div class="numstep numstep--md">
+              <input class="input input-bordered fancy-area w-full numstep__input"
+                     type="number" min="0" step="0.001"
+                     x-model.number="form.weight_kg">
+              <button type="button" class="numstep__btn numstep__btn--up"   aria-label="Zwiększ"></button>
+              <button type="button" class="numstep__btn numstep__btn--down" aria-label="Zmniejsz"></button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <!-- ===== / ILOŚĆ + WYMIARY ===== -->
+
+      <!-- WYBORY -->
+      <div class="md:col-span-2 grid md:grid-cols-2 gap-3 md:auto-rows-fr items-start">
+        <!-- CatalogItem -->
+        <div class="p-3 rounded border h-full flex flex-col">
+          <div class="flex items-center justify-between">
+            <div class="font-medium">Pozycja z katalogu (opcjonalnie)</div>
+            <button class="btn btn-xs" type="button" x-show="selectedCatalog" @click="clearCatalog()">Usuń katalog</button>
+          </div>
+
+          <template x-if="!selectedCatalog">
+            <button class="btn btn-sm btn-outline mt-2" type="button" @click="openCatalogPicker()">Wybierz z katalogu</button>
+          </template>
+
+          <template x-if="selectedCatalog">
+            <div class="catalog-summary mt-2">
+              <img :src="app.imgUrl(selectedCatalog.image_path)" alt="">
+              <div class="meta text-sm">
+                <div class="font-medium truncate" x-text="selectedCatalog.item_name"></div>
+                <div class="opacity-70 text-xs truncate" x-text="selectedCatalog.type?.path || ''"></div>
+              </div>
+
+              <div class="attr-pills">
+                <template
+                  x-for="pair in _attrPairs(selectedCatalog.attributes || selectedCatalog.attrs || {}).slice(0,12)"
+                  :key="pair[0] + (ui_schema ? JSON.stringify(ui_schema.labels?.[pair[0]]||'') : '')">
+                  <span class="attr-pill" :title="pair[0] + ': ' + String(pair[1])">
+                    <span class="k" x-text="pair[0] + ':'"></span>
+                    <span class="v" x-text="String(pair[1])"></span>
+                  </span>
+                </template>
+
+                <span class="text-[11px] opacity-60"
+                      x-show="_attrPairs(selectedCatalog.attributes || selectedCatalog.attrs || {}).length === 0">
+                  brak atrybutów
+                </span>
+              </div>
+            </div>
+          </template>
+
+          <p class="text-xs opacity-70 mt-2">
+            Po wyborze z katalogu – kategoria ustawi się automatycznie i będzie zablokowana.
+          </p>
+        </div>
+
+        <!-- Kategoria -->
+        <div class="p-3 rounded border h-full flex flex-col" id="f_type">
+          <div class="flex items-center justify-between">
+            <div class="font-medium">Kategoria</div>
+            <button class="btn btn-xs" type="button" x-show="selectedType && !selectedCatalog" @click="clearCategory()">Zmień</button>
+          </div>
+
+          <template x-if="!selectedType && !selectedCatalog">
+            <button class="btn btn-sm btn-outline mt-2" type="button" @click="openCategoryPicker()">Wybierz kategorię</button>
+          </template>
+
+          <template x-if="selectedType">
+            <div class="mt-2 text-sm">
+              <div class="font-medium" x-text="selectedType.name"></div>
+              <div class="opacity-70" x-text="selectedType.path"></div>
+            </div>
+          </template>
+
+          <template x-if="selectedCatalog">
+            <div class="mt-2 text-xs opacity-70">Kategoria zablokowana — pochodzi z wybranego katalogu. Usuń katalog, aby zmienić kategorię.</div>
+          </template>
+
+          <p class="mt-2 text-xs text-error" x-show="errors.type" x-text="errors.type"></p>
+        </div>
+      </div>
+
+      <!-- ATRUBUTY (SSF) -->
+      <div class="md:col-span-2">
+        <label class="label"><span class="label-text">Atrybuty</span></label>
+        <textarea id="user_offer_attrs_ssf" data-ssf="1" class="hidden">{}</textarea>
+        <p class="text-xs text-error mt-1 whitespace-pre-line" x-show="schemaErr" x-text="schemaErr"></p>
+      </div>
+
+      <!-- ZDJĘCIA -->
+      <div class="md:col-span-2">
+        <label class="label"><span class="label-text">Zdjęcia</span></label>
+
+        <!-- istniejące -->
+        <div class="img-tiler mb-2" x-show="existingImages.length">
+          <template x-for="(img, i) in existingImages" :key="img.public_id || img.id">
+            <div class="img-tile"
+                 draggable="true"
+                 @dragstart="startDrag(i)"
+                 @dragover.prevent
+                 @drop="dropDrag(i)">
+              <img :src="app.imgUrl(img.image_path || img.url || img.path)" class="img-tile__img" alt="">
+              <button type="button" class="img-tile__btn" title="Zaznacz do usunięcia"
+                      @click="toggleRemoveExisting(img.public_id || img.id)">✕</button>
+              <div class="absolute left-1 bottom-1 text-[10px] px-1 py-0.5 rounded bg-base-100/80 border"
+                   x-text="i+1"></div>
+              <div class="absolute left-1 top-1 text-[10px] px-1 py-0.5 rounded bg-base-100/80 border">przeciągnij</div>
+              <div class="absolute inset-0 pointer-events-none" :class="removeExistingIds.includes(img.public_id||img.id)?'is-marked':''"></div>
+            </div>
+          </template>
+        </div>
+
+        <div class="img-tiler mb-2" x-show="stagedFiles.length">
+          <template x-for="(f, idx) in stagedFiles" :key="idx">
+            <div class="img-tile">
+              <img :src="URL.createObjectURL(f)" class="img-tile__img" alt="">
+              <button type="button" class="img-tile__btn" @click="removeStaged(idx)">✕</button>
+            </div>
+          </template>
+        </div>
+
+        <div class="dropzone" :class="_dzOver ? 'is-over' : ''"
+             @dragover.prevent="onDragOver" @dragleave.prevent="onDragLeave" @drop="onDrop">
+          <div class="flex items-center gap-2">
+            <input id="user-offer-files" type="file" class="hidden" accept="image/*" multiple @change="onFiles">
+            <label for="user-offer-files" class="btn btn-outline btn-sm">Dodaj zdjęcia</label>
+            <span class="text-xs opacity-70">Przeciągnij tutaj lub wybierz pliki. Kafelki 96×96.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="md:col-span-2 flex items-center gap-3">
+        <button class="btn btn-primary btn-gold" type="submit" :disabled="busy" x-text="busy ? 'Zapisywanie…' : 'Zapisz'"></button>
+        <a class="btn btn-ghost" href="/me" hx-boost="true" hx-target="#app-root" hx-push-url="true">Anuluj</a>
+        <span class="text-error whitespace-pre-line" x-show="err" x-text="err"></span>
+        <span class="text-success" x-text="ok"></span>
+      </div>
+    </form>
+  </div>
+
+  {% include 'app/partials/_catalog_pick_modals.html' %}
+</section>

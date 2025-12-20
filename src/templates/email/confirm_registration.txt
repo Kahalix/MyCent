@@ -1,0 +1,6 @@
+Cześć {{ first_name }}!
+
+Aby aktywować konto, otwórz ten link (ważny {{ valid_for_hours }} godz.):
+{{ action_url }}
+
+— {{ site_name }}

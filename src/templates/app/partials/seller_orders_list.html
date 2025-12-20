@@ -1,0 +1,90 @@
+<section class="max-w-5xl mx-auto" data-protected>
+  <h1 class="text-2xl font-semibold mb-4">Zamówienia w moim sklepie</h1>
+  <div x-data="app.sellerOrders()" x-init="init()">
+
+    <!-- AKCJE + FILTRY -->
+    <div class="mb-3 space-y-2">
+      <!-- Rząd 1: akcje (zawsze u góry, po lewej) -->
+      <div class="flex flex-wrap items-center gap-2">
+        <a class="btn btn-sm"
+           href="/seller/orders/new/offline-sale"
+           hx-boost="true" hx-target="#app-root" hx-push-url="true">+ Sprzedaż offline</a>
+
+        <a class="btn btn-sm"
+           href="/seller/orders/new/pawn-purchase"
+           hx-boost="true" hx-target="#app-root" hx-push-url="true">+ Skup od klienta</a>
+      </div>
+
+      <!-- Rząd 2: filtry (po prawej; na małych ekranach łamią się w dół) -->
+      <div class="flex flex-wrap items-center gap-2 justify-end">
+        <!-- Rodzaj -->
+        <select class="select select-bordered select-sm fancy-select"
+                x-model="f.kind" @change="reload()" aria-label="Rodzaj">
+          <option value="">Wszystko</option>
+          <option value="sale">Sprzedaże</option>
+          <option value="pawn">Skupy</option>
+        </select>
+
+        <!-- Status -->
+        <select class="select select-bordered select-sm fancy-select"
+                x-model="f.status" @change="reload()" aria-label="Status">
+          <option value="">Status: wszystkie</option>
+          <option value="PENDING">Oczekujące</option>
+          <option value="COMPLETED">Zakończone</option>
+          <option value="CANCELLED">Anulowane</option>
+          <option value="REFUNDED">Zwrócone</option>
+        </select>
+
+        <!-- Szukaj + Filtruj (wspólna wysokość dzięki join) -->
+        <div class="join w-full sm:w-auto">
+          <input class="input input-bordered input-sm join-item w-full sm:w-64"
+                 placeholder="Szukaj…" x-model="f.search"
+                 @keydown.enter.prevent="reload()" aria-label="Szukaj">
+          <button class="btn btn-sm join-item" @click="reload()">Filtruj</button>
+        </div>
+
+        <!-- Export -->
+        <button class="btn btn-sm btn-outline" @click="downloadExport()">Eksport CSV</button>
+      </div>
+    </div>
+
+    <!-- Skeleton -->
+    <template x-if="loading">
+      <div class="space-y-1">
+        <div class="p-3 rounded-lg border list-row animate-pulse bg-base-300/30"></div>
+        <div class="p-3 rounded-lg border list-row animate-pulse bg-base-300/30"></div>
+      </div>
+    </template>
+
+    <template x-if="err">
+      <div class="alert alert-error my-3" x-text="err"></div>
+    </template>
+
+    <!-- Lista: mikro-odstępy -->
+    <div class="space-y-1" x-show="!loading && !err">
+      <template x-for="o in items" :key="o.public_id">
+        <div class="p-3 rounded-lg border list-row flex items-center justify-between">
+          <div>
+            <div class="text-sm opacity-70">Zamówienie</div>
+            <div class="font-mono text-xs" x-text="o.public_id"></div>
+            <div class="text-xs opacity-70 mt-1">
+              Status: <span class="font-medium" x-text="statusLabel(o.order_status)"></span>
+              <span class="ml-2 badge badge-ghost" x-show="o.tx_type==='PAWN_PURCHASE'">Skup</span>
+              <span class="ml-2 badge badge-ghost" x-show="o.tx_type!=='PAWN_PURCHASE'">Sprzedaż</span>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-sm opacity-70">Kwota</div>
+            <div class="font-semibold"
+                 x-text="o.tx_type==='PAWN_PURCHASE' ? ('− '+app.moneyText(o.purchase_cost)) : app.moneyText(o.purchase_cost)"></div>
+            <div class="mt-2 flex gap-2 justify-end">
+              <a class="btn btn-sm btn-primary"
+                 :href="'/seller/orders/'+o.public_id"
+                 hx-boost="true" hx-target="#app-root" hx-push-url="true">Szczegóły</a>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+</section>

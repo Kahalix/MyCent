@@ -1,0 +1,248 @@
+<section class="max-w-5xl mx-auto" data-protected
+         x-data="app.sellerPawnForm()" x-init="init()">
+  <div class="mb-4 flex items-center gap-2">
+    <a class="btn btn-ghost" href="/seller/pawns" hx-boost="true" hx-target="#app-root" hx-push-url="true">← Wróć</a>
+    <h1 class="text-xl font-semibold">Nowy zastaw</h1>
+  </div>
+
+  <div class="card card-bordered bg-base-100">
+    <form class="card-body gold-panel grid gap-4"
+          hx-boost="false"
+          @submit.prevent.stop="save()"
+          novalidate>
+      <template x-if="err"><div class="alert alert-error whitespace-pre-line" x-text="err"></div></template>
+      <template x-if="ok"><div class="alert alert-success" x-text="ok"></div></template>
+
+      <!-- KLIENT (powiązanie + odłączenie jak w offline) -->
+      <div class="p-3 rounded border border-base-300 bg-base-100">
+        <div class="flex items-center gap-2">
+          <div class="font-medium">Klient (opcjonalnie)</div>
+          <span class="text-xs opacity-70">(wyszukaj po emailu/telefonie lub imieniu+nazwisku)</span>
+        </div>
+
+        <div class="mt-2 grid sm:grid-cols-[1fr_auto] gap-2">
+          <input class="input input-bordered input-sm fancy-area" placeholder="Szukaj klienta…" x-model="cust.q" @keydown.enter.prevent="cust.search()">
+          <button class="btn btn-sm" type="button" @click="cust.search()">Szukaj</button>
+        </div>
+
+        <div class="mt-2 max-h-48 overflow-auto space-y-1 cm-soft-scroll" x-show="cust.results.length">
+          <template x-for="c in cust.results" :key="c.public_id">
+            <button type="button" class="w-full text-left p-2 rounded border border-base-300 bg-base-100 hover:bg-base-200/60"
+                    @click="cust.pick(c)">
+              <div class="font-medium" x-text="(c.first_name||'')+' '+(c.last_name||'') || '(bez nazwy)'"></div>
+              <div class="text-xs opacity-70" x-text="(c.email||'—') + ' • ' + (c.phone||'—') + ' • ' + (c.city||'')"></div>
+            </button>
+          </template>
+          <div class="pt-2 flex justify-center" x-show="cust.next">
+            <button type="button" class="btn btn-outline btn-xs" @click="cust.more()">Więcej…</button>
+          </div>
+        </div>
+
+        <div class="mt-3 grid md:grid-cols-2 gap-2">
+          <input class="input input-bordered fancy-area" placeholder="Imię" x-model="customer.first_name">
+          <input class="input input-bordered fancy-area" placeholder="Nazwisko" x-model="customer.last_name">
+          <input class="input input-bordered fancy-area" type="email" placeholder="Email" x-model="customer.email">
+          <input class="input input-bordered fancy-area" placeholder="Telefon" x-model="customer.phone">
+          <input class="input input-bordered fancy-area md:col-span-2" placeholder="Adres – linia 1" x-model="customer.address_line1">
+          <input class="input input-bordered fancy-area md:col-span-2" placeholder="Adres – linia 2" x-model="customer.address_line2">
+          <input class="input input-bordered fancy-area" placeholder="Kod pocztowy" x-model="customer.postal_code">
+          <input class="input input-bordered fancy-area" placeholder="Miasto" x-model="customer.city">
+          <input class="input input-bordered fancy-area" placeholder="Kraj (ISO-2, np. PL)" x-model="customer.country">
+        </div>
+
+        <div class="mt-2 text-xs flex items-center gap-2">
+          <span x-show="customer_public_id" class="badge badge-ghost">
+            Powiązano: <span class="ml-1 font-mono" x-text="customer_public_id"></span>
+          </span>
+          <button class="btn btn-xs btn-outline" type="button" x-show="customer_public_id" @click="cust.clearLink()">Odłącz</button>
+        </div>
+      </div>
+
+      <!-- PARAMETRY ZASTAWU (bez zmian poza klasami) -->
+      <div class="grid sm:grid-cols-3 gap-3">
+        <div id="f_principal_amount">
+          <label class="label"><span class="label-text">Kapitał (kwota)</span></label>
+          <input id="pawn_principal_amount" class="input input-bordered fancy-area w-full"
+                 :class="fv.principal_amount ? 'input-error' : ''"
+                 inputmode="decimal" placeholder="np. 700.00" x-model="principal_amount">
+          <p class="text-xs text-error mt-1" x-show="fv.principal_amount" x-text="fv.principal_amount"></p>
+        </div>
+        <div>
+          <label class="label"><span class="label-text">Waluta</span></label>
+          <select class="select select-bordered fancy-select w-full" x-model="principal_currency"><option>PLN</option></select>
+        </div>
+        <div id="f_due_in_days">
+          <label class="label"><span class="label-text">Termin (dni)</span></label>
+          <select id="pawn_due_days" class="select select-bordered fancy-select w-full" x-model="due_in_days">
+            <option value="7">7</option><option value="14">14</option><option value="30">30</option><option value="60">60</option>
+          </select>
+          <p class="text-xs text-error mt-1" x-show="fv.due_in_days" x-text="fv.due_in_days"></p>
+        </div>
+      </div>
+
+      <!-- L I N I E -->
+      <div class="p-3 rounded border border-base-300 bg-base-100">
+        <div class="flex items-center justify-between">
+          <div class="font-medium">Przedmioty</div>
+          <button class="btn btn-sm btn-outline" type="button" @click="addLine()">+ Dodaj pozycję</button>
+        </div>
+
+        <div class="mt-3 space-y-4">
+          <template x-for="(row, i) in lines" :key="row.uid">
+            <div class="p-3 rounded border border-base-300 bg-base-100">
+              <div class="flex items-center gap-2">
+                <div class="join">
+                  <button type="button" class="btn btn-xs join-item" :class="{'btn-primary': row.mode==='SET'}" @click="row.mode='SET'">Z oferty</button>
+                  <button type="button" class="btn btn-xs join-item" :class="{'btn-primary': row.mode==='CAT'}" @click="row.mode='CAT'">Z katalogu / kategorii</button>
+                </div>
+                <button type="button" class="btn btn-xs btn-ghost ml-auto" @click="removeLine(i)">Usuń</button>
+              </div>
+
+              <!-- SET — wygląd jak w offline -->
+              <div class="mt-3" x-show="row.mode==='SET'">
+                <template x-if="!row.item_set.selected">
+                  <div class="space-y-2">
+                    <div class="grid sm:grid-cols-[1fr_auto] gap-2">
+                      <input class="input input-bordered input-sm fancy-area" placeholder="Szukaj w ofertach…"
+                             x-model="row.item_set.q" @keydown.enter.prevent="searchItemSets(row)">
+                      <button class="btn btn-sm" type="button" @click="searchItemSets(row)">Szukaj</button>
+                    </div>
+                    <div class="text-xs text-error" x-show="row._errs.selected" x-text="row._errs.selected"></div>
+
+                    <template x-if="row.item_set.loading"><div class="h-20 rounded border animate-pulse bg-base-300/40"></div></template>
+
+                    <div class="grid sm:grid-cols-2 gap-2 max-h-[50vh] overflow-auto cm-soft-scroll">
+                      <template x-for="it in row.item_set.results" :key="it.public_id || it.id">
+                        <button type="button"
+                                class="p-2 rounded border hover:bg-base-200/60 text-left flex items-center gap-3"
+                                @click="pickItemSet(row, it)">
+                          <img :src="img(it)" class="list-thumb rounded object-cover border" alt="">
+                          <div class="min-w-0">
+                            <div class="font-medium truncate" x-text="it.set_name || '(bez nazwy)'"></div>
+                            <div class="text-xs opacity-70 truncate"
+                                 x-text="(it.type?.path || '—') + ' • ' + priceText(it)"></div>
+                          </div>
+                        </button>
+                      </template>
+                    </div>
+
+                    <div class="pt-2 flex justify-center" x-show="row.item_set.next">
+                      <button type="button" class="btn btn-outline btn-xs" @click="moreItemSets(row)">Pokaż więcej</button>
+                    </div>
+                  </div>
+                </template>
+
+                <template x-if="row.item_set.selected">
+                  <div class="flex items-center gap-3">
+                    <img :src="img(row.item_set.selected)" class="list-thumb rounded object-cover border" alt="">
+                    <div class="min-w-0">
+                      <div class="font-medium truncate" x-text="row.item_set.selected.set_name || '(bez nazwy)'"></div>
+                      <div class="text-xs opacity-70" x-text="row.item_set.selected.type?.path || '—'"></div>
+                      <div class="text-xs opacity-70" x-text="'ID: ' + (row.item_set.selected.public_id || row.item_set.selected.id)"></div>
+                    </div>
+                    <button type="button" class="btn btn-xs ml-auto" @click="clearItemSet(row)">Zmień</button>
+                  </div>
+                </template>
+              </div>
+
+              <!-- CAT (bez zmian funkcjonalnych, tylko klasy) -->
+              <div class="mt-3" x-show="row.mode==='CAT'">
+                <div class="grid md:grid-cols-2 gap-3 items-stretch">
+                  <div class="p-3 rounded border border-base-300 bg-base-100 h-full flex flex-col">
+                    <div class="flex items-center justify-between">
+                      <div class="font-medium">Źródło</div>
+                      <button class="btn btn-xs" type="button" x-show="row._selectedCatalog" @click="clearRowCatalog(i)">Usuń katalog</button>
+                    </div>
+
+                    <div class="mt-2 flex gap-2">
+                      <button class="btn btn-sm btn-outline" type="button" @click="openRowCatalogPicker(i)">Wybierz z katalogu</button>
+                      <button class="btn btn-sm btn-outline" type="button" x-show="!row._selectedCatalog" @click="openRowCategoryPicker(i)">Wybierz kategorię</button>
+                    </div>
+
+                    <template x-if="row._selectedCatalog">
+                      <div class="catalog-summary mt-2">
+                        <img :src="app.imgUrl(row._selectedCatalog.image_path || row._selectedCatalog.image_url || '')" alt="">
+                        <div class="meta text-sm">
+                          <div class="font-medium truncate" x-text="row._selectedCatalog.item_name"></div>
+                          <div class="text-xs opacity-70 truncate" x-text="row._selectedCatalog.type?.path || ''"></div>
+                        </div>
+                      </div>
+                    </template>
+
+                    <div class="text-xs text-error mt-1" x-show="row._errs.selected" x-text="row._errs.selected"></div>
+                  </div>
+
+                  <div class="p-3 rounded border border-base-300 bg-base-100 h-full flex flex-col">
+                    <div class="flex items-center justify-between">
+                      <div class="font-medium">Kategoria</div>
+                      <button class="btn btn-xs" type="button" x-show="row._selectedType && !row._selectedCatalog" @click="clearRowCategory(i)">Zmień</button>
+                    </div>
+
+                    <template x-if="row._selectedType">
+                      <div class="mt-2 text-sm">
+                        <div class="font-medium" x-text="row._selectedType.name"></div>
+                        <div class="opacity-70" x-text="row._selectedType.path"></div>
+                      </div>
+                    </template>
+                    <template x-if="row._selectedCatalog">
+                      <div class="mt-2 text-xs opacity-70">Kategoria pochodzi z katalogu (zablokowana).</div>
+                    </template>
+
+                    <div class="mt-3">
+                      <label class="label"><span class="label-text">Atrybuty</span></label>
+                      <textarea class="hidden" data-ssf="1" :id="'pawn_attrs_ssf_'+row.uid">{}</textarea>
+                      <p class="text-xs text-error mt-1 whitespace-pre-line" x-show="row._schemaErr" x-text="row._schemaErr"></p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pola pozycji -->
+              <div class="grid md:grid-cols-2 gap-2 mt-3">
+                <input class="input input-bordered fancy-area" placeholder="Tytuł (opcjonalnie)" x-model="row.title">
+                <input class="input input-bordered fancy-area" placeholder="Opis (opcjonalnie)" x-model="row.description">
+
+                <div>
+                  <label class="label"><span class="label-text">Ilość</span></label>
+                  <div class="numstep numstep--md">
+                    <input :id="'pawn_qty_'+row.uid"
+                           class="input input-bordered fancy-area w-full numstep__input"
+                           :class="row._errs.quantity ? 'input-error' : ''"
+                           type="number" min="1" step="1" x-model.number="row.quantity">
+                    <button type="button" class="numstep__btn numstep__btn--up"   aria-label="Zwiększ"></button>
+                    <button type="button" class="numstep__btn numstep__btn--down" aria-label="Zmniejsz"></button>
+                  </div>
+                  <p class="text-xs text-error mt-1" x-show="row._errs.quantity" x-text="row._errs.quantity"></p>
+                </div>
+
+                <div class="grid grid-cols-[1fr_auto] gap-2">
+                  <div>
+                    <label class="label"><span class="label-text">Wycena (kwota)</span></label>
+                    <input :id="'pawn_app_'+row.uid" class="input input-bordered fancy-area w-full"
+                           :class="row._errs.appraisal_amount ? 'input-error' : ''"
+                           inputmode="decimal" placeholder="np. 333.00" x-model="row.appraisal_amount">
+                    <p class="text-xs text-error mt-1" x-show="row._errs.appraisal_amount" x-text="row._errs.appraisal_amount"></p>
+                  </div>
+                  <div>
+                    <label class="label"><span class="label-text">Waluta</span></label>
+                    <select class="select select-bordered fancy-select w-full" x-model="row.appraisal_currency">
+                      <option>PLN</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button class="btn btn-primary btn-gold" type="submit" :disabled="busy" x-text="busy ? 'Zapisywanie…' : 'Zapisz'"></button>
+        <a class="btn btn-ghost" href="/seller/pawns" hx-boost="true" hx-target="#app-root" hx-push-url="true">Anuluj</a>
+      </div>
+    </form>
+  </div>
+
+  {% include 'app/partials/_catalog_pick_modals.html' %}
+</section>

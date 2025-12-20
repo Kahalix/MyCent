@@ -1,0 +1,24 @@
+{% extends "email/_base.html" %}
+{% block content %}
+<p style="margin:0 0 16px;color:#374151;">Cześć {{ first_name }}!</p>
+
+<p style="margin:0 0 8px;color:#374151;">
+  Cena obserwowanej oferty <strong>{{ item_name }}</strong> spadła.
+</p>
+<p style="margin:0 16px 16px;padding:12px;border-radius:8px;background:#f9fafb;color:#111827;border:1px solid #e9ecf3;">
+  <span style="display:inline-block;min-width:120px;">Poprzednio:</span>
+  <strong>{{ old_price }}</strong><br />
+  <span style="display:inline-block;min-width:120px;">Teraz:</span>
+  <strong>{{ new_price }}</strong>
+</p>
+
+<p style="margin:0 0 16px;">
+  <a href="{{ action_url }}" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#111827;color:#ffffff;text-decoration:none;font-weight:600;">
+    Zobacz ofertę
+  </a>
+</p>
+
+<p style="margin:0;color:#6b7280;word-break:break-all;">
+  Jeżeli przycisk nie działa, skopiuj ten adres: {{ action_url }}
+</p>
+{% endblock %}

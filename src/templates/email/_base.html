@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{ subject|default:site_name }}</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+  </head>
+  <body style="margin:0;padding:0;background:#f6f7fb;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7fb;padding:24px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e9ecf3;">
+            <tr>
+              <td style="padding:24px 28px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;">
+                <h1 style="margin:0 0 12px;font-size:20px;line-height:1.4;color:#111827;">{{ subject }}</h1>
+                {% block content %}{% endblock %}
+                <p style="margin-top:24px;font-size:12px;color:#6b7280;">
+                  Ten e-mail został wysłany przez {{ site_name }}. Jeśli to nie Ty inicjowałeś tę akcję, zignoruj tę wiadomość.
+                </p>
+              </td>
+            </tr>
+          </table>
+          <p style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;font-size:12px;color:#9ca3af;margin-top:16px;">
+            &copy; {{ site_name }} {{ now|date:"Y" }}
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

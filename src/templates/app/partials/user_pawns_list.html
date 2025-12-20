@@ -1,0 +1,81 @@
+<section class="max-w-5xl mx-auto" data-protected
+         x-data="app.userPawnsList()" x-init="init()">
+
+  <h1 class="text-2xl font-semibold mb-4">Moje zastawy</h1>
+
+  <!-- Toolbar -->
+    <div class="mb-3 space-y-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Szukaj -->
+        <div class="join w-full sm:w-auto">
+          <input
+            class="input input-bordered join-item w-full sm:w-64"
+            placeholder="Szukaj…"
+            x-model="q"
+            @keydown.enter.prevent="load()"
+            aria-label="Szukaj zastawów"
+          >
+          <button class="btn join-item" @click="load()">Szukaj</button>
+        </div>
+
+        <!-- Status -->
+        <div class="relative">
+          <label for="user-pawns-status" class="sr-only">Status</label>
+          <select id="user-pawns-status"
+                  class="select select-bordered select-sm fancy-select"
+                  x-model="status" @change="load()" aria-label="Status">
+            <option value="">Wszystkie</option>
+            <option value="ACTIVE">Aktywny</option>
+            <option value="REDEEMED">Wykupiony</option>
+            <option value="FORFEITED">Przepadły</option>
+            <option value="CANCELLED">Anulowany</option>
+          </select>
+        </div>
+
+        <!-- Daty -->
+        <div class="join">
+          <input type="date" class="input input-bordered input-sm join-item" x-model="dueFrom" aria-label="Od daty">
+          <input type="date" class="input input-bordered input-sm join-item" x-model="dueTo"   aria-label="Do daty">
+          <button class="btn btn-sm join-item" @click="load()">Filtruj</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Skeleton -->
+    <template x-if="loading">
+      <div class="space-y-1">
+        <div class="p-3 rounded-lg border list-row animate-pulse bg-base-300/20"></div>
+        <div class="p-3 rounded-lg border list-row animate-pulse bg-base-300/20"></div>
+      </div>
+    </template>
+
+    <!-- Lista -->
+    <div class="pawns-list space-y-1 mt-1" x-show="!loading">
+      <template x-for="p in items" :key="p.public_id">
+        <a class="block p-3 rounded-lg border list-row hover:bg-base-200/50"
+           :href="'/pawns/'+p.public_id" hx-boost="true" hx-target="#app-root" hx-push-url="true">
+          <div class="flex items-start gap-3">
+            <div class="min-w-0 grow">
+              <div class="font-medium">
+                Kapitał: <span x-text="app.moneyText(p.principal)"></span>
+                <span class="ml-2 text-xs opacity-70" x-show="isExpired(p)">po terminie</span>
+              </div>
+              <div class="text-xs opacity-70 mt-0.5">
+                Od: <span x-text="p.start_date"></span> • Do: <span x-text="p.due_date"></span>
+              </div>
+            </div>
+            <div class="list-actions flex-col items-end gap-1">
+              <span class="badge" :class="badgeCls(p.status)" x-text="statusLabel(p.status)"></span>
+              <div class="text-right text-sm">
+                Wycena: <span class="font-medium" x-text="app.moneyText(p.appraisal_total)"></span>
+              </div>
+            </div>
+          </div>
+        </a>
+      </template>
+
+      <template x-if="!items.length">
+        <div class="text-sm opacity-70">Brak zastawów.</div>
+      </template>
+    </div>
+</section>

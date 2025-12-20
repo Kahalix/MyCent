@@ -1,0 +1,221 @@
+<section class="max-w-4xl mx-auto" x-data="app.profileView()" x-init="load()" data-protected>
+  <h1 class="text-2xl font-semibold mb-4">Profil</h1>
+
+  <!-- Zakładki: zawsze widoczne, czysty Tailwind -->
+    <nav class="mb-6">
+      <ul class="tabs-rail" role="tablist">
+        <li><button type="button" class="tab-btn" :class="{'is-active': tab==='overview'}"  :aria-selected="tab==='overview'"  @click="setTab('overview')">Ogólne</button></li>
+        <li><button type="button" class="tab-btn" :class="{'is-active': tab==='photo'}"     :aria-selected="tab==='photo'"     @click="setTab('photo')">Zdjęcie</button></li>
+        <li><button type="button" class="tab-btn" :class="{'is-active': tab==='data'}"      :aria-selected="tab==='data'"      @click="setTab('data')">Dane</button></li>
+        <li><button type="button" class="tab-btn" :class="{'is-active': tab==='shipping'}"  :aria-selected="tab==='shipping'"  @click="setTab('shipping')">Wysyłki</button></li>
+        <li><button type="button" class="tab-btn" :class="{'is-active': tab==='security'}"  :aria-selected="tab==='security'"  @click="setTab('security')">Bezpieczeństwo</button></li>
+      </ul>
+    </nav>
+
+
+  <template x-if="!me">
+    <div class="alert">Ładowanie…</div>
+  </template>
+
+  <template x-if="me">
+    <div>
+      <!-- TAB: Ogólne (podgląd z avatar + skróty) -->
+      <div x-show="tab==='overview'" x-cloak>
+        <div class="card card-bordered bg-base-100">
+          <div class="card-body">
+            <div class="flex flex-col md:flex-row items-start md:items-center gap-6">
+              <img :src="me.user_image || 'https://placehold.co/160x160?text=avatar'"
+                   class="w-28 h-28 rounded-full border object-cover" alt="">
+
+              <div class="grow grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div>
+                  <div class="text-sm opacity-70">Imię i nazwisko</div>
+                  <div class="font-medium" x-text="[(me.first_name||''),(me.last_name||'')].filter(Boolean).join(' ') || '—'"></div>
+                </div>
+                <div>
+                  <div class="text-sm opacity-70">E-mail</div>
+                  <div class="font-medium" x-text="me.email"></div>
+                </div>
+                <div>
+                  <div class="text-sm opacity-70">Telefon</div>
+                  <div class="font-medium" x-text="me.phone_number || '—'"></div>
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-2 w-full md:w-auto">
+                <button class="btn btn-outline btn-sm" @click="setTab('photo')">Zmień zdjęcie</button>
+                <button class="btn btn-outline btn-sm" @click="setTab('data')">Edytuj dane</button>
+                <button class="btn btn-gold btn-sm" @click="setTab('shipping')">Adresy wysyłkowe</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: Zdjęcie (zmiana avatara) -->
+      <div x-show="tab==='photo'" x-cloak>
+        <div class="card card-bordered bg-base-100">
+          <div class="card-body">
+            <h2 class="card-title mb-4">Zdjęcie profilowe</h2>
+
+            <div class="flex flex-col md:flex-row items-center gap-6">
+              <img :src="previewUrl || me.user_image || 'https://placehold.co/160x160?text=avatar'"
+                   class="w-28 h-28 rounded-full border object-cover" alt="">
+
+              <div class="w-full md:max-w-md">
+                <!-- ukryty input + 2 przyciski -->
+                <input id="avatar-input" type="file" class="hidden"
+                       x-ref="avatarInput" accept="image/*" @change="onPickAvatar">
+
+                <div class="flex gap-2">
+                  <label for="avatar-input" class="btn btn-outline w-full truncate">
+                    <span x-text="selectedFile ? selectedFile.name : 'Wybierz zdjęcie'"></span>
+                  </label>
+                  <button type="button" class="btn btn-primary btn-gold"
+                          :disabled="!selectedFile || avatarBusy"
+                          @click="uploadAvatar()">
+                    <span x-show="!avatarBusy">Wyślij</span>
+                    <span x-show="avatarBusy" class="loading loading-spinner"></span>
+                  </button>
+                </div>
+
+                <div class="mt-2 flex gap-2">
+                  <button class="btn btn-ghost btn-xs" type="button"
+                          x-show="selectedFile" @click="clearAvatarSelection()">Wyczyść</button>
+                  <button class="btn btn-outline btn-xs" type="button" @click="deleteAvatar()">Usuń aktualne</button>
+                </div>
+
+                <p class="text-error mt-2 text-sm" x-text="avatarErr"></p>
+                <p class="text-success mt-1 text-sm" x-text="avatarOk"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: Dane (edycja pól) -->
+      <div x-show="tab==='data'" x-cloak>
+        <div class="card card-bordered bg-base-100">
+          <div class="card-body gold-panel">
+            <h2 class="card-title">Dane kontaktowe</h2>
+
+            <form class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2" @submit.prevent="save()">
+              <input class="input input-bordered" placeholder="Imię" x-model="me.first_name">
+              <input class="input input-bordered" placeholder="Nazwisko" x-model="me.last_name">
+              <input class="input input-bordered md:col-span-2" placeholder="Telefon" x-model="me.phone_number">
+              <div class="md:col-span-2 flex items-center gap-3">
+                <button class="btn btn-primary btn-gold" :disabled="busy" x-text="busy?'Zapisywanie…':'Zapisz'"></button>
+                <span class="text-success" x-text="okMsg"></span>
+                <span class="text-error" x-text="err"></span>
+              </div>
+            </form>
+
+            <div class="mt-4 text-sm opacity-70">
+              <div><span class="font-medium">E-mail:</span> <span x-text="me.email"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: Wysyłki (książka adresowa) -->
+      <template x-if="tab==='shipping'">
+      <div class="card card-bordered bg-base-100" x-data="app.shippingAddress()" x-init="load()">
+        <div class="card-body gold-panel">
+          <h2 class="card-title">Adres wysyłkowy</h2>
+
+          <form class="grid md:grid-cols-2 gap-3 mt-2" gold-panel @submit.prevent="save()">
+            <input class="input input-bordered" placeholder="Imię" x-model="addr.first_name">
+            <input class="input input-bordered" placeholder="Nazwisko" x-model="addr.last_name">
+            <input class="input input-bordered md:col-span-2" placeholder="E-mail" x-model="addr.email" type="email">
+            <input class="input input-bordered md:col-span-2" placeholder="Telefon" x-model="addr.phone_number">
+            <input class="input input-bordered md:col-span-2" placeholder="Ulica" x-model="addr.street">
+            <div class="grid grid-cols-2 gap-3">
+              <input class="input input-bordered" placeholder="Nr domu" x-model="addr.house_number">
+              <input class="input input-bordered" placeholder="Województwo" x-model="addr.state">
+            </div>
+            <input class="input input-bordered" placeholder="Miasto" x-model="addr.city">
+            <input class="input input-bordered" placeholder="Kod pocztowy" x-model="addr.postal_code">
+            <input class="input input-bordered md:col-span-2" placeholder="Kraj" x-model="addr.country">
+
+            <div class="md:col-span-2 flex items-center gap-3">
+              <button class="btn btn-primary btn-gold" :disabled="busy" x-text="busy ? 'Zapisywanie…' : (exists ? 'Zapisz zmiany' : 'Dodaj adres')"></button>
+              <button class="btn btn-outline" type="button" x-show="exists" @click="remove()">Usuń</button>
+              <span class="text-success" x-text="ok"></span>
+              <span class="text-error" x-text="err"></span>
+            </div>
+          </form>
+        </div>
+      </div>
+    </template>
+    <!-- TAB: Bezpieczeństwo (zmiana hasła + e-maila) -->
+    <div x-show="tab==='security'" x-cloak>
+      <div class="card card-bordered bg-base-100">
+        <div class="card-body grid md:grid-cols-2 gap-6">
+          <!-- Zmiana hasła -->
+            <div x-data="app.changePasswordForm()">
+              <h3 class="font-semibold mb-2">Zmień hasło</h3>
+
+              <form class="space-y-3 gold-panel p-4" @submit.prevent="submit">
+                <label class="form-control">
+                  <span class="label"><span class="label-text">Obecne hasło</span></span>
+                  <div class="join w-full">
+                    <input class="input input-bordered join-item w-full"
+                           :type="show_old ? 'text' : 'password'"
+                           x-model="old_password" placeholder="Obecne hasło" required>
+                    <button class="btn join-item" type="button" @click="show_old=!show_old" :aria-pressed="show_old">
+                      <span x-text="show_old ? 'Ukryj' : 'Pokaż'"></span>
+                    </button>
+                  </div>
+                </label>
+
+                <label class="form-control">
+                  <span class="label"><span class="label-text">Nowe hasło</span></span>
+                  <div class="join w-full">
+                    <input class="input input-bordered join-item w-full"
+                           :type="show_n1 ? 'text' : 'password'"
+                           x-model="new_password" placeholder="Min. 10 znaków" required>
+                    <button class="btn join-item" type="button" @click="show_n1=!show_n1">
+                      <span x-text="show_n1 ? 'Ukryj' : 'Pokaż'"></span>
+                    </button>
+                  </div>
+                  <span class="label text-warning text-xs" x-show="weak">Hasło jest krótkie – użyj min. 10 znaków.</span>
+                </label>
+
+                <label class="form-control">
+                  <span class="label"><span class="label-text">Powtórz nowe hasło</span></span>
+                  <div class="join w-full">
+                    <input class="input input-bordered join-item w-full"
+                           :type="show_n2 ? 'text' : 'password'"
+                           x-model="new_password2" placeholder="Powtórz hasło" required>
+                    <button class="btn join-item" type="button" @click="show_n2=!show_n2">
+                      <span x-text="show_n2 ? 'Ukryj' : 'Pokaż'"></span>
+                    </button>
+                  </div>
+                </label>
+
+                <div class="flex items-center gap-3">
+                  <button class="btn btn-primary btn-gold" :disabled="busy" x-text="busy?'Zapisywanie…':'Zmień hasło'"></button>
+                  <div class="text-success text-sm" x-text="ok"></div>
+                  <div class="text-error text-sm whitespace-pre-line" x-text="err"></div>
+                </div>
+              </form>
+            </div>
+
+          <!-- Zmiana e-maila -->
+          <div x-data="app.changeEmailForm()">
+            <h3 class="font-semibold mb-2">Zmień e-mail</h3>
+            <form class="space-y-2" @submit.prevent="submit">
+              <input class="input input-bordered w-full" type="email" x-model="new_email" placeholder="Nowy e-mail" required>
+              <button class="btn btn-outline" :disabled="busy" x-text="busy?'Wysyłanie…':'Wyślij link potwierdzający'"></button>
+              <div class="text-success text-sm" x-text="ok"></div>
+              <div class="text-error text-sm" x-text="err"></div>
+            </form>
+            <p class="opacity-70 text-xs mt-1">Na nowy adres wyślemy link do potwierdzenia.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+
+  </template>
+</section>

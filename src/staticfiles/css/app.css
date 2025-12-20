@@ -1,0 +1,1896 @@
+/* ==========================================================================
+   app.css
+   ========================================================================== */
+
+
+/* Indykator trasy (górna belka) */
+.route-indicator{
+  position: fixed; inset: 0 0 auto 0; height: 3px; z-index: 60; pointer-events: none; display: none;
+}
+.route-indicator.htmx-request{ display:block; }
+.route-indicator__bar{
+  height: 100%;
+  background: oklch(var(--p));
+  animation: route-progress 1.2s ease-in-out infinite;
+}
+@keyframes route-progress{
+  0%{ transform: translateX(-60%); width: 40%; }
+  50%{ transform: translateX(20%);  width: 60%; }
+  100%{ transform: translateX(100%); width: 20%; }
+}
+
+/* Miękki fade #app-root podczas requestu */
+#app-root.is-route-loading{
+  opacity: .6;
+  filter: saturate(.9);
+  transition: opacity .15s ease, filter .15s ease;
+  pointer-events: none;
+}
+
+
+
+/* Złoty przycisk (zostawiamy) */
+.btn-gold{
+  background-image: linear-gradient(180deg, var(--fallback-p, oklch(var(--p))) 0%, color-mix(in oklab, oklch(var(--p)) 90%, black) 100%);
+  border: none;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 8px 20px -8px rgba(0,0,0,.5);
+}
+.btn-gold:hover{ filter: brightness(1.05); }
+
+/* „Glass” karta */
+.glass-card{
+  background: color-mix(in oklab, oklch(var(--b1)) 94%, transparent);
+  border: 1px solid color-mix(in oklab, oklch(var(--b3)) 70%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+/* Złotawa obwódka / poświata do sekcji z danymi */
+.gold-panel{
+  border: 1px solid color-mix(in oklab, oklch(var(--p)) 42%, oklch(var(--b3)) 58%);
+  background: linear-gradient(180deg,
+    color-mix(in oklab, oklch(var(--b2)) 85%, transparent) 0%,
+    color-mix(in oklab, oklch(var(--b1)) 92%, transparent) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    0 10px 28px -16px rgba(0,0,0,.55),
+    0 0 0 1px color-mix(in oklab, oklch(var(--p)) 18%, transparent);
+  border-radius: .75rem;
+}
+.gold-panel .card-body{ padding: 1rem; }
+
+/* Ogólne karty/sekcje w dark: lekko jaśniejsze */
+:root[data-theme="lownDark"] .card,
+:root[data-theme="lownDark"] .card-bordered{
+  background-color: oklch(var(--b2));
+  border-color:     oklch(var(--b3));
+}
+
+/* Nav link hover – subtelna pigułka */
+.navlink{ padding:.5rem .75rem; border-radius:.5rem; }
+.navlink:hover{ background: color-mix(in oklab, oklch(var(--b2)) 85%, white 15%); }
+
+/* Avatar limit (jak było) */
+img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
+
+/* Upewnij się, że cloak działa natychmiast */
+[x-cloak]{ display:none !important; }
+
+/* === TOAST TRAY (pozycja + bezpieczne marginesy) === */
+.toast-tray{
+  position: fixed;
+  right: calc(16px + env(safe-area-inset-right));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  width: min(92vw, 380px);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none; /* kliki tylko na kartach */
+}
+
+/* Pojedyncza karta toasta */
+.toast-card{
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: start;
+  gap: .75rem;
+  padding: .75rem .875rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in oklab, oklch(var(--b3)) 70%, transparent);
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, oklch(var(--b1)) 88%, transparent) 0%,
+      color-mix(in oklab, oklch(var(--b1)) 82%, transparent) 100%);
+  backdrop-filter: blur(10px) saturate(1.1);
+  box-shadow:
+    0 10px 28px rgba(0,0,0,.35),
+    0 0 0 1px color-mix(in oklab, oklch(var(--b3)) 35%, transparent);
+  color: oklch(var(--bc));
+  transform-origin: 100% 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Lewy akcent (taśma) */
+.toast-card::before{
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: var(--toast-accent, #d4af37);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--toast-accent) 35%, transparent),
+    0 0 18px color-mix(in oklab, var(--toast-accent) 60%, transparent);
+}
+
+/* Warianty kolorystyczne */
+.toast-card.is-success{ --toast-accent: #3ddc84; }
+.toast-card.is-error  { --toast-accent: #ef4444; }
+.toast-card.is-warning{ --toast-accent: #f59e0b; }
+.toast-card.is-info   { --toast-accent: #38bdf8; }
+
+/* Elementy wnętrza toasta */
+.toast-icon{
+  margin-top: 2px;
+  opacity: .95;
+  color: var(--toast-accent, #d4af37);
+  filter: drop-shadow(0 0 8px color-mix(in oklab, var(--toast-accent) 65%, transparent));
+}
+.toast-body{ font-size: .925rem; line-height: 1.35rem; }
+.toast-close{
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: oklch(var(--bc));
+  opacity: .7;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 8px;
+  transition: opacity .15s ease, background-color .15s ease;
+  cursor: pointer;
+}
+.toast-close:hover{ opacity: 1; background: color-mix(in oklab, oklch(var(--b2)) 70%, transparent); }
+
+/* Tryb dark – odrobinę mocniejszy glass */
+:root[data-theme="lownDark"] .toast-card{
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, oklch(var(--b2)) 86%, transparent) 0%,
+      color-mix(in oklab, oklch(var(--b2)) 82%, transparent) 100%);
+  box-shadow:
+    0 12px 32px rgba(0,0,0,.45),
+    0 0 0 1px color-mix(in oklab, oklch(var(--b3)) 45%, transparent);
+}
+
+/* === Pola formularza / selecty === */
+.fancy-area,
+.fancy-select{
+  background-color: oklch(var(--b1));
+  color: oklch(var(--bc));
+  border-color: oklch(var(--b3));
+  transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease, transform .08s ease;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+}
+.fancy-area::placeholder,
+.fancy-select::placeholder{
+  color: color-mix(in oklab, oklch(var(--bc)) 55%, transparent);
+  opacity: .7;
+}
+.fancy-area:hover,
+.fancy-select:hover{
+  background-color: color-mix(in oklab, oklch(var(--b1)) 92%, white 8%);
+}
+.fancy-area:focus,
+.fancy-select:focus{
+  outline: none;
+  border-color: oklch(var(--p));
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, oklch(var(--p)) 26%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.08);
+}
+.fancy-area.is-invalid,
+.fancy-select.is-invalid,
+.fancy-area[aria-invalid="true"],
+.fancy-select[aria-invalid="true"]{
+  border-color: oklch(var(--error));
+  box-shadow: 0 0 0 3px color-mix(in oklab, oklch(var(--error)) 26%, transparent);
+}
+.fancy-area:disabled,
+.fancy-select:disabled{
+  opacity: .7;
+  cursor: not-allowed;
+}
+
+/* Textarea szczegóły */
+.fancy-area{
+  min-height: 3rem;
+  line-height: 1.35rem;
+  resize: vertical;
+  caret-color: oklch(var(--p));
+}
+
+/* Select: custom strzałka i padding */
+.fancy-select{
+  appearance: none;
+  background-image:
+    url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' fill='%23d4af37' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.5 7.5l4.5 4.5 4.5-4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right .75rem center;
+  background-size: 16px 16px;
+  padding-right: 2rem;
+  cursor: pointer;
+}
+.select-sm.fancy-select{ padding-right: 1.75rem; }
+.fancy-select option{
+  background-color: oklch(var(--b1));
+  color: oklch(var(--bc));
+}
+
+/* Dark – subtelnie ciemniejsze tło i mocniejszy hover */
+:root[data-theme="lownDark"] .fancy-area,
+:root[data-theme="lownDark"] .fancy-select{
+  background-color: oklch(var(--b2));
+  border-color: oklch(var(--b3));
+}
+:root[data-theme="lownDark"] .fancy-area:hover,
+:root[data-theme="lownDark"] .fancy-select:hover{
+  background-color: color-mix(in oklab, oklch(var(--b2)) 90%, white 10%);
+}
+
+/* Delikatny „tap” po kliknięciu */
+.fancy-area:active,
+.fancy-select:active{ transform: translateY(0.5px); }
+
+/* ===================================================================
+   CUSTOM NUMBER STEPPER (scoped, bez grzebania w globalnych spinnerach)
+   Używa Twoich zmiennych: --frame-bg / --frame-border / --bc / --p
+   =================================================================== */
+
+/* Kontener steppera (otuli input) */
+.numstep{
+  position: relative;
+  display: inline-block;
+  width: 100%;            /* naturalnie rozciąga się jak input */
+}
+
+/* Rozmiary wariantów (opcjonalnie) */
+.numstep--sm{ --numstep-btn-w: 1.6rem; }
+.numstep--md{ --numstep-btn-w: 2.0rem; }
+.numstep--lg{ --numstep-btn-w: 2.4rem; }
+
+/* Domyślny rozmiar przycisków */
+.numstep{ --numstep-btn-w: 2rem; }
+
+/* Sam input (dodamy mu klasę .numstep__input) */
+.numstep__input{
+  width: 100%;
+  padding-right: calc(var(--numstep-btn-w) + .35rem); /* miejsce na przyciski */
+  -moz-appearance: textfield; /* bez natywnych strzałek w FF (tylko w tym komponencie) */
+}
+/* Bez natywnych strzałek w WebKit – TYLKO w tym komponencie */
+.numstep__input::-webkit-outer-spin-button,
+.numstep__input::-webkit-inner-spin-button{
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Przyciski ↑ / ↓ (absolutnie po prawej, dzielą wysokość na pół) */
+.numstep__btn{
+  position: absolute;
+  right: 0;
+  width: var(--numstep-btn-w);
+  display: grid;
+  place-items: center;
+  color: oklch(var(--bc));
+  background: var(--frame-bg);
+  border-left: 1px solid var(--frame-border);
+  transition: background-color .15s ease, color .15s ease, opacity .12s ease, box-shadow .15s ease, transform .06s ease;
+  cursor: pointer;
+  user-select: none;
+  z-index: 1;
+}
+.numstep__btn--up{
+  top: 0;
+  height: calc(50% - .5px);
+  border-bottom: 1px solid var(--frame-border);
+  border-top-right-radius: .5rem;
+}
+.numstep__btn--down{
+  bottom: 0;
+  height: calc(50% - .5px);
+  border-bottom-right-radius: .5rem;
+}
+
+/* Ikony chevronów – przez maskę (działa w nowoczesnych przeglądarkach) */
+.numstep__btn::before{
+  content: "";
+  inline-size: 14px;
+  block-size: 14px;
+  background-color: currentColor;
+  mask: url("data:image/svg+xml;utf8,<svg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'><path d='M5.5 7.5l4.5 4.5 4.5-4.5' fill='currentColor'/></svg>") no-repeat center / contain;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'><path d='M5.5 7.5l4.5 4.5 4.5-4.5' fill='currentColor'/></svg>") no-repeat center / contain;
+}
+.numstep__btn--up::before{ transform: rotate(180deg); } /* strzałka w górę */
+
+/* Hover / active / focus */
+.numstep__btn:hover{
+  background: color-mix(in oklab, var(--frame-bg) 92%, white 8%);
+}
+.numstep__btn:active{ transform: translateY(.5px); }
+.numstep:focus-within .numstep__btn{
+  box-shadow: inset 0 0 0 2px color-mix(in oklab, oklch(var(--p)) 18%, transparent);
+}
+
+/* Dark – delikatnie mocniejsze tło/obramowania */
+:root[data-theme="lownDark"] .numstep__btn{
+  background: color-mix(in oklab, var(--frame-bg) 88%, black 12%);
+  border-left-color: color-mix(in oklab, oklch(var(--b3)) 70%, #fff 22%);
+}
+:root[data-theme="lownDark"] .numstep__btn:hover{
+  background: color-mix(in oklab, var(--frame-bg) 82%, black 18%);
+}
+
+/* Rozmiary ikon dla wariantów */
+.numstep--sm .numstep__btn::before{ inline-size: 12px; block-size: 12px; }
+.numstep--lg .numstep__btn::before{ inline-size: 16px; block-size: 16px; }
+
+/* Disabled (gdy input disabled lub kontener ma .is-disabled) */
+.numstep.is-disabled,
+.numstep__input:disabled{
+  opacity: .6;
+}
+.numstep__input:disabled ~ .numstep__btn,
+.numstep.is-disabled .numstep__btn{
+  pointer-events: none;
+}
+
+/* Integracja w SSF: niech wrapper wypełnia kolumnę z kontrolką */
+.ssf-field .numstep{ width: 100%; }
+
+
+/* ===== Tabs (rail + buttons) ===== */
+.tabs-rail{
+  display: flex;
+  gap: .375rem;
+  padding: .375rem;
+  border-radius: .875rem;
+  background: color-mix(in oklab, oklch(var(--b2)) 85%, transparent);
+  border: 1px solid color-mix(in oklab, oklch(var(--b3)) 70%, transparent);
+  backdrop-filter: blur(6px);
+}
+.tab-btn{
+  position: relative;
+  padding: .5rem .9rem;
+  border-radius: .65rem;
+  font-size: .9rem;
+  line-height: 1rem;
+  color: color-mix(in oklab, oklch(var(--bc)) 88%, transparent);
+  transition: background-color .15s ease, color .15s ease, box-shadow .15s ease, transform .08s ease, border-color .15s ease;
+  border: 1px solid transparent;
+  background: transparent;
+}
+.tab-btn:hover{
+  background: color-mix(in oklab, oklch(var(--b2)) 88%, white 12%);
+  color: oklch(var(--bc));
+}
+.tab-btn:active{ transform: translateY(.5px); }
+.tab-btn.is-active,
+.tab-btn[aria-selected="true"]{
+  background: oklch(var(--b1));
+  color: oklch(var(--bc));
+  border-color: color-mix(in oklab, oklch(var(--p)) 38%, oklch(var(--b3)) 62%);
+  box-shadow:
+    0 8px 20px -10px rgba(0,0,0,.35),
+    0 0 0 3px color-mix(in oklab, oklch(var(--p)) 22%, transparent) inset,
+    inset 0 1px 0 rgba(255,255,255,.08);
+}
+.tab-btn.is-active::after,
+.tab-btn[aria-selected="true"]::after{
+  content: '';
+  position: absolute;
+  left: .6rem; right: .6rem; bottom: .45rem;
+  height: 2px; border-radius: 2px;
+  background-image: linear-gradient(90deg,
+    color-mix(in oklab, oklch(var(--p)) 75%, white 5%),
+    color-mix(in oklab, oklch(var(--p)) 55%, black 10%)
+  );
+  opacity: .9;
+}
+.tab-btn:focus-visible{
+  outline: none;
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, oklch(var(--p)) 30%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.08);
+}
+:root[data-theme="lownDark"] .tabs-rail{
+  background: color-mix(in oklab, oklch(var(--b3)) 55%, transparent);
+  border-color: color-mix(in oklab, oklch(var(--b3)) 85%, transparent);
+}
+:root[data-theme="lownDark"] .tab-btn:hover{
+  background: color-mix(in oklab, oklch(var(--b2)) 92%, white 8%);
+}
+
+/* --- Teleport root (modale) --- */
+.overlay-root{ position: fixed; inset: 0; z-index: 1000; pointer-events: none; }
+.overlay-root > *{ pointer-events: auto; }
+
+/* --- Kafelki zdjęć — 96x96 --- */
+.img-tiler{ display:flex; flex-wrap:wrap; gap:.5rem; }
+.img-tile{
+  position: relative; width: 6rem; height: 6rem; border-radius: .5rem; overflow: hidden;
+  border: 1px solid color-mix(in oklab, oklch(var(--b3)) 70%, transparent);
+}
+.img-tile__img{ width:100%; height:100%; object-fit:cover; display:block; }
+.img-tile__btn{
+  position:absolute; top:.25rem; right:.25rem;
+  width: 1.75rem; height: 1.75rem; border-radius: 9999px;
+  display:flex; align-items:center; justify-content:center;
+  background: color-mix(in oklab, oklch(var(--b1)) 92%, transparent);
+  border: 1px solid color-mix(in oklab, oklch(var(--b3)) 70%, transparent);
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  font-size:.9rem; line-height:1rem;
+}
+.img-tile.is-marked{
+  outline: 2px solid oklch(var(--error)); outline-offset: 2px; filter: saturate(0.85);
+}
+.img-tile.is-marked::after{
+  content: "Usunąć";
+  position:absolute; left:0; right:0; bottom:0;
+  padding: 2px 4px; text-align:center; font-size:.7rem; color:#fff;
+  background: color-mix(in oklab, oklch(var(--error)) 82%, transparent);
+}
+
+/* Dropzone */
+.dropzone{
+  border: 1px dashed color-mix(in oklab, oklch(var(--b3)) 75%, transparent);
+  border-radius: .75rem; padding: .75rem;
+  background: color-mix(in oklab, oklch(var(--b1)) 94%, transparent);
+  transition: border-color .15s ease, background-color .15s ease;
+}
+.dropzone.is-over{
+  border-color: oklch(var(--primary));
+  background: color-mix(in oklab, oklch(var(--b1)) 92%, transparent);
+}
+
+/* Miniatury ogłoszeń — 97.33 x 97.33 */
+:root { --list-thumb: 97.33px; }
+
+
+.list-thumb{
+  inline-size: var(--list-thumb);   /* width */
+  block-size:  var(--list-thumb);   /* height */
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  flex: 0 0 var(--list-thumb);      /* nie zgniataj w flexboxie */
+}
+
+/* Warianty rozmiaru miniatury listy */
+.list-thumb--sm { --list-thumb: 64px; }
+/* jeszcze mniejsza wersja */
+.list-thumb--xs { --list-thumb: 56px; }
+
+/* ======== CHAT ==== */
+
+/* Kolory bazowe (DaisyUi */
+:root{
+  --c-bg:        #ffffff;
+  --c-card:      #f7f8fb;
+  --c-border:    #e6e8ee;
+  --c-text:      #0f172a;
+  --c-muted:     #6b7280;
+  --c-soft:      #f1f5f9;
+  --c-accent:    #d4af37;
+  --c-accent-ink:#111111;
+  --c-me:        #1f2937;    /* moje bąbelki */
+  --c-me-ink:    #ffffff;
+  --c-them:      #e5e7eb;    /* ich bąbelki */
+  --c-them-ink:  #111827;
+
+  /* chat layout */
+  --chat-center-gap: clamp(48px, 11vw, 160px); /* szeroki odstęp między stronami */
+  --bubble-max:      66%;                       /* max szerokość bąbelka */
+  --cm-avatar-size: 30px;
+}
+
+:root[data-theme="lownDark"]{
+  --c-bg:        #2b3038;
+  --c-card:      #343b45;
+  --c-border:    #3f4753;
+  --c-text:      #eef1f5;
+  --c-muted:     #a0a6b0;
+  --c-soft:      #2f3540;
+  --c-accent:    #d4af37;
+  --c-accent-ink:#101216;
+  --c-me:        #0f172a;
+  --c-me-ink:    #e5e7eb;
+  --c-them:      #485061;
+  --c-them-ink:  #eef1f5;
+
+  --chat-center-gap: clamp(56px, 12vw, 180px);
+}
+
+/* Jeżeli istnieją zmienne Daisy (oklch var(--p), var(--b1) itd.), skorzystaj z nich delikatnie */
+:root{
+  --c-accent:    color-mix(in oklab, oklch(var(--p, 68% 0.1 85)) 92%, #d4af37);
+  --c-card:      color-mix(in oklab, oklch(var(--b2, 95% 0.02 250)) 90%, var(--c-card));
+  --c-border:    color-mix(in oklab, oklch(var(--b3, 90% 0.03 250)) 80%, var(--c-border));
+  --c-bg:        color-mix(in oklab, oklch(var(--b1, 100% 0 0)) 92%, var(--c-bg));
+}
+
+/* Utility: scrollbar, miniatury, sticky */
+.cm-soft-scroll{ scrollbar-width: thin; scrollbar-color: rgba(0,0,0,.2) transparent; }
+.cm-soft-scroll::-webkit-scrollbar{ width:8px; height:8px; }
+.cm-soft-scroll::-webkit-scrollbar-thumb{ background:rgba(0,0,0,.22); border-radius:9999px; }
+
+.cm-thumb{ width:64px; height:64px; border-radius:12px; overflow:hidden; background:var(--c-soft); border:1px solid var(--c-border); }
+.cm-thumb > img{ width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
+
+.cm-thumb-80{ width:80px; height:80px; border-radius:14px; overflow:hidden; background:var(--c-soft); border:1px solid var(--c-border); }
+.cm-thumb-80 > img{ width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
+
+.cm-media{ aspect-ratio: 4/3; background:var(--c-soft); overflow:hidden; }
+.cm-media > img{ width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
+
+.cm-sticky{ position: sticky; top: 72px; }
+
+/* Karty i przyciski (neutral, bez Daisy) */
+.cm-card{ background:var(--c-card); border:1px solid var(--c-border); border-radius:14px; }
+.cm-card--flat{ background:var(--c-bg); }
+.cm-btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+  padding:.6rem .9rem; border-radius:.7rem; font-weight:600;
+  border:1px solid var(--c-border); background:var(--c-bg); color:var(--c-text);
+  transition: .15s ease background-color, .15s ease border-color, .15s ease color, .08s ease transform;
+}
+.cm-btn:hover{ background: color-mix(in oklab, var(--c-card) 70%, var(--c-bg) 30%); }
+.cm-btn:active{ transform: translateY(.5px); }
+.cm-btn--primary{
+  background: var(--c-accent); color: var(--c-accent-ink);
+  border-color: color-mix(in oklab, var(--c-accent) 40%, var(--c-border));
+}
+.cm-btn--primary:hover{ filter: brightness(1.03); }
+
+/* Pola w composerze */
+.cm-input{
+  width:100%; min-height:3rem; border-radius:.8rem; padding:.65rem .85rem; resize:vertical;
+  background:var(--c-bg); border:1px solid var(--c-border); color:var(--c-text);
+  transition:.15s border-color, .15s box-shadow, .15s background-color;
+}
+.cm-input:focus{
+  outline:none; border-color: var(--c-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--c-accent) 25%, transparent);
+}
+
+/* === Bąbelki i linie wiadomości === */
+
+/* generujemy ducha avatara, który rezerwuje miejsce kolumny */
+.cm-msgline.is-same::before{
+  content: "";
+  width: var(--cm-avatar-size);
+  height: var(--cm-avatar-size);
+  border-radius: 9999px;
+  visibility: hidden;
+  flex: 0 0 var(--cm-avatar-size);
+}
+
+.cm-msgline{
+  display:flex; align-items:flex-end; gap:.5rem;
+  margin: 6px 0;                  /* lekki odstęp góra–dół dla każdej wiadomości */
+}
+.cm-msgline.is-same{
+  margin-block: 4px;              /* minimalnie ciaśniej, gdy ten sam nadawca */
+}
+.cm-msgline:not(.is-same){
+  margin-top: 14px;               /* większa separacja, gdy zmienia się nadawca */
+}
+.cm-msgline--me{ justify-content:flex-end; flex-direction: row-reverse; }
+
+.cm-avatar{
+  width:30px; height:30px; border-radius:9999px; overflow:hidden;
+  border:1px solid var(--c-border); background:var(--c-soft); flex:0 0 auto;
+}
+.cm-avatar > img{ width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
+
+.cm-bubble{
+  max-width: var(--bubble-max);
+  padding:.6rem .85rem;
+  border-radius: 16px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.06);
+  line-height: 1.35;
+}
+.cm-bubble--them{
+  background: var(--c-them); color: var(--c-them-ink);
+  border-top-left-radius:6px;
+  margin-right: var(--chat-center-gap);   /* odsunięcie od środka */
+}
+.cm-bubble--me{
+  background: var(--c-me); color: var(--c-me-ink);
+  border-top-right-radius:6px;
+  margin-left: var(--chat-center-gap);    /* odsunięcie od środka */
+}
+
+.cm-time{ font-size: 11px; color: var(--c-muted); margin-top: .35rem; }
+
+/* Nagłówki / separatory */
+.cm-h1{ font-weight:700; font-size:1.25rem; color: var(--c-text); }
+.cm-muted{ color: var(--c-muted); }
+.cm-sep{ height:1px; background: var(--c-border); }
+
+/* Pasek nagłówka ogłoszenia nad wątkiem */
+.cm-itembar{
+  display:flex; align-items:center; gap:.75rem;
+  background: var(--c-card);
+  border:1px solid var(--c-border);
+  border-radius: 14px;
+  padding: .5rem .6rem;
+}
+.cm-itembar .thumb{ width:48px; height:48px; border-radius:10px; overflow:hidden; background:var(--c-soft); border:1px solid var(--c-border); }
+.cm-itembar .thumb > img{ width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
+.cm-itembar .meta{ min-width:0; }
+.cm-itembar .title{ font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cm-itembar .sub{ font-size:.85rem; color:var(--c-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cm-itembar .price{ font-weight:700; margin-left:auto; }
+.cm-itembar .actions{ display:flex; gap:.5rem; margin-left:.5rem; }
+
+@media (max-width: 480px){
+  .cm-itembar .actions{ display:none; }
+  .cm-itembar .price{ font-size:.95rem; }
+}
+
+/* === CHAT: wszyscy od lewej + stała kolumna tekstu (Grid) === */
+
+/* ustawienia kolumny avatara i odstępu */
+:root{
+  --cm-avatar-size: 30px;   /* jeśli chcesz większy avatar, zmień tutaj */
+  --cm-gap: .5rem;          /* odstęp avatar ↔ bąbelek */
+}
+
+/* 1) Zamiast Flexa używamy Grida: [avatar | treść] */
+.cm-msgline{
+  display: grid !important;
+  grid-template-columns: var(--cm-avatar-size) 1fr !important;
+  column-gap: var(--cm-gap) !important;
+  align-items: end !important;
+  margin: 6px 0; /* delikatny oddech pionowy */
+}
+
+/* 2) Wszyscy od lewej – neutralizujemy „me” (na Gridzie i tak bez znaczenia) */
+.cm-msgline--me{
+  justify-content: initial !important;
+  flex-direction: initial !important;
+}
+
+/* 3) Pozycjonowanie dzieci w kolumnach */
+.cm-msgline .cm-avatar{ grid-column: 1 !important; }
+.cm-msgline .cm-bubble{ grid-column: 2 !important; }
+
+/* 4) Kolejne wiadomości tego samego nadawcy (bez avatara): */
+.cm-msgline.is-same::before{ content: none !important; }
+
+/* 5) Usuń boczne marginesy z bąbelków (wszystko od lewej) */
+.cm-bubble--them,
+.cm-bubble--me{
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* 6) Odstępy między grupami (gdy zmienia się nadawca) */
+.cm-msgline.is-same{ margin-top: 4px; }
+.cm-msgline:not(.is-same){ margin-top: 14px; }
+
+/* 7) Stempel czasu – wyrównaj do kolumny tekstu (kol. 2) */
+.cm-time{
+  text-align: left !important;
+  padding-left: calc(var(--cm-avatar-size) + var(--cm-gap)) !important;
+  padding-right: 0 !important;
+}
+
+/* 1) Grid nie rozciąga dzieci w osi inline */
+.cm-msgline{
+  justify-items: start !important;     /* zamiast domyślnego 'stretch' */
+}
+
+/* 2) Sam bąbelek ma szerokość wg treści z limitem */
+.cm-bubble{
+  display: inline-block !important;    /* shrink-to-fit */
+  width: auto !important;
+  max-width: var(--bubble-max) !important;  /* np. 66% jak masz wyżej */
+  min-width: 0 !important;                  /* bez wymuszania min-content */
+  box-sizing: border-box;
+}
+
+.cm-bubble--them,
+.cm-bubble--me{
+  /* bazowy radius masz 16px w .cm-bubble — tu tylko korygujemy narożniki */
+  border-top-left-radius: 6px !important;   /* lekko ścięty przy avatarze (LEWO) */
+  border-top-right-radius: 16px !important; /* pełny po prawej */
+}
+
+
+
+/* ========= Responsive grids for pickers ========= */
+.grid-cards{
+  display:grid;
+  gap:.5rem;
+  align-content:start;  /* start od góry kontenera */
+  align-items:stretch;  /* <— WAŻNE: elementy (karty) rozciągają się do wysokości rzędu */
+}
+.grid-autofill-220{ grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); }
+.grid-autofill-240{ grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); }
+
+/* ========= Card: pełna wysokość, widoczne obramowanie (light + dark) ========= */
+.ci-card{
+  height:100%;                      /* wypełnij wysokość toru grida */
+  display:flex;
+  flex-direction:column;            /* zawartość startuje od góry */
+  gap:.5rem;
+  border-radius:.65rem;
+  padding:.6rem .65rem;
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, oklch(var(--b1)) 95%, transparent) 0%,
+      color-mix(in oklab, oklch(var(--b1)) 90%, transparent) 100%);
+  border:1px solid color-mix(in oklab, oklch(var(--b3)) 80%, #000 10%);
+  box-shadow: 0 1px 0 rgba(0,0,0,.02);
+}
+:root[data-theme="lownDark"] .ci-card{
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, oklch(var(--b2)) 92%, transparent) 0%,
+      color-mix(in oklab, oklch(var(--b2)) 86%, transparent) 100%);
+  /* jaśniejsza, wyraźna ramka w dark */
+  border-color: color-mix(in oklab, oklch(var(--b3)) 60%, #fff 28%);
+  box-shadow: 0 1px 0 rgba(0,0,0,.25);
+}
+
+/* head sekcji (miniatura + tytuł) wyrównane do góry */
+.ci-head{
+  display:grid;
+  grid-template-columns: 48px 1fr;
+  gap:.6rem;
+  align-items:start;
+}
+.ci-thumb{ width:48px; height:48px; border-radius:.5rem; overflow:hidden; border:1px solid color-mix(in oklab, oklch(var(--b3)) 70%, transparent); background: color-mix(in oklab, oklch(var(--b2)) 90%, transparent); }
+.ci-thumb > img{ width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
+
+.ci-title{ font-weight:600; line-height:1.15; }
+.ci-path{ font-size:.8rem; opacity:.7; }
+
+.ci-spacer{ margin-top:auto; }
+
+/* Atrybuty (pills) – czytelne w light/dark */
+.attr-pills{ display:flex; flex-wrap:wrap; gap:.35rem .4rem; }
+.attr-pill{
+  display:inline-flex; align-items:center; gap:.3rem;
+  padding:.18rem .45rem; border-radius:.5rem;
+  border:1px solid color-mix(in oklab, oklch(var(--b3)) 70%, transparent);
+  background: color-mix(in oklab, oklch(var(--b1)) 92%, white 8%);
+  font-size:.78rem; line-height:1rem; white-space:nowrap;
+}
+:root[data-theme="lownDark"] .attr-pill{
+  border-color: color-mix(in oklab, oklch(var(--b3)) 58%, #fff 18%);
+  background: color-mix(in oklab, oklch(var(--b2)) 85%, #000 5%);
+}
+.attr-pill .k{ opacity:.65; }
+.attr-pill .v{ font-weight:600; }
+
+/* ========= Catalog summary (image + attrs under it) ========= */
+.catalog-summary{ display:flex; flex-direction:column; align-items:flex-start; }
+.catalog-summary > img{
+  width: 6rem; height: 6rem; border-radius:.5rem; object-fit:cover; object-position:center;
+  border:1px solid color-mix(in oklab, oklch(var(--b3)) 75%, transparent);
+}
+.catalog-summary .meta{ margin-top:.5rem; }
+.catalog-summary .attr-pills{ margin-top:.5rem; }
+
+/* drobny boost dla input-error (gdy używasz) */
+.input-error{ border-color: oklch(var(--error)) !important; }
+
+/* ===== Item gallery (responsywna) ===== */
+.item-gallery{ display:grid; gap:.75rem; }
+
+/* duże podglądowe */
+.item-gallery__main{
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;               /* kwadrat, ale */
+  max-height: min(72vh, 720px);      /* …nie rośnie bez końca */
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid color-mix(in oklab, oklch(var(--b3)) 70%, transparent);
+  background: color-mix(in oklab, oklch(var(--b2)) 90%, transparent);
+  display: grid;
+  place-items: center;
+}
+.item-gallery__main > img{
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* licznik w rogu */
+.item-gallery__count{
+  position: absolute; right: .5rem; bottom: .5rem;
+  font-size: 12px;
+  padding: .2rem .45rem;
+  border-radius: .5rem;
+  background: color-mix(in oklab, oklch(var(--b1)) 92%, transparent);
+  border: 1px solid color-mix(in oklab, oklch(var(--b3)) 70%, transparent);
+}
+
+/* placeholder gdy brak zdjęć */
+.item-gallery__placeholder{
+  width: 100%; height: 100%;
+  display: grid; place-items: center;
+  color: color-mix(in oklab, oklch(var(--bc)) 68%, transparent);
+  font-size: .9rem; text-align: center;
+  padding: .75rem;
+}
+
+/* rząd miniaturek: na mobile pozioma listwa przewijana */
+.item-gallery__thumbs{
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(64px, 1fr);
+  gap: .5rem;
+  overflow-x: auto;
+  padding-bottom: .25rem;
+  -webkit-overflow-scrolling: touch;
+}
+.item-gallery__thumb{
+  inline-size: 72px;
+  block-size: 72px;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, oklch(var(--b3)) 75%, transparent);
+  background: color-mix(in oklab, oklch(var(--b2)) 92%, transparent);
+}
+.item-gallery__thumb--active{ outline: 2px solid oklch(var(--p)); outline-offset: 2px; }
+.item-gallery__thumb canvas,
+.item-gallery__thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+/* desktop: siatka 5 miniaturek */
+@media (min-width: 1024px){
+  .item-gallery__thumbs{
+    grid-auto-flow: row;
+    grid-auto-columns: unset;
+    grid-template-columns: repeat(5, 1fr);
+    overflow-x: visible;
+  }
+  .item-gallery__thumb{ inline-size: 84px; block-size: 84px; }
+}
+
+/* Lightbox – pełnoekranowy, ale nie blokujemy scrolla strony gdy zamknięty */
+.lb-overlay{
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(0,0,0,.8);
+  backdrop-filter: blur(2px);
+}
+.lb-img{
+  max-width: min(92vw, 1400px);
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+
+
+
+/* === Kontrastowe ramki (light/dark) + panele i dropdown === */
+:root{
+  --frame-bg:        color-mix(in oklab, oklch(var(--b1)) 96%, white 4%);
+  --frame-bg-subtle: color-mix(in oklab, oklch(var(--b1)) 90%, white 10%);
+  --frame-border:    color-mix(in oklab, oklch(var(--b3)) 90%, black 10%);
+}
+:root[data-theme="lownDark"]{
+  --frame-bg:        color-mix(in oklab, oklch(var(--b2)) 88%, black 12%);
+  --frame-bg-subtle: color-mix(in oklab, oklch(var(--b2)) 80%, black 20%);
+  --frame-border:    color-mix(in oklab, oklch(var(--b3)) 85%, white 15%);
+}
+
+.elevated-panel{
+  background: var(--frame-bg) !important;
+  border-color: var(--frame-border) !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,.08);
+  border-radius: .75rem;
+}
+.elevated-panel--soft{
+  background: var(--frame-bg-subtle) !important;
+  border-color: var(--frame-border) !important;
+}
+
+/* === Status dropdown — wyraźna ramka + kontrast w light/dark === */
+.dropdown-panel{
+  border-radius: .75rem;
+  background: color-mix(in oklab, oklch(var(--b1)) 96%, white 4%);
+  border: 1px solid color-mix(in oklab, oklch(var(--b3)) 85%, #000 18%);
+  box-shadow:
+    0 14px 36px rgba(0,0,0,.25),
+    0 0 0 1px color-mix(in oklab, oklch(var(--b3)) 55%, transparent);
+}
+
+/* sekcje z górną/dolną ramką w panelu */
+.dropdown-panel__section{
+  background: transparent;
+  border-color: color-mix(in oklab, oklch(var(--b3)) 80%, #000 14%);
+}
+
+/* lista i pozycje – luźniejsze odstępy i delikatny separator */
+.dd-list{ padding: .25rem 0; }
+.dd-item{
+  display:flex; align-items:center; gap:.6rem;
+  padding:.5rem .75rem;
+  line-height: 1.25;
+}
+.dd-item + .dd-item{
+  border-top: 1px dashed color-mix(in oklab, oklch(var(--b3)) 70%, #000 10%);
+}
+.dd-item:hover{
+  background: color-mix(in oklab, oklch(var(--b2)) 88%, white 12%);
+}
+.dd-check{ transform: translateY(-.5px); }
+
+/* wiersze listy ofert + skeleton – wyraźna ramka/tło */
+.list-row{
+  background: var(--frame-bg);
+  border-color: var(--frame-border) !important;
+  border-radius: .75rem;
+}
+
+/* lekko mocniejsze obramowanie inputów/selectów */
+.fancy-select,
+.input.input-bordered{
+  border-color: var(--frame-border) !important;
+}
+
+/* w dark trybie – mocniejszy kontrast obramowań i hovera */
+:root[data-theme="lownDark"] .dropdown-panel{
+  background: color-mix(in oklab, oklch(var(--b2)) 92%, black 8%);
+  border-color: color-mix(in oklab, oklch(var(--b3)) 70%, #fff 22%);
+  box-shadow:
+    0 16px 40px rgba(0,0,0,.45),
+    0 0 0 1px color-mix(in oklab, oklch(var(--b3)) 60%, transparent);
+}
+:root[data-theme="lownDark"] .dropdown-panel__section{
+  border-color: color-mix(in oklab, oklch(var(--b3)) 66%, #fff 24%);
+}
+:root[data-theme="lownDark"] .dd-item + .dd-item{
+  border-top-color: color-mix(in oklab, oklch(var(--b3)) 62%, #fff 24%);
+}
+:root[data-theme="lownDark"] .dd-item:hover{
+  background: color-mix(in oklab, oklch(var(--b2)) 82%, #000 18%);
+}
+
+/* podbity kolor .border */
+.dropdown-panel .border,
+.dropdown-panel .border-b,
+.dropdown-panel .border-t{
+  border-color: color-mix(in oklab, oklch(var(--b3)) 80%, #000 14%) !important;
+}
+:root[data-theme="lownDark"] .dropdown-panel .border,
+:root[data-theme="lownDark"] .dropdown-panel .border-b,
+:root[data-theme="lownDark"] .dropdown-panel .border-t{
+  border-color: color-mix(in oklab, oklch(var(--b3)) 66%, #fff 22%) !important;
+}
+
+
+/* === przycisk filtra (light/dark) === */
+.btn-filter{
+  /* tło neutralne, lekki „glass” */
+  background: color-mix(in oklab, oklch(var(--b1)) 96%, white 4%);
+  /* grubsza, wyraźna ramka */
+  border-width: 1.5px !important;
+  border-color: color-mix(in oklab, oklch(var(--b3)) 78%, #000 22%) !important;
+  /* lekki cień, by oddzielić od tła */
+  box-shadow: 0 1px 0 rgba(0,0,0,.04);
+  color: oklch(var(--bc));
+}
+.btn-filter:hover{
+  background: color-mix(in oklab, oklch(var(--b1)) 92%, white 8%);
+  border-color: color-mix(in oklab, oklch(var(--b3)) 70%, #000 30%) !important;
+}
+.btn-filter:focus-visible{
+  outline: none;
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, oklch(var(--p)) 28%, transparent),
+    0 1px 0 rgba(0,0,0,.04);
+}
+/* aktywny – gdy dropdown otwarty */
+.btn-filter[aria-expanded="true"]{
+  background: color-mix(in oklab, oklch(var(--b1)) 90%, white 10%);
+  border-color: oklch(var(--p)) !important;
+}
+
+/* badge wewnątrz przycisku – wyraźny kontur */
+.btn-filter__badge{
+  border: 1px solid color-mix(in oklab, oklch(var(--b3)) 70%, #000 18%);
+  background: color-mix(in oklab, oklch(var(--b1)) 94%, transparent);
+  color: inherit;
+}
+
+/* Dark mode: mocniejsza ramka + ciemniejsze tło */
+:root[data-theme="lownDark"] .btn-filter{
+  background: color-mix(in oklab, oklch(var(--b2)) 90%, black 10%);
+  border-color: color-mix(in oklab, oklch(var(--b3)) 70%, #fff 22%) !important;
+}
+:root[data-theme="lownDark"] .btn-filter:hover{
+  background: color-mix(in oklab, oklch(var(--b2)) 84%, black 16%);
+  border-color: color-mix(in oklab, oklch(var(--b3)) 62%, #fff 28%) !important;
+}
+:root[data-theme="lownDark"] .btn-filter[aria-expanded="true"]{
+  background: color-mix(in oklab, oklch(var(--b2)) 80%, black 20%);
+  border-color: oklch(var(--p)) !important;
+}
+:root[data-theme="lownDark"] .btn-filter__badge{
+  border-color: color-mix(in oklab, oklch(var(--b3)) 60%, #fff 26%);
+  background: color-mix(in oklab, oklch(var(--b2)) 88%, black 12%);
+}
+
+
+/* ======= Landing: hero blobki i kafelki kategorii / produktów ======= */
+.hero-blob{
+  position:absolute; border-radius:9999px; filter: blur(32px);
+  pointer-events:none; opacity:.55;
+}
+.hero-blob--a{
+  right:-12rem; bottom:-10rem; width: 22rem; height:22rem;
+  background-image: radial-gradient(closest-side, color-mix(in oklab, oklch(var(--p)) 40%, #fff 0%), transparent 65%);
+}
+.hero-blob--b{
+  right:12rem; top:-8rem; width: 18rem; height:18rem; opacity:.4;
+  background-image: radial-gradient(closest-side, color-mix(in oklab, oklch(var(--a)) 28%, #fff 0%), transparent 65%);
+}
+
+/* Kategorie */
+.cat-card{
+  display:flex; gap:.6rem; align-items:center;
+  padding:.5rem; border-radius:.75rem;
+  border:1px solid color-mix(in oklab, oklch(var(--b3)) 78%, transparent);
+  background: color-mix(in oklab, oklch(var(--b1)) 96%, transparent);
+  transition: transform .12s ease, background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.cat-card:hover{
+  transform: translateY(-1px);
+  background: color-mix(in oklab, oklch(var(--b1)) 92%, white 8%);
+  box-shadow: 0 10px 24px rgba(0,0,0,.08);
+}
+.cat-card__thumb{
+  width:56px; height:56px; border-radius:.6rem; overflow:hidden; flex:0 0 auto;
+  border:1px solid color-mix(in oklab, oklch(var(--b3)) 70%, transparent);
+  background: color-mix(in oklab, oklch(var(--b2)) 90%, transparent);
+}
+.cat-card__thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+.cat-card__meta{ min-width:0; }
+.cat-card__title{ font-weight:600; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cat-card__count{ font-size:.8rem; opacity:.7; }
+
+/* Kafelki produktów */
+.grid-cards{ display:grid; gap:.75rem; }
+.grid-autofill-240{ grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); }
+
+.prod-card{
+  display:flex; flex-direction:column; border:1px solid color-mix(in oklab, oklch(var(--b3)) 78%, transparent);
+  background: linear-gradient(180deg,
+    color-mix(in oklab, oklch(var(--b1)) 96%, transparent) 0%,
+    color-mix(in oklab, oklch(var(--b1)) 92%, transparent) 100%);
+  border-radius:.9rem; overflow:hidden;
+  transition: transform .12s ease, box-shadow .15s ease, border-color .15s ease, background-color .15s ease;
+}
+.prod-card:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 18px 40px -22px rgba(0,0,0,.5);
+}
+.prod-card.skeleton{
+  height: 320px; background: color-mix(in oklab, oklch(var(--b2)) 86%, transparent);
+  border-style:dashed;
+}
+
+.prod-thumb{ aspect-ratio: 4/3; width:100%; background: color-mix(in oklab, oklch(var(--b2)) 92%, transparent); }
+.prod-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+.prod-body{ padding:.75rem .8rem; display:flex; flex-direction:column; gap:.35rem; }
+.prod-title{
+  font-weight:600; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.prod-sub{ font-size:.9rem; opacity:.8; }
+.prod-actions{ display:flex; gap:.5rem; margin-top:.35rem; }
+
+
+/* Indykator trasy (górna belka) */
+.route-indicator{
+  position: fixed; inset: 0 0 auto 0; height: 3px; z-index: 60; pointer-events: none; display: none;
+}
+.route-indicator.htmx-request{ display:block; }
+.route-indicator__bar{
+  height: 100%;
+  background: oklch(var(--p));
+  animation: route-progress 1.2s ease-in-out infinite;
+}
+@keyframes route-progress{
+  0%{ transform: translateX(-60%); width: 40%; }
+  50%{ transform: translateX(20%);  width: 60%; }
+  100%{ transform: translateX(100%); width: 20%; }
+}
+
+/* Miękki fade #app-root podczas requestu */
+#app-root.is-route-loading{
+  opacity: .6;
+  filter: saturate(.9);
+  transition: opacity .15s ease, filter .15s ease;
+  pointer-events: none;
+}
+
+.route-indicator.app-request{ display:block; }
+
+
+.route-indicator.is-busy{ display:block; }
+
+/* === Pełnoekranowy overlay ładowania === */
+.global-loader{
+  position: fixed; inset: 0; z-index: 120;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.38);               /* półprzezroczyste zaciemnienie */
+  backdrop-filter: blur(2px);
+  pointer-events: none;                       /* gdy ukryty */
+}
+.global-loader.is-visible{
+  display: flex; pointer-events: auto;        /* blokuje interakcje w trakcie */
+  animation: gl-fade-in .12s ease-out;
+}
+@keyframes gl-fade-in{ from{opacity:0} to{opacity:1} }
+
+.global-loader__panel{
+  min-width: 220px;
+  border-radius: 14px;
+  padding: 18px 20px;
+  background: #ffffff;
+  color: #111;
+  border: 1px solid rgba(0,0,0,.08);
+  box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  display: flex; flex-direction: column; align-items: center; gap: .6rem;
+}
+.dark .global-loader__panel{
+  background: #15161a; color: #fafafa;
+  border-color: rgba(255,255,255,.08);
+  box-shadow: 0 10px 30px rgba(0,0,0,.45);
+}
+
+/* Spinner – prosty, lekki, w kolorze brandu (bierze currentColor) */
+.loader-spinner{
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 4px solid rgba(0,0,0,.12);
+  border-top-color: currentColor;
+  animation: loader-spin .9s linear infinite;
+  color: oklch(var(--p));
+}
+.dark .loader-spinner{
+  border-color: rgba(255,255,255,.16);
+  border-top-color: currentColor;
+}
+@keyframes loader-spin{ to{ transform: rotate(360deg); } }
+
+.global-loader__text{
+  font-weight: 600; letter-spacing: .2px; opacity: .9;
+}
+
+/* preferencje dostępności */
+@media (prefers-reduced-motion: reduce){
+  .loader-spinner{ animation: none; }
+}
+
+
+/* ===== Stripe Payment Element  ===== */
+.stripe-frame{
+  padding: .875rem;
+  border-radius: .75rem;
+  background: var(--frame-bg);
+  border: 1px solid var(--frame-border);
+  box-shadow: 0 1px 0 rgba(0,0,0,.03);
+  min-height: 56px;
+}
+
+/* delikatny focus na przycisku zapłać */
+.btn-success:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, oklch(var(--success)) 30%, transparent);
+}
+
+
+/* ============================================================
+   RESPONSYWNOŚĆ PRZYCISKÓW (MOBILE-FIRST)
+   ============================================================ */
+
+/* 0) Uspokojenie klików na mobilu */
+button, .btn, .cm-btn, .numstep__btn, .img-tile__btn {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* 1) Domyślne wymiary i łamanie etykiet (bezpieczne dla DaisyUI) */
+.btn, .cm-btn, .btn-gold, .btn-filter {
+  min-height: 40px;
+  padding-inline: clamp(.8rem, 2vw, 1rem);
+  line-height: 1.2;
+  font-size: clamp(.92rem, .9rem + .2vw, 1rem);
+  white-space: normal;             /* pozwól zawijać */
+  overflow-wrap: anywhere;         /* niech nawet długie słowa nie wypychają układu */
+}
+
+/* XS/SM Daisy bywają zbyt drobne – na wąskich ekranach podnieś je do 40–44px */
+@media (max-width: 640px){
+  .btn-xs, .btn-sm { min-height: 40px; padding-inline: .85rem; font-size: .95rem; }
+}
+
+/* 2) Mobile: przyciski pełnej szerokości + lepsze układanie w wierszach */
+@media (max-width: 640px){
+  .btn, .cm-btn, .btn-gold, .btn-filter { width: 100%; }
+
+  /* „wiersze akcji” – uogólnienie: każdy .flex z przyciskami niech się zawija */
+  .prod-actions,
+  .cm-itembar .actions,
+  .card-body .flex.gap-2,
+  .card-body .flex.gap-3 {
+    flex-wrap: wrap;
+    gap: .5rem !important;
+  }
+
+  /* badge w przycisku niech nie wypycha etykiety */
+  .btn .badge, .cm-btn .badge { transform: translateY(-.5px); }
+}
+
+/* 3) Duże tap-targety gdy urządzenie ma wskaźnik „coarse” (palec) */
+@media (pointer: coarse){
+  .btn, .cm-btn, .btn-gold, .btn-filter,
+  .btn-xs, .btn-sm {
+    min-height: 44px;
+    min-width: 44px;   /* dla ikon-solo */
+  }
+  /* Stepper: powiększ przyciski ↑/↓ i cel w dotyku */
+  .numstep--md{ --numstep-btn-w: 2.6rem; }
+  .numstep__btn{ height: calc(50% - .5px); }
+  /* Ikonka na miniaturze – też urosnij */
+  .img-tile__btn{ width: 2.75rem; height: 2.75rem; }
+}
+
+/* 4) Klaster przycisków – helper bez ingerencji w HTML (opcjonalnie) */
+.btn-group, .actions, .prod-actions {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;              /* zawijaj, żeby nic nie uciekało poza ekran */
+}
+.btn-group > .btn,
+.actions > .btn,
+.prod-actions > .btn { flex: 0 1 auto; }
+
+/* 5) Ikono-przyciski: ujednolicone kwadraty (używaj gdy button jest tylko ikoną) */
+.btn-icon, .cm-btn--icon {
+  width: 44px; height: 44px; padding: 0;
+  display: inline-grid; place-items: center;
+}
+
+/* 6) Kontrast i stany (zostawiamy Twoją estetykę, tylko drobny boost dostępności) */
+.btn:hover, .cm-btn:hover, .btn-gold:hover, .btn-filter:hover {
+  filter: brightness(1.03);
+}
+.btn:focus-visible, .cm-btn:focus-visible, .btn-gold:focus-visible, .btn-filter:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, oklch(var(--p)) 26%, transparent);
+}
+
+/* 7) Statusowe pigułki/filtry – niech mieszczą się w 2 liniach na mobile */
+@media (max-width: 480px){
+  .tabs-rail { flex-wrap: wrap; row-gap: .35rem; }
+  .tab-btn { flex: 1 1 auto; text-align: center; }
+}
+
+/* 8) Zmniejsz „sztywność” elementów w ciasnych gridach (przyciski w kartach) */
+.prod-card .prod-actions .btn,
+.ci-card .attr-pill .btn {
+  min-width: min(100%, 240px);   /* pozwól rosnąć, ale bez rozpychania kart */
+}
+
+
+/* =========================
+   NAVBAR HOTFIX (scoped)
+   ========================= */
+
+/* 1) Nie rób z przycisków w headerze 100% szerokości */
+@media (max-width: 640px){
+  header .btn,
+  header .cm-btn,
+  header .btn-gold,
+  header .btn-filter{
+    width: auto !important;
+  }
+}
+
+/* 2) Kompaktowe wymiary w pasku nawigacji (nadpisują globalne 40–44px) */
+header .btn,
+header .cm-btn{
+  min-height: 36px;
+  padding-block: .35rem;
+  padding-inline: .55rem;
+  line-height: 1.1;
+  white-space: nowrap;           /* nie zawijaj etykiet w headerze */
+  overflow-wrap: normal;
+}
+
+/* XS/SM w headerze – trzymaj je małe nawet na mobile */
+@media (max-width: 640px){
+  header .btn-xs,
+  header .btn-sm{
+    min-height: 34px;
+    padding-inline: .55rem;
+    font-size: .9rem;
+  }
+}
+
+/* 3) Klaster po prawej – nie zawijaj na kolejne linie */
+header .ml-auto{
+  flex-wrap: nowrap !important;
+  gap: .35rem !important;
+}
+
+/* 4) Ikono-przyciski (koszyk/czat) – nie rozszerzaj */
+header .btn .text-lg{ line-height: 1; }
+header .btn[aria-label]{ min-width: 0; }
+
+/* 5) Nadpisz „coarse pointer” dla headera (żeby nie puchł do 44px) */
+@media (pointer: coarse){
+  header .btn,
+  header .cm-btn{
+    min-height: 36px;
+  }
+}
+
+
+/* ======== Oddech między kartami listy ======== */
+.offers-list{ /* już jest space-y-1 w HTML; zostawiamy subtelne 4px */ }
+
+/* ======== Nagłówkowe akcje (pionowy oddech + wrap) ======== */
+.offers-actions{
+  display:flex; flex-wrap:wrap; gap:.5rem; row-gap:.5rem;
+  margin-left:.25rem;
+}
+.offers-actions .btn{ flex: 1 1 calc(50% - .25rem); }
+@media (min-width:640px){
+  .offers-actions .btn{ flex: 0 0 auto; }
+}
+
+/* ======== Prawa „szyna” w karcie (serce góra, data dół) ======== */
+.offers-list .list-row{
+  position: relative;
+  overflow: hidden; /* nic nie wyjdzie poza kartę */
+}
+
+/* stała rezerwa miejsca na szynę, żeby treść nie wpadała pod nią */
+.offers-list{ --offer-rail-w: 3.25rem; }           /* desktop */
+@media (max-width: 480px){
+  .offers-list{ --offer-rail-w: 2.9rem; }         /* mobile – ciut węższa */
+}
+
+.offer-body{
+  padding-right: calc(var(--offer-rail-w) + .25rem);
+  padding-bottom: 2rem; /* oddech nad datą */
+}
+
+/* sama szyna – trzyma prawą krawędź, ustawia elementy góra/dół */
+.offer-rail{
+  position: absolute;
+  right: .75rem; top: .75rem; bottom: .75rem;
+  display: flex; flex-direction: column;
+  align-items: flex-end; justify-content: space-between;
+  pointer-events: none; /* kliki tylko na przyciskach wewnątrz */
+}
+
+/* serduszko – tap target + nie zlewa się z krawędzią */
+.save-btn{
+  width: 2.25rem; height: 2.25rem;
+  display: grid; place-items: center;
+  border-radius: .5rem;
+  font-size: 1rem;
+  pointer-events: auto;
+}
+
+/* data – mała pigułka; zawsze wewnątrz karty */
+.item-date{
+  font-size: .75rem;
+  padding: .18rem .45rem;
+  border-radius: .45rem;
+  color: oklch(var(--bc));
+  background: var(--frame-bg);
+  border: 1px solid var(--frame-border);
+  opacity: .9;
+  white-space: nowrap;
+  pointer-events: none;
+  max-width: 100%;
+}
+
+/* mobile: nic nie wystaje, elementy ciut mniejsze */
+@media (max-width: 480px){
+  .save-btn{ width: 2.1rem; height: 2.1rem; font-size: .95rem; }
+  .item-date{ font-size: .72rem; }
+}
+
+/* ======== Cena – wyraźna pigułka ======== */
+item-price{
+  display:inline-flex; align-items:center; gap:.3rem;
+  padding:.18rem .5rem;
+  border-radius:.5rem;
+  line-height:1;
+  font-weight:600;               /* pół-bold zamiast 700 */
+  background: color-mix(in oklab, oklch(var(--b1)) 94%, transparent);
+  color: oklch(var(--bc));
+  box-shadow: 0 2px 10px rgba(0,0,0,.04);  /* lekki cień, bez borderu */
+}
+:root[data-theme="lownDark"] .item-price{
+  background: color-mix(in oklab, oklch(var(--b2)) 88%, transparent);
+  box-shadow: 0 2px 10px rgba(0,0,0,.12);
+}
+
+/* ===== Rezerwa pod prawą „szynę” i data/serce jak wcześniej ===== */
+.offers-list{ --offer-rail-w: 3.25rem; }
+@media (max-width: 480px){ .offers-list{ --offer-rail-w: 2.9rem; } }
+.offer-body{ padding-right: calc(var(--offer-rail-w) + .25rem); padding-bottom: 2rem; }
+.offer-rail{
+  position:absolute; right:.75rem; top:.75rem; bottom:.75rem;
+  display:flex; flex-direction:column; align-items:flex-end; justify-content:space-between;
+  pointer-events:none;
+}
+.save-btn{ width:2.25rem; height:2.25rem; display:grid; place-items:center; border-radius:.5rem; font-size:1rem; pointer-events:auto; }
+.item-date{
+  font-size:.75rem; padding:.18rem .45rem; border-radius:.45rem;
+  color: oklch(var(--bc)); background: var(--frame-bg); border: 1px solid var(--frame-border);
+  opacity:.9; white-space:nowrap; pointer-events:none; max-width:100%;
+}
+@media (max-width: 480px){ .save-btn{ width:2.1rem; height:2.1rem; font-size:.95rem; } .item-date{ font-size:.72rem; } }
+
+/* ===== Subtelny odstęp pionowy dla buttonów, żeby nie „kleiły się” ===== */
+.offers-actions .btn,
+.modal .btn,
+.offers-list .list-row .btn{ margin-block:.125rem; } /* 2px */
+
+/* ============================================================
+   PATCH: globalna responsywność i oddechy przycisków (bez zmian w HTML)
+   ============================================================ */
+
+/* A. Uniwersalny, subtelny odstęp pionowy wokół przycisków */
+.btn, .cm-btn, a.btn { margin-block: .125rem; } /* ~2px */
+
+/* B. Mobile – małe przyciski nie są blokowe (auto width) */
+@media (max-width: 640px){
+  .btn-sm, .btn-xs,
+  a.btn.btn-sm, a.btn.btn-xs,
+  button.btn.btn-sm, button.btn.btn-xs {
+    width: auto !important;       /* nie rozciągaj */
+    min-width: 0;                  /* pozwól się zawijać w klastrach */
+    flex: 0 0 auto;                /* zachowuj się jak „chip” */
+  }
+}
+
+/* C. Mobile – typowe „toolbarowe” nagłówki (np. tytuł + akcja po prawej)
+   Trzymaj przycisk kompaktowo, nie 100% szerokości. */
+@media (max-width: 640px){
+  .flex.items-center.justify-between > .btn,
+  .flex.items-center.justify-end > .btn,
+  .flex.items-center.gap-3 > .btn,
+  .flex.items-center.gap-2 > .btn {
+    width: auto !important;
+    flex: 0 0 auto;
+  }
+}
+
+/* D. Mobile – klastery z .flex.gap-2/.gap-3 (np. saved_center, landing)
+   Wymuś zawijanie + bezpieczne odstępy, aby nic nie wychodziło poza ekran. */
+@media (max-width: 640px){
+  .flex.gap-2, .flex.gap-3 {
+    flex-wrap: wrap;
+    gap: .5rem !important;          /* ciut większa separacja w dotyku */
+  }
+  .flex.gap-2 .btn, .flex.gap-3 .btn,
+  .flex.gap-2 a.btn, .flex.gap-3 a.btn {
+    width: auto;                    /* nie rób 100% w klastrach */
+    flex: 0 1 auto;                 /* pozwól się zawijać */
+  }
+}
+
+/* E. Mobile – sekcje tytułowe na landingach/listach: przyciski kompaktowe */
+@media (max-width: 640px){
+  .landing .btn-sm,
+  .landing .btn-xs {
+    width: auto !important;
+    flex: 0 0 auto;
+  }
+}
+
+/* F. Bezpieczne tap-targety również dla <a class="btn"> */
+@media (pointer: coarse){
+  a.btn, a.cm-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* G. Nano-odstęp między buttonami i treścią w kartach/listach (konserwatywnie) */
+.list-row .btn,
+.card .btn,
+.modal .btn,
+.prod-card .btn {
+  margin-block: .125rem;
+}
+
+
+/* ===========================================
+   LISTY: elegancka karta, subtelny hover, lepszy mobile
+   (bez zmian w HTML)
+   =========================================== */
+
+/* Karta wiersza */
+.list-row{
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, oklch(var(--b1)) 96%, transparent) 0%,
+      color-mix(in oklab, oklch(var(--b1)) 92%, transparent) 100%);
+  border: 1px solid var(--frame-border) !important;
+  border-radius: .75rem;
+  box-shadow: 0 1px 0 rgba(0,0,0,.03);
+  transition:
+    background-color .15s ease,
+    border-color .15s ease,
+    box-shadow .18s ease,
+    transform .08s ease;
+}
+
+/* Hover/Focus – delikatne uniesienie */
+.list-row:hover{
+  background: color-mix(in oklab, oklch(var(--b1)) 90%, white 10%);
+  border-color: color-mix(in oklab, var(--frame-border) 78%, #000 22%) !important;
+  box-shadow: 0 10px 26px -18px rgba(0,0,0,.35);
+  transform: translateY(-1px);
+}
+.list-row:active{ transform: translateY(0); }
+.list-row:focus-visible{
+  outline: none;
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, oklch(var(--p)) 24%, transparent),
+    0 10px 26px -18px rgba(0,0,0,.35);
+}
+
+/* Dark – trochę mocniejszy kontrast */
+:root[data-theme="lownDark"] .list-row{
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, oklch(var(--b2)) 92%, transparent) 0%,
+      color-mix(in oklab, oklch(var(--b2)) 86%, transparent) 100%);
+  border-color: color-mix(in oklab, var(--frame-border) 70%, #fff 22%) !important;
+  box-shadow: 0 1px 0 rgba(0,0,0,.22);
+}
+:root[data-theme="lownDark"] .list-row:hover{
+  background: color-mix(in oklab, oklch(var(--b2)) 84%, black 16%);
+  border-color: color-mix(in oklab, var(--frame-border) 62%, #fff 28%) !important;
+  box-shadow: 0 14px 32px -18px rgba(0,0,0,.6);
+}
+
+/* Miniatury – spójne z kartą */
+.list-thumb{
+  border-radius: .6rem;
+  border: 1px solid color-mix(in oklab, var(--frame-border) 78%, transparent);
+  background: color-mix(in oklab, oklch(var(--b2)) 92%, transparent);
+  box-shadow: 0 3px 14px rgba(0,0,0,.06);
+}
+
+/* Tytuł + meta (lekka hierarchia) */
+.list-row .font-medium{
+  font-weight: 600;               /* bez przesadnego bolda */
+  letter-spacing: .1px;
+}
+.list-row .text-sm{               /* podtytuł/meta (cena/kategoria) */
+  color: color-mix(in oklab, oklch(var(--bc)) 70%, transparent);
+}
+.list-row .badge.badge-ghost{     /* pigułki meta – spójna ramka */
+  border: 1px solid color-mix(in oklab, var(--frame-border) 78%, transparent);
+  background: color-mix(in oklab, oklch(var(--b1)) 94%, white 6%);
+}
+
+/* Skeleton list – spójniejsze „kości” */
+.animate-pulse.list-row,
+.space-y-2 > .animate-pulse{
+  background: color-mix(in oklab, oklch(var(--b1)) 92%, transparent);
+  border-style: dashed;
+}
+
+/* =======================
+   Responsive
+   ======================= */
+
+/* Prawy blok z akcjami (np. w Zapisane) – ładne zawijanie na mobile */
+@media (max-width: 560px){
+  .list-row{ padding: .65rem !important; gap: .6rem !important; }
+  .list-row .list-thumb{ inline-size: 84px; block-size: 84px; }
+
+  /* prawy klaster przycisków, gdy istnieje jako bezpośrednie dziecko */
+  .list-row > .flex.gap-2.shrink-0,
+  .list-row > .flex.gap-3.shrink-0{
+    flex-basis: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
+    border-top: 1px dashed var(--frame-border);
+    padding-top: .5rem;
+    margin-top: .25rem;
+  }
+  .list-row > .flex.gap-2.shrink-0 .btn,
+  .list-row > .flex.gap-3.shrink-0 .btn{
+    width: auto;          /* nie rozciągaj na 100% w klastrze */
+    flex: 0 1 auto;       /* zawijaj z gracją */
+  }
+}
+
+/* Delikatnie ciaśniejszy układ w bardzo wąskich */
+@media (max-width: 380px){
+  .list-row{ gap: .5rem !important; }
+  .list-row .list-thumb{ inline-size: 76px; block-size: 76px; }
+}
+
+/* Oddechy micro wokół buttonów w kartach (żeby nie „kleiły się” do tekstów) */
+.list-row .btn{ margin-block: .125rem; }
+
+/* Pigułka ceny – spójna i dyskretna (korzysta z .item-price, jeśli jest) */
+.item-price{
+  display:inline-flex; align-items:center; gap:.35rem;
+  padding:.2rem .55rem; border-radius:.55rem; line-height:1;
+  font-weight:600;
+  background: color-mix(in oklab, oklch(var(--b1)) 94%, transparent);
+  box-shadow: 0 2px 10px rgba(0,0,0,.04);
+}
+:root[data-theme="lownDark"] .item-price{
+  background: color-mix(in oklab, oklch(var(--b2)) 88%, transparent);
+  box-shadow: 0 2px 10px rgba(0,0,0,.12);
+}
+
+
+/* === Prawa kolumna z akcjami w listach === */
+.list-actions{
+  margin-left: auto;              /* dociśnij do prawej krawędzi wiersza */
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex: 0 0 auto;                 /* nie zgniataj */
+}
+
+/* Oddechy micro dla buttonów wewnątrz wierszy */
+.list-row .btn{ margin-block: .125rem; }
+
+/* Mobile: akcje schodzą pod treść, ale zostają w obrębie karty */
+@media (max-width: 560px){
+  .list-actions{
+    flex-basis: 100%;
+    justify-content: flex-end;
+    border-top: 1px dashed var(--frame-border);
+    padding-top: .5rem;
+    margin-top: .25rem;
+  }
+}
+
+/* Skeletony list – spójne z naszym skinem (gdy ktoś zapomni .list-row) */
+.animate-pulse.list-row,
+.space-y-2 > .animate-pulse{
+  background: color-mix(in oklab, oklch(var(--b1)) 92%, transparent);
+  border-style: dashed;
+}
+
+
+/* Więcej oddechu i ładne karty dla widoków zamówień */
+.order-detail .gold-panel .card-body { padding: 1.25rem !important; }
+.order-detail .elevated-panel      { padding: 1.25rem !important; }
+
+/* Klarowniejsze pigułki atrybutów (jeśli nie masz już stylu globalnego) */
+.attr-pills { display:flex; flex-wrap:wrap; gap:.375rem .5rem; }
+.attr-pill  { display:inline-flex; align-items:center; gap:.25rem; border:1px solid var(--b3, rgba(0,0,0,.12));
+              border-radius:.5rem; padding:.15rem .5rem; font-size:12px; line-height:1; background: color-mix(in oklab, var(--b1, #fff) 85%, transparent); }
+.attr-pill .k { opacity:.7; }
+.attr-pill .v { font-weight:500; }
+
+/* lekki oddech tylko dla widoków zastawu */
+.pawn-detail .gold-panel .card-body{ padding: 1.25rem !important; }
+.pawn-detail .elevated-panel{ padding: 1.25rem !important; }
+.pawn-detail .list-row{ padding: .75rem 1rem !important; }
+
+/* Optional: wyrównanie oddechu/orderów do zastawów */
+.elevated-panel{ border:1px solid var(--b3); background:var(--b1); border-radius:12px; padding:1rem; }
+.list-row{ border:1px solid var(--b3); background:var(--b1); border-radius:10px; }
+.panel-head{ display:flex; align-items:center; gap:.5rem; padding-bottom:.25rem; margin-bottom:.5rem; border-bottom:1px dashed var(--b3); }
+.attr-badges{ display:flex; flex-wrap:wrap; gap:.375rem .45rem; }
+.attr-pills{ display:flex; flex-wrap:wrap; gap:.375rem .5rem; margin-top:.25rem; }
+.attr-pill{ display:inline-flex; align-items:center; gap:.25rem; border:1px solid var(--b3); border-radius:.5rem; padding:.15rem .5rem; font-size:12px; }
+.attr-pill .k{ opacity:.7; } .attr-pill .v{ font-weight:500; }
+
+
+/* ============================
+   NAVBAR: User menu (ładniejszy)
+   ============================ */
+
+/* Przycisk użytkownika: kapsułka, bez obramówki */
+.user-menu__btn{
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .35rem .5rem;
+  border-radius: 9999px;
+  background: transparent;
+  transition: background-color .15s ease, filter .12s ease;
+}
+.user-menu__btn:hover{
+  background: color-mix(in oklab, oklch(var(--b2)) 86%, white 14%);
+  filter: brightness(1.02);
+}
+
+/* Avatar w headerze: idealnie okrągły, BEZ obramówki */
+.user-menu__avatar{
+  width: 32px; height: 32px;
+  border-radius: 9999px;
+  object-fit: cover; object-position: center;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  display: block;
+}
+
+/* Sam panel: „glass” + delikatna ramka, zaokrąglenia */
+.user-menu__panel{
+  border-radius: .9rem;
+  background: color-mix(in oklab, oklch(var(--b1)) 96%, white 4%);
+  border: 1px solid color-mix(in oklab, oklch(var(--b3)) 85%, #000 18%);
+  box-shadow:
+    0 16px 40px rgba(0,0,0,.25),
+    0 0 0 1px color-mix(in oklab, oklch(var(--b3)) 55%, transparent);
+  padding: .35rem; /* p-2 w HTML zostaje – to tylko baza */
+}
+
+/* Strzałka od boku: kwadrat 12x12 obrócony o 45° (side arrow) */
+.user-menu__panel::before{
+  content:""; position: absolute; width: 12px; height: 12px;
+  transform: rotate(45deg);
+  background: color-mix(in oklab, oklch(var(--b1)) 96%, white 4%);
+  z-index: -1; /* pod panel, by ładnie łączyło krawędzie */
+}
+.user-menu__panel::after{
+  content:""; position: absolute; width: 12px; height: 12px;
+  transform: rotate(45deg);
+  background: color-mix(in oklab, oklch(var(--b1)) 96%, white 4%);
+  box-shadow:
+    1px 1px 0 0 color-mix(in oklab, oklch(var(--b3)) 85%, #000 18%);
+}
+
+/* Wariant: strzałka po PRAWEJ stronie panelu (typowe — przy avatarze po prawej) */
+.user-menu__panel[data-side="right"]::before{ right: -7px; top: 16px; }
+.user-menu__panel[data-side="right"]::after {
+  right: -7px; top: 16px;
+  /* krawędzie „ramki” odtworzone cieniem po skosie */
+}
+
+/* Wariant: strzałka po LEWEJ (fallback gdy mało miejsca po prawej) */
+.user-menu__panel[data-side="left"]::before{ left: -7px; top: 16px; }
+.user-menu__panel[data-side="left"]::after {
+  left: -7px; top: 16px;
+  box-shadow:
+    -1px -1px 0 0 color-mix(in oklab, oklch(var(--b3)) 85%, #000 18%);
+}
+
+/* Dark – mocniejszy „glass” i ramki */
+:root[data-theme="lownDark"] .user-menu__panel{
+  background: color-mix(in oklab, oklch(var(--b2)) 92%, black 8%);
+  border-color: color-mix(in oklab, oklch(var(--b3)) 70%, #fff 22%);
+  box-shadow:
+    0 18px 44px rgba(0,0,0,.45),
+    0 0 0 1px color-mix(in oklab, oklch(var(--b3)) 60%, transparent);
+}
+:root[data-theme="lownDark"] .user-menu__panel::before,
+:root[data-theme="lownDark"] .user-menu__panel::after{
+  background: color-mix(in oklab, oklch(var(--b2)) 92%, black 8%);
+}
+
+/* Lista pozycji w menu – ciaśniej, czytelny hover */
+.user-menu__panel .menu{ padding: .25rem; }
+.user-menu__panel .menu li > *{
+  border-radius: .55rem;
+}
+.user-menu__panel .menu li > *:hover{
+  background: color-mix(in oklab, oklch(var(--b2)) 88%, white 12%);
+}
+
+/* Zrzuć obramowanie avatara odziedziczone z innych reguł w headerze */
+header img.rounded-full{ border: none !important; }
+
+/* ===== User menu: widoczna careta (chip) ===== */
+.user-menu__btn{ cursor: pointer; }
+
+.user-menu__caret{
+  inline-size: 20px; block-size: 20px;
+  border-radius: 9999px;
+  display: inline-grid; place-items: center;
+  margin-left: .15rem;
+  background: var(--frame-bg);
+  border: 1px solid var(--frame-border);
+  color: color-mix(in oklab, oklch(var(--bc)) 70%, transparent);
+  transition: transform .15s ease, background-color .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease;
+}
+
+/* Ikonka strzałki w chipie przez maskę (ostre, niezależnie od DPI) */
+.user-menu__caret::before{
+  content:"";
+  inline-size: 12px; block-size: 12px;
+  background-color: currentColor;
+  mask: url("data:image/svg+xml;utf8,<svg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'><path d='M5.5 7.5l4.5 4.5 4.5-4.5' fill='currentColor'/></svg>") no-repeat center / contain;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'><path d='M5.5 7.5l4.5 4.5 4.5-4.5' fill='currentColor'/></svg>") no-repeat center / contain;
+}
+
+/* Stany: hover/open/dark */
+.user-menu__btn:hover .user-menu__caret{
+  background: color-mix(in oklab, var(--frame-bg) 92%, white 8%);
+  color: oklch(var(--bc));
+}
+.user-menu__btn.is-open .user-menu__caret{ transform: rotate(180deg); }
+
+:root[data-theme="lownDark"] .user-menu__caret{
+  background: color-mix(in oklab, var(--frame-bg) 88%, black 12%);
+}
+:root[data-theme="lownDark"] .user-menu__btn:hover .user-menu__caret{
+  background: color-mix(in oklab, var(--frame-bg) 82%, black 18%);
+  color: oklch(var(--bc));
+}
+
+/* ====== Theme toggle (sun/moon) — v2 ====== */
+.btn-theme{
+  inline-size: 34px; block-size: 34px;
+  border-radius: 9999px;
+  display: inline-grid; place-items: center;
+  color: color-mix(in oklab, oklch(var(--bc)) 72%, transparent);
+  transition:
+    color .15s ease, transform .08s ease, box-shadow .15s ease;
+}
+/* wyłącz starą pseudo-ikonę, jeśli została wcześniej zdefiniowana */
+.btn-theme::before{ content: none !important; }
+
+.btn-theme:hover{
+  color: oklch(var(--bc));
+}
+.btn-theme:active{ transform: translateY(.5px); }
+
+/* same ikony (SVG inline) – rozmiar + płynność */
+.btn-theme svg{
+  width: 18px; height: 18px; display: block;
+  transition: transform .25s ease, opacity .15s ease, color .15s ease;
+}
+.btn-theme:active svg{ transform: rotate(12deg); }
+
+/* Pokazuj menu aż do bardzo wąskiej szerokości (~600px) */
+.show-from-600 { display: flex !important; }
+@media (max-width: 599.98px){
+  .show-from-600 { display: none !important; }
+}
+
+
+/* === Chat Inbox: badge w zakładkach === */
+.tab-badge{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width: 1.25rem; height: 1.25rem;
+  margin-left: .5rem; padding: 0 .35rem;
+  border-radius: .625rem;
+  font-size: .72rem; line-height: 1;
+  background: color-mix(in oklab, oklch(var(--p)) 28%, var(--c-card));
+  color: oklch(var(--bc));
+  border: 1px solid color-mix(in oklab, oklch(var(--b3)) 70%, transparent);
+  box-shadow: 0 1px 0 rgba(0,0,0,.06);
+}
+:root[data-theme="lownDark"] .tab-badge{
+  background: color-mix(in oklab, oklch(var(--p)) 26%, var(--c-bg));
+  border-color: color-mix(in oklab, oklch(var(--b3)) 62%, #fff 22%);
+}
+
+

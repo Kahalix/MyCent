@@ -1,0 +1,9 @@
+Cześć {{ first_name }}!
+
+Cena obserwowanej oferty „{{ item_name }}” spadła.
+Poprzednio: {{ old_price }}
+Teraz:      {{ new_price }}
+
+Zobacz ofertę: {{ item_url }}
+
+— {{ site_name }}

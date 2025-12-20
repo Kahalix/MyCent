@@ -1,0 +1,16 @@
+{% extends "email/_base.html" %}
+{% block content %}
+  <p style="margin:0 0 16px;color:#374151;">Cześć {{ first_name }}!</p>
+  <p style="margin:0 12px 16px 0;color:#374151;">Potwierdzamy przyjęcie Twojego zamówienia.</p>
+
+  <ul style="margin:0 0 16px 18px;padding:0;color:#374151;">
+    {% for it in orders %}
+      <li style="margin:0 0 8px;">
+        <strong>Zamówienie:</strong> {{ it.order.public_id }}<br/>
+        <a href="{{ it.order_url }}" style="color:#111827;text-decoration:underline;">Podgląd zamówienia</a>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <p style="margin:16px 0 0;color:#374151;">Dziękujemy za zakupy w {{ site_name }}!</p>
+{% endblock %}

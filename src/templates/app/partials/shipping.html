@@ -1,0 +1,41 @@
+<section class="max-w-4xl mx-auto" x-data="app.addressBook()" x-init="init()" data-protected>
+  <h1 class="text-2xl font-semibold mb-4">Adresy wysyłkowe</h1>
+
+  <template x-if="!loaded"><div class="text-sm opacity-70">Ładowanie…</div></template>
+
+  <div class="space-y-3" x-show="loaded">
+    <template x-for="a in addresses" :key="a.id">
+      <div class="p-3 rounded-lg border flex items-start justify-between gap-3">
+        <div class="text-sm leading-5">
+          <div class="font-medium" x-text="a.full_name"></div>
+          <div x-text="a.street + ' ' + a.house_no + (a.apartment_no?('/'+a.apartment_no):'')"></div>
+          <div x-text="a.postcode + ' ' + a.city"></div>
+          <div class="opacity-70" x-text="a.country"></div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-xs" @click="setDefault(a.id)"
+                  :class="a.is_default?'btn-primary btn-gold':''"
+                  x-text="a.is_default?'Domyślny':'Ustaw domyślny'"></button>
+          <button class="btn btn-xs btn-outline" @click="remove(a.id)">Usuń</button>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <form class="grid md:grid-cols-2 gap-3 mt-6 border-t pt-4" @submit.prevent="add()">
+    <input class="input input-bordered" placeholder="Imię i nazwisko" x-model="form.full_name" required>
+    <input class="input input-bordered" placeholder="Telefon" x-model="form.phone">
+    <input class="input input-bordered" placeholder="Ulica" x-model="form.street" required>
+    <div class="grid grid-cols-2 gap-3">
+      <input class="input input-bordered" placeholder="Nr domu" x-model="form.house_no" required>
+      <input class="input input-bordered" placeholder="Nr lokalu" x-model="form.apartment_no">
+    </div>
+    <input class="input input-bordered" placeholder="Miasto" x-model="form.city" required>
+    <input class="input input-bordered" placeholder="Kod pocztowy" x-model="form.postcode" required>
+    <input class="input input-bordered md:col-span-2" placeholder="Kraj" x-model="form.country" value="Polska">
+    <div class="md:col-span-2">
+      <button class="btn btn-primary btn-gold" :disabled="busy" x-text="busy?'Dodawanie…':'Dodaj adres'"></button>
+      <span class="ml-2 text-error" x-text="err"></span>
+    </div>
+  </form>
+</section>

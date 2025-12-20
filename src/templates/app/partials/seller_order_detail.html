@@ -1,0 +1,344 @@
+<section class="max-w-5xl mx-auto" data-protected
+         x-data="app.sellerOrderDetail('{{ order_public_id }}')"
+         x-init="init()">
+
+  <!-- Skeleton / błąd -->
+  <template x-if="loading"><div class="h-28 rounded-lg elevated-panel animate-pulse"></div></template>
+  <template x-if="err"><div class="alert alert-error my-3" x-text="err"></div></template>
+
+  <template x-if="order">
+    <div class="space-y-6">
+
+      <!-- Pasek tytułowy -->
+      <div class="flex items-center gap-2">
+        <a class="btn btn-ghost" href="/seller/orders" hx-boost="true" hx-target="#app-root" hx-push-url="true">← Wróć</a>
+        <h1 class="text-2xl font-semibold" x-text="isPawn ? 'Skup od klienta' : 'Zamówienie (sklep)'"></h1>
+        <span class="ml-auto text-xs">ID: <span class="font-mono" x-text="order.public_id"></span></span>
+      </div>
+
+      <!-- Podsumowanie (gold) -->
+      <div class="gold-panel">
+        <div class="card-body grid md:grid-cols-3 gap-3">
+          <div class="md:col-span-2 space-y-2">
+            <div class="flex items-start gap-2 flex-wrap">
+              <div class="text-sm opacity-70">Status</div>
+              <div class="ml-2 badge"
+                   :class="{
+                     'badge-success': order?.order_status==='COMPLETED',
+                     'badge-warning': order?.order_status==='PENDING',
+                     'badge-error'  : order?.order_status==='CANCELLED',
+                     'badge-info'   : order?.order_status==='SHIPPED' || order?.order_status==='DELIVERED'
+                   }"
+                   x-text="tOrderStatus(order?.order_status) || '—'"></div>
+            </div>
+
+            <div class="grid sm:grid-cols-3 gap-2">
+              <div>
+                <div class="text-xs opacity-70">Metoda płatności</div>
+                <div class="font-medium" x-text="tPaymentMethod(order.payment_method) || '—'"></div>
+              </div>
+              <div>
+                <div class="text-xs opacity-70">Data</div>
+                <div class="font-medium" x-text="order.purchase_date || '—'"></div>
+              </div>
+              <div>
+                <div class="text-xs opacity-70" x-text="isPawn ? 'Suma pozycji (wypłata)' : 'Razem'"></div>
+                <div class="text-lg font-semibold"
+                     x-text="isPawn ? ('− ' + app.moneyText(order.items_total || order.purchase_cost))
+                                    : app.moneyText(order.purchase_cost)"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-1 md:text-right" x-show="!isPawn">
+            <div class="text-xs opacity-70">Pozycje</div>
+            <div class="font-medium" x-text="app.moneyText(order.items_total)"></div>
+            <div class="text-xs opacity-70">Wysyłka</div>
+            <div class="font-medium" x-text="app.moneyText(order.shipping_total)"></div>
+
+            <div class="mt-2 flex items-center gap-2 md:justify-end">
+              <a class="btn btn-sm" href="#" @click.prevent="downloadReceipt('csv')">CSV</a>
+              <a class="btn btn-sm btn-outline" href="#" @click.prevent="downloadReceipt('pdf')">PDF</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Adres dostawy – rozwijalny panel -->
+      <template x-if="order.shipping_address && Object.values(order.shipping_address).some(v => String(v||'').trim() !== '')">
+        <div class="elevated-panel p-0">
+          <!-- Nagłówek -->
+          <button type="button"
+                  class="panel-head w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-base-200/40 transition cursor-pointer"
+                  @click="toggle('__shipaddr')">
+            <div class="font-medium">Adres dostawy</div>
+
+            <!-- Badge: liczba paczek + łączny koszt / odbiór osobisty -->
+            <span class="badge" :class="pkgCount() > 0 ? 'badge-info' : 'badge-ghost'"
+                  x-text="shippingModeSummary()"></span>
+
+            <!-- Krótki podgląd -->
+            <span class="text-xs opacity-70 truncate"
+                  x-text="[
+                           [(order.shipping_address.first_name||''),(order.shipping_address.last_name||'')].filter(Boolean).join(' '),
+                           (order.shipping_address.city||'')
+                         ].filter(Boolean).join(' • ')"></span>
+
+            <!-- Chevron -->
+            <span class="ml-auto text-xs opacity-70" x-text="isExpanded('__shipaddr') ? '▼' : '►'"></span>
+          </button>
+
+          <!-- Treść -->
+          <div class="px-4 pb-4 pt-3 border-t" x-show="isExpanded('__shipaddr')" x-collapse>
+            <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+              <div>
+                <div class="text-xs opacity-70">Odbiorca</div>
+                <div class="font-medium"
+                     x-text="[(order.shipping_address.first_name||''),(order.shipping_address.last_name||'')].filter(Boolean).join(' ') || '—'"></div>
+              </div>
+              <div>
+                <div class="text-xs opacity-70">Ulica i nr</div>
+                <div x-text="((order.shipping_address.street||'') + (order.shipping_address.house_number ? ' ' + order.shipping_address.house_number : '')).trim() || '—'"></div>
+              </div>
+              <div>
+                <div class="text-xs opacity-70">Kod / Miasto</div>
+                <div>
+                  <span x-text="order.shipping_address.postal_code || ''"></span>
+                  <span x-text="order.shipping_address.city ? ' ' + order.shipping_address.city : ''"></span>
+                  <span x-show="!(order.shipping_address.postal_code || order.shipping_address.city)">—</span>
+                </div>
+              </div>
+              <div>
+                <div class="text-xs opacity-70">Województwo</div>
+                <div x-text="order.shipping_address.state || '—'"></div>
+              </div>
+              <div>
+                <div class="text-xs opacity-70">Kraj</div>
+                <div x-text="order.shipping_address.country || '—'"></div>
+              </div>
+              <div>
+                <div class="text-xs opacity-70">Kontakt</div>
+                <div>
+                  <span x-text="order.shipping_address.phone_number || '—'"></span>
+                  <span class="opacity-60" x-show="order.shipping_address.phone_number && order.shipping_address.email">•</span>
+                  <span x-text="order.shipping_address.email || ''"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Pozycje -->
+      <div class="elevated-panel p-4">
+        <div class="font-medium mb-2">Pozycje</div>
+
+        <div class="space-y-2">
+          <template x-for="ln in order.order_lines" :key="ln.public_id">
+            <div class="list-row p-3">
+              <div class="flex items-start gap-3">
+                <div class="cm-thumb-80">
+                  <img :src="app.imgUrl(ln.item?.cover_image_url || ln.item?.images?.[0]?.image_path || '')" alt="">
+                </div>
+
+                <div class="min-w-0 flex-1">
+                  <div class="font-medium truncate" x-text="ln.item?.set_name || ln.item_snapshot?.set_name || 'Pozycja'"></div>
+                  <div class="text-xs opacity-70">
+                    Ilość: <span x-text="ln.quantity"></span>
+                    · Cena jedn.: <b x-text="app.moneyText(ln.unit_price)"></b>
+                    · Razem: <b x-text="app.moneyText(ln.line_total)"></b>
+                  </div>
+
+                  <!-- Badge z atrybutów -->
+                  <div class="attr-badges mt-1" x-show="attrBadgesFor(ln).length">
+                    <template x-for="b in attrBadgesFor(ln)" :key="b.text + uiNonce">
+                      <span class="badge"
+                            :class="{
+                              'badge-success': b.tone==='success',
+                              'badge-info'   : b.tone==='info',
+                              'badge-warning': b.tone==='warning',
+                              'badge-error'  : b.tone==='error',
+                              'badge-ghost'  : !['success','info','warning','error'].includes(b.tone)
+                            }"
+                            x-text="b.text"></span>
+                    </template>
+                  </div>
+
+                  <!-- Pigułki atrybutów -->
+                  <div class="attr-pills" x-show="attrPairsFor(ln).length">
+                    <template x-for="pair in attrPairsFor(ln).slice(0,10)" :key="pair[0] + uiNonce">
+                      <span class="attr-pill" :title="pair[0] + ': ' + String(pair[1])">
+                        <span class="k" x-text="pair[0] + ':'"></span>
+                        <span class="v" x-text="pair[1]"></span>
+                      </span>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Wysyłka (sprzedaż) -->
+                <template x-if="!isPawn">
+                  <div class="text-right min-w-[260px]">
+                    <div class="text-sm opacity-70">Wysyłka</div>
+                    <div
+                      x-text="lineShipping(ln.public_id)
+                        ? (lineShipping(ln.public_id).package_label && lineShipping(ln.public_id).package_label !== 'PICKUP'
+                            ? (lineShipping(ln.public_id).package_label + ' • ' + app.moneyText(lineShipping(ln.public_id).price))
+                            : 'Odbiór osobisty')
+                        : '—'"></div>
+
+                    <button class="btn btn-ghost btn-xs mt-1" @click="toggle(ln.public_id)">
+                      <span x-text="isExpanded(ln.public_id) ? 'Ukryj' : 'Szczegóły'"></span>
+                    </button>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Szczegóły wysyłki (sprzedaż) -->
+              <div class="mt-3 p-3 rounded bg-base-200/50 border"
+                   x-show="!isPawn && isExpanded(ln.public_id)" x-collapse>
+                <div class="grid md:grid-cols-3 gap-3 text-sm">
+                  <div>
+                    <div class="font-medium">Pozycja</div>
+                    <div>ID linii: <span class="font-mono" x-text="ln.public_id"></span></div>
+                    <div>Kategoria: <span x-text="ln.item_snapshot?.type_path || '—'"></span></div>
+                  </div>
+                  <div>
+                    <div class="font-medium">Parametry</div>
+                    <div>Wymiary:
+                      <span x-text="[ln.item_snapshot?.length_cm, ln.item_snapshot?.width_cm, ln.item_snapshot?.height_cm].filter(x=>x!=null).join('×') || '—'"></span>
+                    </div>
+                    <div>Waga: <span x-text="ln.item_snapshot?.weight_kg || '—'"></span> kg</div>
+                  </div>
+                  <div>
+                    <div class="font-medium">Wysyłka</div>
+                    <div>Etykieta: <span x-text="lineShipping(ln.public_id)?.package_label || '—'"></span></div>
+                    <div>Cena: <span x-text="app.moneyText(lineShipping(ln.public_id)?.price)"></span></div>
+                    <div>Status: <span x-text="tShippingStatus(lineShipping(ln.public_id)?.shipping_status) || '—'"></span></div>
+                    <div>Tracking: <span x-text="lineShipping(ln.public_id)?.tracking_number || '—'"></span></div>
+
+                    <div class="mt-2 grid grid-cols-1 gap-2">
+                      <label class="form-control">
+                        <span class="label-text">Zmień status</span>
+                        <select class="select select-bordered select-sm fancy-select"
+                                x-model="statusByLine[ln.public_id]">
+                          <template x-for="s in statuses" :key="s">
+                            <option :value="s" x-text="tShippingStatus(s)"></option>
+                          </template>
+                        </select>
+                      </label>
+                      <label class="form-control">
+                        <span class="label-text">Numer tracking</span>
+                        <input class="input input-bordered input-sm"
+                               x-model="trackingByLine[ln.public_id]">
+                      </label>
+                      <button class="btn btn-sm"
+                              @click="updateShippingStatus(ln.public_id)">
+                        Zapisz status
+                      </button>
+
+                      <div class="divider my-2"></div>
+
+                      <div class="font-medium">Ustaw metodę wysyłki</div>
+                      <label class="form-control">
+                        <span class="label-text">Metoda</span>
+                        <select class="select select-bordered select-sm fancy-select"
+                                x-model="linePkgSelection[ln.public_id]">
+                          <option value="">— odbiór osobisty —</option>
+                          <template x-for="p in pkgTypes" :key="p.public_id">
+                            <option
+                              :value="p.public_id"
+                              x-text="(p.provider || 'PACZKA') + (p.dimensions ? ' • '+p.dimensions : '') + ' • ' + app.moneyText(p.price)">
+                            </option>
+                          </template>
+                        </select>
+                      </label>
+                      <label class="form-control">
+                        <span class="label-text">Cena (override, opcj.)</span>
+                        <input class="input input-bordered input-sm"
+                               x-model="priceOverrideByLine[ln.public_id]"
+                               placeholder="np. 12.99">
+                      </label>
+                      <div class="flex flex-wrap gap-2">
+                        <button class="btn btn-sm"
+                                @click="addShipping(
+                                         ln.public_id,
+                                         linePkgSelection[ln.public_id],
+                                         priceOverrideByLine[ln.public_id]
+                                       )">
+                          Ustaw wysyłkę
+                        </button>
+                        <button class="btn btn-sm btn-outline"
+                                @click="addShipping(ln.public_id, '', '')">
+                          Ustaw odbiór osobisty
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+              <!-- /szczegóły -->
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Klient (stały, bez zwijania) -->
+      <div class="elevated-panel p-4">
+        <div class="panel-head">
+          <div class="font-medium">Klient</div>
+          <span class="text-xs opacity-70" x-show="!order.customer_public_id">(snapshot z chwili transakcji)</span>
+          <span class="ml-auto text-xs" x-show="order.customer_public_id">
+            Powiązano: <span class="font-mono" x-text="order.customer_public_id"></span>
+          </span>
+        </div>
+
+        <!-- Dane snapshotu / ensure-customer -->
+        <div class="grid md:grid-cols-2 gap-2">
+          <input class="input input-bordered" placeholder="Imię" x-model="custForm.first_name">
+          <input class="input input-bordered" placeholder="Nazwisko" x-model="custForm.last_name">
+          <input class="input input-bordered" type="email" placeholder="Email" x-model="custForm.email">
+          <input class="input input-bordered" placeholder="Telefon" x-model="custForm.phone">
+
+          <input class="input input-bordered md:col-span-2" placeholder="Adres – linia 1" x-model="custForm.address.line1">
+          <input class="input input-bordered md:col-span-2" placeholder="Adres – linia 2" x-model="custForm.address.line2">
+          <input class="input input-bordered" placeholder="Kod pocztowy" x-model="custForm.address.postal_code">
+          <input class="input input-bordered" placeholder="Miasto" x-model="custForm.address.city">
+          <input class="input input-bordered" placeholder="Kraj (ISO-2, np. PL)" x-model="custForm.address.country">
+
+          <input class="input input-bordered" placeholder="Typ dokumentu" x-model="custForm.document_type">
+          <input class="input input-bordered" placeholder="Numer dokumentu" x-model="custForm.document_number">
+          <div>
+            <label class="label"><span class="label-text">Data urodzenia</span></label>
+            <input class="input input-bordered w-full" type="date" x-model="custForm.birth_date">
+          </div>
+        </div>
+
+        <!-- Akcje klienta -->
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <div class="join">
+            <input class="input input-bordered input-sm join-item" placeholder="Szukaj klienta (email/telefon/imię nazwisko)" x-model="custSearch.q" @keydown.enter.prevent="searchCustomers()">
+            <button class="btn btn-sm join-item" @click="searchCustomers()">Szukaj</button>
+          </div>
+          <button class="btn btn-sm btn-primary" @click="ensureCustomer()">Połącz / Utwórz klienta</button>
+          <button class="btn btn-sm btn-outline" x-show="order.customer_public_id" @click="detachCustomer()">Odłącz</button>
+          <span class="text-xs opacity-70" x-show="ensureInfo" x-text="ensureInfo"></span>
+        </div>
+
+        <!-- Wyniki wyszukiwania -->
+        <div class="mt-2 max-h-48 overflow-auto space-y-1" x-show="custSearch.results.length">
+          <template x-for="c in custSearch.results" :key="c.public_id">
+            <div class="p-2 rounded border flex items-center gap-2">
+              <div class="min-w-0">
+                <div class="font-medium truncate" x-text="(c.first_name||'')+' '+(c.last_name||'') || '(bez nazwy)'"></div>
+                <div class="text-xs opacity-70 truncate" x-text="(c.email||'—') + ' • ' + (c.phone||'—') + ' • ' + (c.city||'')"></div>
+              </div>
+              <button class="btn btn-xs ml-auto" @click="attachCustomer(c.public_id)">Połącz</button>
+            </div>
+          </template>
+        </div>
+      </div>
+
+    </div>
+  </template>
+</section>

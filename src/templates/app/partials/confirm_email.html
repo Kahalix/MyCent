@@ -1,0 +1,6 @@
+<section class="max-w-md mx-auto" x-data="app.confirmEmailChangeView()" x-init="init()">
+  <h1 class="text-2xl font-semibold mb-4">Potwierdzanie adresu e-mail</h1>
+  <div x-show="state==='loading'">Trwa potwierdzanie…</div>
+  <div class="text-success" x-text="msg" x-show="msg"></div>
+  <div class="text-error" x-text="err" x-show="err"></div>
+</section>
