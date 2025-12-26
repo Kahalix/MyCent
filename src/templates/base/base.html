@@ -200,6 +200,9 @@
                  @keydown.escape.stop.prevent="close()"
                  @click.outside="close()">
               <ul class="menu menu-sm">
+                <li x-show="canAdminPanel" x-cloak>
+                  <a href="/admin/" hx-boost="false" data-no-boost>Panel administratora</a>
+                </li>
                 <li x-show="isModerator" x-cloak><a href="/moderation" data-requires-auth hx-boost="true" hx-target="#app-root" hx-push-url="true">Moderacja</a></li>
                 <li><a href="/profile" data-requires-auth hx-boost="true" hx-target="#app-root" hx-push-url="true">Profil</a></li>
                 <li><a href="/chat" data-requires-auth hx-boost="true" hx-target="#app-root" hx-push-url="true">Wiadomości</a></li>

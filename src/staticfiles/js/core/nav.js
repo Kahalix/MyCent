@@ -8,6 +8,7 @@ app.navState = function () {
     hasSeller: false,
     isSellerOwner: false,
     isModerator: false,
+    canAdminPanel: false,
     sellerCtx: null,
     cartCount: 0,
     chatUnread: 0,
@@ -32,6 +33,7 @@ app.navState = function () {
           this._unsubscribeInbox();
           this.user = null;
           this.hasSeller = false;
+          this.canAdminPanel = false;
           this.cartCount = 0;
           this.chatUnread = 0;
           this._threadUnread.clear();
@@ -51,6 +53,7 @@ app.navState = function () {
             this._unsubscribeInbox();
             this.user = null;
             this.hasSeller = false;
+            this.canAdminPanel = false;
             this.cartCount = 0;
             this.chatUnread = 0;
             this._threadUnread.clear();
@@ -112,6 +115,7 @@ app.navState = function () {
         if (r.ok) {
           this.user = await r.json();
           app.me = this.user;
+          this.canAdminPanel = !!(this.user?.is_staff || this.user?.is_superuser);
           await this.fetchSellerContext();
           this.fetchCartCount();
         }
