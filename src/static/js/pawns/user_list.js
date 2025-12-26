@@ -4,7 +4,7 @@ app.userPawnsList = function () {
   const PAWN_STATUS = {
     ACTIVE: 'Aktywny',
     REDEEMED: 'Wykupiony',
-    FORFEITED: 'Przepadły',
+    FORFEITED: 'Niewykupiony',
     CANCELLED: 'Anulowany',
   };
 

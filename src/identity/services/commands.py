@@ -44,7 +44,7 @@ def _auth_payload(user, refresh: RefreshToken | None = None) -> dict:
 def register_user(request, *, email: str, password: str, first_name: str, last_name: str) -> dict:
     email = email.lower()
     if is_email_taken_ci(email):
-        raise EmailAlreadyUsed("Email already registered")
+        raise EmailAlreadyUsed("Konto o podanym adresie e-mail już istnieje")
     user = create_user(email, password, first_name, last_name, active=False)
     _send_registration_confirmation_email(request, user=user, hours_valid=24)
     return {"message": "Sprawdź e-mail w celu aktywacji."}
@@ -60,7 +60,7 @@ def _send_registration_confirmation_email(request, *, user, hours_valid: int = 2
             "first_name": user.first_name or user.email,
             "action_url": url,
             "valid_for_hours": hours_valid,
-            "site_name": "Lown",
+            "site_name": "MyCent",
         },
     )
 
@@ -165,7 +165,7 @@ def forgot_password(request, *, email: str) -> dict:
                 "first_name": user.first_name or user.email,
                 "action_url": url,
                 "valid_for_minutes": 30,
-                "site_name": "Lown",
+                "site_name": "MyCent",
             },
         )
     return {"message": "Jeśli konto istnieje, wysłaliśmy instrukcje."}
@@ -193,7 +193,7 @@ def request_email_change(request, *, user, new_email: str) -> dict:
             "first_name": user.first_name or user.email,
             "action_url": url,
             "valid_for_minutes": 60,
-            "site_name": "Lown",
+            "site_name": "MyCent",
             "new_email": new_email,
         },
     )
@@ -237,7 +237,7 @@ def admin_create_user(*, email: str, password: str, first_name: str, last_name: 
                       role: str|None=None, user_status: str|None=None, is_staff: bool=False, is_active: bool=True):
     email = email.lower()
     if is_email_taken_ci(email):
-        raise EmailAlreadyUsed("Email already registered")
+        raise EmailAlreadyUsed("Konto o podanym adresie e-mail już istnieje")
     u = create_user(email, password, first_name, last_name, active=is_active)
     if role: u.role = role
     if user_status: u.user_status = user_status

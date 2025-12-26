@@ -1,4 +1,3 @@
-# payments/services/commands.py
 from __future__ import annotations
 from decimal import Decimal
 import secrets

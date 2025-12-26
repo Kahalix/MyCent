@@ -312,7 +312,8 @@ app.sellerOrderDetail = function (orderPublicId) {
     },
     tPaymentMethod(code){
       const m = {
-        CASH:'Gotówka', CREDIT_CARD:'Karta', DEBIT_CARD:'Karta debetowa',
+        CASH:'Gotówka', ONLINE_PAYMENT:'Płatność Online',
+        CREDIT_CARD:'Karta', DEBIT_CARD:'Karta debetowa',
         BANK_TRANSFER:'Przelew bankowy', CASH_ON_DELIVERY:'Pobranie',
         PAYPAL:'PayPal', BLIK:'BLIK', APPLE_PAY:'Apple Pay', GOOGLE_PAY:'Google Pay'
       };

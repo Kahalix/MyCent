@@ -29,7 +29,7 @@
                      'badge-info'   : pawn?.status==='REDEEMED',
                      'badge-warning': pawn?.status==='FORFEITED'
                    }"
-                   x-text="({ACTIVE:'Aktywny', REDEEMED:'Wykupiony', FORFEITED:'Przepadek'}[pawn?.status] || (pawn?.status || '—'))">
+                   x-text="({ACTIVE:'Aktywny', REDEEMED:'Wykupiony', FORFEITED:'Niewykupiony'}[pawn?.status] || (pawn?.status || '—'))">
               </div>
             </div>
 
@@ -63,7 +63,7 @@
             </div>
             <div class="actions md:justify-end">
               <button class="btn btn-sm btn-success" :disabled="busy || !active" @click="redeem()">Wykup</button>
-              <button class="btn btn-sm btn-warning" :disabled="busy || !active" @click="forfeit()">Przepadek</button>
+              <button class="btn btn-sm btn-warning" :disabled="busy || !active" @click="forfeit()">Niewykupiony</button>
             </div>
 
             <div class="mt-2 flex items-center gap-2 md:justify-end">

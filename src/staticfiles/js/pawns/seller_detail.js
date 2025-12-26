@@ -1,6 +1,4 @@
-// static/js/pawns/seller_detail.js
 window.app = window.app || {};
-// fallback, gdyby nie było załadowane globalnie (np. z offer_form.js)
 app.getSchemaCached = app.getSchemaCached || (async () => ({ schema:{}, ui_schema:{} }));
 
 app.sellerPawnDetail = function (publicId) {
@@ -89,13 +87,13 @@ app.sellerPawnDetail = function (publicId) {
     },
 
     async forfeit(){
-      if (!confirm('Oznaczyć jako przepadek?')) return;
+      if (!confirm('Oznaczyć jako niewykupiony?')) return;
       this.busy = true;
       try{
         const r = await app.api(`/api/sellers/mine/pawns/${this.pawn.public_id}/forfeit/`, { method:'POST' });
         const j = await r.json().catch(()=> ({}));
-        if (!r.ok){ app.error(app.errText?.(j) || 'Nie udało się oznaczyć przepadku.'); return; }
-        app.ok('Zastaw oznaczony jako przepadek.');
+        if (!r.ok){ app.error(app.errText?.(j) || 'Nie udało się oznaczyć jako niewykupiony.'); return; }
+        app.ok('Zastaw oznaczony jako niewykupiony.');
         this.pawn = j;
       } catch(e){ app.error(e?.message || 'Błąd'); }
       finally { this.busy = false; }

@@ -6,7 +6,7 @@ class ItemTypeCreateForm(forms.Form):
     parent_path = forms.CharField(max_length=1024, required=False)
 
 class ItemTypeUpdateForm(forms.Form):
-    path = forms.CharField(max_length=1024)  # obowiązkowe — identyfikuje kategorię
+    path = forms.CharField(max_length=1024)
     name = forms.CharField(max_length=120, required=False)
     parent_path = forms.CharField(max_length=1024, required=False)
 

@@ -1,4 +1,3 @@
-// static/js/orders/buyer_list.js
 window.app = window.app || {};
 
 app.buyerOrders = function () {

@@ -5,7 +5,6 @@
     <div class="alert">Ładowanie…</div>
   </template>
 
-  <!-- Brak profilu - formularz tworzenia -->
   <template x-if="!loading && !seller">
     <div class="card card-bordered bg-base-100">
       <div class="card-body gold-panel">
@@ -24,42 +23,41 @@
 
           <div class="md:col-span-2 flex items-center gap-3">
             <button class="btn btn-primary btn-gold" :disabled="busy" x-text="busy?'Tworzenie…':'Utwórz'"></button>
-            <span class="text-error whitespace-pre-line" x-text="err"></span>
           </div>
         </form>
       </div>
     </div>
   </template>
 
-  <!-- Jest profil - zakładki -->
   <template x-if="!loading && seller">
     <div>
-      <!-- Pasek zakładek -->
       <nav class="mb-6">
-            <ul class="tabs-rail" role="tablist">
-              <li><button type="button" class="tab-btn" :class="{'is-active': tab==='overview'}"
-                          x-show="can('overview')" @click="setTab('overview')">Podgląd</button></li>
-              <li><button type="button" class="tab-btn" :class="{'is-active': tab==='data'}"
-                          x-show="can('data')" @click="setTab('data')">Dane</button></li>
-              <li><button type="button" class="tab-btn" :class="{'is-active': tab==='graphics'}"
-                          x-show="can('graphics')" @click="setTab('graphics')">Grafika</button></li>
-              <li><button type="button" class="tab-btn" :class="{'is-active': tab==='accounts'}"
-                          x-show="can('accounts')" @click="setTab('accounts')">Konta bankowe</button></li>
-              <li><button type="button" class="tab-btn" :class="{'is-active': tab==='members'}"
-                          x-show="can('members')" @click="setTab('members')">Członkowie</button></li>
-              <li><button type="button" class="tab-btn" :class="{'is-active': tab==='offers'}"
-                          x-show="can('offers')" @click="setTab('offers')">Oferty</button></li>
-            </ul>
+        <ul class="tabs-rail" role="tablist">
+          <li><button type="button" class="tab-btn" :class="{'is-active': tab==='overview'}"
+                      x-show="can('overview')" @click="setTab('overview')">Podgląd</button></li>
+          <li><button type="button" class="tab-btn" :class="{'is-active': tab==='data'}"
+                      x-show="can('data')" @click="setTab('data')">Dane</button></li>
+          <li><button type="button" class="tab-btn" :class="{'is-active': tab==='graphics'}"
+                      x-show="can('graphics')" @click="setTab('graphics')">Grafika</button></li>
+          <li><button type="button" class="tab-btn" :class="{'is-active': tab==='accounts'}"
+                      x-show="can('accounts')" @click="setTab('accounts')">Konta bankowe</button></li>
+          <li><button type="button" class="tab-btn" :class="{'is-active': tab==='members'}"
+                      x-show="can('members')" @click="setTab('members')">Członkowie</button></li>
+          <li><button type="button" class="tab-btn" :class="{'is-active': tab==='offers'}"
+                      x-show="can('offers')" @click="setTab('offers')">Oferty</button></li>
+        </ul>
       </nav>
 
-
-      <!-- TAB: Podgląd -->
       <div x-show="tab==='overview'" x-cloak>
         <div class="card card-bordered bg-base-100">
           <div class="card-body gold-panel">
             <div class="flex flex-col md:flex-row items-start gap-6">
-              <img :src="seller.logo_image || 'https://placehold.co/200x120?text=Logo'"
-                   class="h-24 w-auto max-w-[240px] object-contain border rounded p-1 bg-base-200/50" alt="">
+              <img
+                  :src="seller.logo_image || 'https://placehold.co/200x120?text=Logo'"
+                  class="object-contain border rounded p-1 bg-base-200/50"
+                  style="width: var(--list-thumb); height: var(--list-thumb);"
+                  alt=""
+                >
               <div class="grow">
                 <div class="text-xl font-semibold" x-text="seller.company_name"></div>
                 <div class="opacity-70 text-sm" x-text="'/'+seller.slug"></div>
@@ -71,16 +69,15 @@
                 </div>
               </div>
               <div class="flex flex-col gap-2 w-full md:w-auto">
-                  <button class="btn btn-outline btn-sm" x-show="can('data')" x-cloak @click="setTab('data')">Edytuj dane</button>
-                  <button class="btn btn-outline btn-sm" x-show="can('graphics')" x-cloak @click="setTab('graphics')">Zmień grafikę</button>
-                  <button class="btn btn-gold btn-sm"    x-show="can('accounts')" x-cloak @click="setTab('accounts')">Konta bankowe</button>
+                <button class="btn btn-outline btn-sm" x-show="can('data')" x-cloak @click="setTab('data')">Edytuj dane</button>
+                <button class="btn btn-outline btn-sm" x-show="can('graphics')" x-cloak @click="setTab('graphics')">Zmień grafikę</button>
+                <button class="btn btn-gold btn-sm"    x-show="can('accounts')" x-cloak @click="setTab('accounts')">Konta bankowe</button>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- TAB: Dane -->
       <div x-show="tab==='data'" x-cloak>
         <div class="card card-bordered bg-base-100">
           <div class="card-body gold-panel">
@@ -93,15 +90,12 @@
               <input class="input input-bordered md:col-span-2" placeholder="Strona www" x-model="seller.website_url" type="url">
               <div class="md:col-span-2 flex items-center gap-3">
                 <button class="btn btn-primary btn-gold" :disabled="busy" x-text="busy?'Zapisywanie…':'Zapisz'"></button>
-                <span class="text-success" x-text="ok"></span>
-                <span class="text-error whitespace-pre-line" x-text="err"></span>
               </div>
             </form>
           </div>
         </div>
       </div>
 
-      <!-- TAB: Grafika -->
       <div x-show="tab==='graphics'" x-cloak>
         <div class="grid md:grid-cols-2 gap-6">
           <div class="card card-bordered bg-base-100">
@@ -112,8 +106,6 @@
               <input id="logo-input" type="file" class="hidden" x-ref="logoInput" accept="image/*" @change="uploadLogo()">
               <label for="logo-input" class="btn btn-outline">Wybierz plik</label>
               <button class="btn btn-primary btn-gold ml-2" :disabled="imgBusy" @click="$refs.logoInput.click()">Wyślij</button>
-              <span class="ml-3 text-error" x-text="imgErr"></span>
-              <span class="ml-3 text-success" x-text="imgOk"></span>
             </div>
           </div>
 
@@ -125,20 +117,16 @@
               <input id="banner-input" type="file" class="hidden" x-ref="bannerInput" accept="image/*" @change="uploadBanner()">
               <label for="banner-input" class="btn btn-outline">Wybierz plik</label>
               <button class="btn btn-primary btn-gold ml-2" :disabled="imgBusy" @click="$refs.bannerInput.click()">Wyślij</button>
-              <span class="ml-3 text-error" x-text="imgErr"></span>
-              <span class="ml-3 text-success" x-text="imgOk"></span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- TAB: Konta bankowe -->
       <div x-show="tab==='accounts'" x-cloak>
         <div class="card card-bordered bg-base-100">
           <div class="card-body gold-panel">
             <h2 class="card-title">Konta bankowe</h2>
 
-            <!-- LISTA KONT -->
             <div class="mt-3 space-y-2" x-show="accounts.length">
               <template x-for="(a, idx) in accounts" :key="a?.public_id || a?.iban || idx">
                 <div class="p-3 rounded-lg border flex flex-col md:flex-row md:items-center gap-3">
@@ -173,7 +161,6 @@
               <div class="text-sm opacity-70 mt-2">Brak kont. Dodaj pierwsze poniżej.</div>
             </template>
 
-            <!-- Dodawanie -->
             <form class="grid md:grid-cols-2 gap-3 mt-5 border-t pt-4" @submit.prevent="createAccount()">
               <input class="input input-bordered md:col-span-2" placeholder="IBAN" x-model="accForm.iban" required>
               <input class="input input-bordered" placeholder="Nazwa banku" x-model="accForm.bank_name">
@@ -184,60 +171,45 @@
               </label>
               <div class="md:col-span-2 flex items-center gap-3">
                 <button class="btn btn-primary btn-gold" :disabled="accBusy" x-text="accBusy ? 'Zapisywanie…' : 'Dodaj konto'"></button>
-                <span class="text-success" x-text="accOk"></span>
-                <span class="text-error whitespace-pre-line" x-text="accErr"></span>
               </div>
             </form>
           </div>
         </div>
       </div>
 
-      <!-- TAB: Oferty -->
-        <div x-show="tab==='offers'" x-cloak>
-          <div class="card card-bordered bg-base-100">
-            <div class="card-body gold-panel">
-              {% include 'app/partials/_seller_offers_list.html' %}
-            </div>
+      <div x-show="tab==='offers'" x-cloak>
+        <div class="card card-bordered bg-base-100">
+          <div class="card-body gold-panel">
+            {% include 'app/partials/_seller_offers_list.html' %}
           </div>
         </div>
+      </div>
 
-      <!-- TAB: Członkowie -->
-        <div x-show="tab==='members'" x-cloak>
-          <div class="card card-bordered bg-base-100">
-            <div class="card-body gold-panel">
-              <h2 class="card-title">Członkowie sklepu</h2>
+      <div x-show="tab==='members'" x-cloak>
+        <div class="card card-bordered bg-base-100">
+          <div class="card-body gold-panel">
+            <h2 class="card-title">Członkowie sklepu</h2>
 
-              <!-- ALERTY globalne dla zakładki -->
-              <template x-if="membersErr">
-                <div class="alert alert-error whitespace-pre-line" x-text="membersErr"></div>
-              </template>
-              <template x-if="membersOk">
-                <div class="alert alert-success" x-text="membersOk"></div>
-              </template>
+            <div class="flex items-center gap-2 mt-2">
+              <input class="input input-bordered input-sm w-full md:w-80"
+                     placeholder="e-mail imię nazwisko tel."
+                     x-model="memberQuery"
+                     @input.debounce.400ms="loadMembers(1)">
+              <button class="btn btn-sm" @click="loadMembers(1)">Szukaj</button>
+            </div>
 
-              <!-- FILTR listy członków -->
-              <div class="flex items-center gap-2 mt-2">
-                <input class="input input-bordered input-sm w-full md:w-80"
-                       placeholder="Szukaj: e-mail / imię / nazwisko / telefon / public_id"
-                       x-model="memberQuery"
-                       @input.debounce.400ms="loadMembers(1)">
-                <button class="btn btn-sm" @click="loadMembers(1)">Szukaj</button>
-              </div>
+            <div class="mt-3 space-y-2" x-show="members.length">
+              <template x-for="(m, idx) in members" :key="memberKey(m, idx)">
+                <div class="p-3 rounded-lg border flex flex-col md:flex-row md:items-center gap-3">
+                  <div class="grow">
+                    <div class="font-medium" x-text="m.user?.email || m.user_email || '—'"></div>
+                    <div class="text-xs opacity-70" x-text="[(m.user?.first_name||''), (m.user?.last_name||'')].filter(Boolean).join(' ')"></div>
+                  </div>
 
-              <!-- LISTA CZŁONKÓW -->
-              <div class="mt-3 space-y-2" x-show="members.length">
-                <template x-for="(m, idx) in members" :key="memberKey(m, idx)">
-                  <div class="p-3 rounded-lg border flex flex-col md:flex-row md:items-center gap-3">
-                    <div class="grow">
-                      <div class="font-medium" x-text="m.user?.email || m.user_email || '—'"></div>
-                      <div class="text-xs opacity-70" x-text="[(m.user?.first_name||''), (m.user?.last_name||'')].filter(Boolean).join(' ')"></div>
-                    </div>
+                  <div class="list-actions flex flex-col md:flex-row items-center gap-2">
+                    <span class="badge" x-text="roleLabel(m.role)"></span>
 
-                    <!-- rola jako badge -->
-                    <span class="badge md:ml-auto" x-text="roleLabel(m.role)"></span>
-
-                    <!-- zmiana roli -->
-                    <div class="md:w-[360px] grid grid-cols-2 gap-2 items-center">
+                    <div class="md:w-[260px] grid grid-cols-2 gap-2 items-center">
                       <select class="select select-bordered select-sm fancy-select"
                               x-model="m.role"
                               @focus="m._roleBefore = m.role"
@@ -249,8 +221,6 @@
                         </template>
                       </select>
 
-
-                      <!-- nie pozwalaj usunąć OWNER-a -->
                       <button class="btn btn-xs btn-outline"
                               :disabled="isOwner(m) || membersBusy"
                               @click="removeMember(m.public_id)">
@@ -258,88 +228,82 @@
                       </button>
                     </div>
                   </div>
-                </template>
-              </div>
-
-              <template x-if="!members.length">
-                <div class="text-sm opacity-70 mt-2">Brak członków.</div>
+                </div>
               </template>
+            </div>
 
-              <!-- PAGINACJA listy członków -->
-              <div class="mt-3 flex items-center gap-2" x-show="members.length">
-                <button class="btn btn-sm" :disabled="!membersHasPrev || membersBusy" @click="prevMembers()">‹ Poprzednia</button>
-                <div class="text-sm opacity-70">Strona <span x-text="membersPage"></span> • Razem: <span x-text="membersTotal"></span></div>
-                <button class="btn btn-sm" :disabled="!membersHasNext || membersBusy" @click="nextMembers()">Następna ›</button>
-              </div>
+            <template x-if="!members.length">
+              <div class="text-sm opacity-70 mt-2">Brak członków.</div>
+            </template>
 
-              <hr class="my-5">
+            <div class="mt-3 flex items-center gap-2" x-show="members.length">
+              <button class="btn btn-sm" :disabled="!membersHasPrev || membersBusy" @click="prevMembers()">‹ Poprzednia</button>
+              <div class="text-sm opacity-70">Strona <span x-text="membersPage"></span> • Razem: <span x-text="membersTotal"></span></div>
+              <button class="btn btn-sm" :disabled="!membersHasNext || membersBusy" @click="nextMembers()">Następna ›</button>
+            </div>
 
-              <!-- KANDYDACI (live-search) -->
-              <div class="grid md:grid-cols-3 gap-3 items-start">
-                <div class="md:col-span-2">
-                  <label class="label"><span class="label-text">Szukaj pracownika (aktywny, niebędący członkiem)</span></label>
-                  <div class="relative">
-                    <input class="input input-bordered w-full"
-                           placeholder="np. jan, kowalski, jan@firma.pl, 555..., public_id"
-                           x-model="memberLookupQuery"
-                           @input.debounce.350ms="searchCandidates()">
-                    <div class="absolute right-2 top-1/2 -translate-y-1/2 text-xs opacity-60" x-show="lookupBusy">Szukam…</div>
+            <hr class="my-5">
 
-                    <!-- Lista wyników -->
-                    <div class="mt-2 border rounded-lg bg-base-100 max-h-64 overflow-auto"
-                         x-show="memberLookupResults.length"
-                         x-transition>
-                      <template x-for="u in memberLookupResults" :key="u.public_id">
-                        <div class="p-2 border-b last:border-b-0 flex items-center justify-between gap-2">
-                          <div>
-                            <div class="font-medium text-sm" x-text="u.email"></div>
-                            <div class="text-xs opacity-70" x-text="[(u.first_name||''),(u.last_name||'')].filter(Boolean).join(' ')"></div>
-                          </div>
-                          <div class="flex items-center gap-2">
-                            <button class="btn btn-xs btn-outline" @click="selectCandidate(u)">Wybierz</button>
-                            <button class="btn btn-xs btn-primary btn-gold" :disabled="membersBusy" @click="addCandidate(u)">Dodaj</button>
-                          </div>
+            <div class="grid md:grid-cols-3 gap-3 items-start">
+              <div class="md:col-span-2">
+                <label class="label"><span class="label-text">Szukaj pracownika (aktywny, niebędący członkiem)</span></label>
+                <div class="relative">
+                  <input class="input input-bordered w-full"
+                         placeholder="e-mail imię nazwisko tel."
+                         x-model="memberLookupQuery"
+                         @input.debounce.350ms="searchCandidates()">
+                  <div class="absolute right-2 top-1/2 -translate-y-1/2 text-xs opacity-60" x-show="lookupBusy">Szukam…</div>
+
+                  <div class="mt-2 border rounded-lg bg-base-100 max-h-64 overflow-auto"
+                       x-show="memberLookupResults.length"
+                       x-transition>
+                    <template x-for="u in memberLookupResults" :key="u.public_id">
+                      <div class="p-2 border-b last:border-b-0 flex items-center justify-between gap-2">
+                        <div>
+                          <div class="font-medium text-sm" x-text="u.email"></div>
+                          <div class="text-xs opacity-70" x-text="[(u.first_name||''),(u.last_name||'')].filter(Boolean).join(' ')"></div>
                         </div>
-                      </template>
-                    </div>
-                  </div>
-                  <p class="text-xs opacity-70 mt-1">Domyślnie pokazuję tylko role „Pracownik”.</p>
-                </div>
-
-                <!-- Rola dla szybkiego dodawania -->
-                <div>
-                  <label class="label"><span class="label-text">Rola dla nowego członka</span></label>
-                  <select class="select select-bordered w-full fancy-select" x-model="memberForm.role">
-                    <template x-for="r in roles" :key="r">
-                      <option :value="r" x-text="roleLabel(r)" :disabled="r==='OWNER'"></option>
+                        <div class="flex items-center gap-2">
+                          <button class="btn btn-xs btn-outline" @click="selectCandidate(u)">Wybierz</button>
+                          <button class="btn btn-xs btn-primary btn-gold" :disabled="membersBusy" @click="addCandidate(u)">Dodaj</button>
+                        </div>
+                      </div>
                     </template>
-                  </select>
+                  </div>
                 </div>
+                <p class="text-xs opacity-70 mt-1">Domyślnie pokazuję tylko role „Pracownik”.</p>
               </div>
 
-              <!-- RĘCZNE dodanie -->
-              <form class="grid md:grid-cols-3 gap-3 mt-5 border-t pt-4" @submit.prevent="addMember()">
-                <input class="input input-bordered" placeholder="E-mail (albo zostaw puste)" x-model="memberForm.email">
-                <input class="input input-bordered" placeholder="user_public_id (albo zostaw puste)" x-model="memberForm.user_public_id">
-                <select class="select select-bordered fancy-select" x-model="memberForm.role">
+              <div>
+                <label class="label"><span class="label-text">Rola dla nowego członka</span></label>
+                <select class="select select-bordered w-full fancy-select" x-model="memberForm.role">
                   <template x-for="r in roles" :key="r">
                     <option :value="r" x-text="roleLabel(r)" :disabled="r==='OWNER'"></option>
                   </template>
                 </select>
-                <div class="md:col-span-3 flex items-center gap-3">
-                  <button class="btn btn-primary btn-gold" :disabled="membersBusy">
-                    <span x-show="!membersBusy">Dodaj członka</span>
-                    <span x-show="membersBusy">Przetwarzam…</span>
-                  </button>
-                  <span class="text-success" x-text="membersOk"></span>
-                  <span class="text-error whitespace-pre-line" x-text="membersErr"></span>
-                </div>
-              </form>
-
-              <p class="text-xs opacity-70 mt-2">Podaj e-mail <em>albo</em> user_public_id. OWNER nie jest nadawany przez API.</p>
+              </div>
             </div>
+
+            <form class="grid md:grid-cols-3 gap-3 mt-5 border-t pt-4" @submit.prevent="addMember()">
+              <input class="input input-bordered" placeholder="E-mail (albo zostaw puste)" x-model="memberForm.email">
+              <input class="input input-bordered" placeholder="user_public_id (albo zostaw puste)" x-model="memberForm.user_public_id">
+              <select class="select select-bordered fancy-select" x-model="memberForm.role">
+                <template x-for="r in roles" :key="r">
+                  <option :value="r" x-text="roleLabel(r)" :disabled="r==='OWNER'"></option>
+                </template>
+              </select>
+              <div class="md:col-span-3 flex items-center gap-3">
+                <button class="btn btn-primary btn-gold" :disabled="membersBusy">
+                  <span x-show="!membersBusy">Dodaj członka</span>
+                  <span x-show="membersBusy">Przetwarzam…</span>
+                </button>
+              </div>
+            </form>
+
+            <p class="text-xs opacity-70 mt-2">Podaj e-mail <em>albo</em> user_public_id.</p>
           </div>
         </div>
+      </div>
 
     </div>
   </template>

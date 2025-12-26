@@ -35,7 +35,7 @@ class Pawn(PublicIdModel):
     STATUS = [("ACTIVE","Active"),("REDEEMED","Redeemed"),("FORFEITED","Forfeited"),("CANCELLED","Cancelled")]
     status = models.CharField(max_length=10, choices=STATUS, default="ACTIVE")
 
-    # po przepadku można utworzyć draft ogłoszenia
+    # po niewykupieniu można utworzyć draft ogłoszenia
     forfeited_item = models.ForeignKey(ItemSet, null=True, blank=True, on_delete=models.SET_NULL, related_name="from_pawn")
 
     class Meta:
@@ -76,7 +76,7 @@ class Pawn(PublicIdModel):
 
 class PawnLine(PublicIdModel):
     pawn = models.ForeignKey(Pawn, on_delete=models.CASCADE, related_name="lines")
-    # powiązanie z ItemSet nie jest wymagane — zwykle snapshot
+    # powiązanie z ItemSet nie jest wymagane - zwykle snapshot
     item_set = models.ForeignKey(ItemSet, null=True, blank=True, on_delete=models.SET_NULL, related_name="pawn_lines")
 
     title = models.CharField(max_length=255)

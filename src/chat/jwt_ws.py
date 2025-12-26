@@ -1,4 +1,3 @@
-# src/chat/jwt_ws.py
 from urllib.parse import parse_qs
 from channels.auth import AuthMiddlewareStack
 from channels.db import database_sync_to_async
@@ -38,7 +37,7 @@ class JWTAuthMiddleware:
                 user = await _get_user_for_token(token)
                 scope["user"] = user
         except Exception:
-            # w razie czegokolwiek – po prostu kontynuuj bez JWT
+            # w razie czegokolwiek - po prostu kontynuuj bez JWT
             pass
 
         return await self.app(scope, receive, send)

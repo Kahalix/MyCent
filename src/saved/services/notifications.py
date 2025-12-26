@@ -1,4 +1,3 @@
-# src/saved/services/notifications.py
 from __future__ import annotations
 from decimal import Decimal
 
@@ -55,7 +54,7 @@ def notify_price_drop(*, user, item_set, old_amount, new_amount, currency: str) 
     ctx = {
         # kontrakt „identity”: nagłówek/CTA itp.
         "first_name": (getattr(user, "first_name", "") or user.email),
-        "site_name": getattr(settings, "SITE_NAME", "Lown"),
+        "site_name": getattr(settings, "SITE_NAME", "MyCent"),
         "action_url": action_url,
 
         # dane specyficzne do treści

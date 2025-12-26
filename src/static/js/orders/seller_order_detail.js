@@ -1,4 +1,3 @@
-// static/js/orders/seller_order_detail.js
 window.app = window.app || {};
 
 app.sellerOrderDetail = function (orderPublicId) {
@@ -241,7 +240,6 @@ app.sellerOrderDetail = function (orderPublicId) {
       if (!this.isPawn) { this._indexShippings(); this._seedAllLineInputs(); }
     },
 
-    // === UI schema helpers + atrybuty ===
     async _ensureUiSchema(path){
       if (!path || this._uiByPath[path]) return;
       try {
@@ -284,7 +282,6 @@ app.sellerOrderDetail = function (orderPublicId) {
       } catch { return []; }
     },
 
-    // --- helpery dla badge w "Adres dostawy" ---
     pkgShipments(){
       return (this.order?.shippings || []).filter(s => (s.package_label || '') !== 'PICKUP');
     },
@@ -312,7 +309,8 @@ app.sellerOrderDetail = function (orderPublicId) {
     },
     tPaymentMethod(code){
       const m = {
-        CASH:'Gotówka', CREDIT_CARD:'Karta', DEBIT_CARD:'Karta debetowa',
+        CASH:'Gotówka', ONLINE_PAYMENT:'Płatność Online',
+        CREDIT_CARD:'Karta', DEBIT_CARD:'Karta debetowa',
         BANK_TRANSFER:'Przelew bankowy', CASH_ON_DELIVERY:'Pobranie',
         PAYPAL:'PayPal', BLIK:'BLIK', APPLE_PAY:'Apple Pay', GOOGLE_PAY:'Google Pay'
       };

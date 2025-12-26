@@ -30,7 +30,7 @@ class ChatParticipantResponse(serializers.ModelSerializer):
 class ChatThreadResponse(serializers.ModelSerializer):
     participants = ChatParticipantResponse(many=True)
     item = ItemSetPublicResponse(source="item_set")
-    thread_kind = serializers.SerializerMethodField()  # <— rodzaj wątku
+    thread_kind = serializers.SerializerMethodField()  # < rodzaj wątku
 
     class Meta:
         model = ChatThread

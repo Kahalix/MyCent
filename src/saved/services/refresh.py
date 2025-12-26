@@ -1,4 +1,3 @@
-# src/saved/services/refresh.py
 from __future__ import annotations
 from django.db import transaction
 from django.db.models import Q
@@ -8,7 +7,7 @@ from catalog.models import ItemType
 from listings.models import ItemSet
 from saved.models import SavedSearch, SavedSearchItem, SavedListing
 from saved.services.notifications import notify_price_drop
-from saved.services.queries import run_saved_query  # <<— używamy filtra opartego o query_string
+from saved.services.queries import run_saved_query  # <<- używamy filtra opartego o query_string
 
 
 def _descendants_types(category_path: str):
@@ -17,12 +16,12 @@ def _descendants_types(category_path: str):
     return ItemType.objects.filter(path__startswith=category_path)
 
 def _since(ss: SavedSearch):
-    # skąd zaczynamy liczenie „nowych” – domyślnie data utworzenia
+    # skąd zaczynamy liczenie „nowych” - domyślnie data utworzenia
     return ss.since_at or ss.created_at
 
 def _query_for_search(ss: SavedSearch):
     """
-    Zwraca queryset NOWYCH ofert (created_at > since) – lekki, bez select_related/prefetch.
+    Zwraca queryset NOWYCH ofert (created_at > since) - lekki, bez select_related/prefetch.
     Używany wyłącznie do budowania snapshota (wystarczy PK).
     """
     qstr = (ss.query_string or "").strip()

@@ -226,7 +226,7 @@ TIME_ZONE = "Europe/Warsaw"
 USE_I18N = True
 USE_TZ = True
 
-SITE_NAME = env.str("SITE_NAME", "Lown")
+SITE_NAME = env.str("SITE_NAME", "MyCent")
 SITE_URL  = env.str("SITE_URL",  "http://localhost:8000")  # dev fallback
 
 STATIC_URL = "/static/"

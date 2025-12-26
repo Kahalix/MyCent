@@ -44,7 +44,7 @@ def _machine_fingerprint(length: int = 5) -> str:
     # zamień np. pierwsze 6 bajtów na int, następnie na bazę
     val = int.from_bytes(h[:6], "big")
     s = _to_base(val)
-    # jeśli krócej — dopełnij z lewej, jeśli dłuższe — utnij do końca
+    # jeśli krócej - dopełnij z lewej, jeśli dłuższe - utnij do końca
     if len(s) < length:
         s = s.rjust(length, _ALPHABET[0])
     elif len(s) > length:
@@ -67,7 +67,7 @@ def cuid2() -> str:
 
     # ustandaryzuj długości segmentów tak, aby końcowy był 24-znakowy
     # plan: ts_len (9) + fp (5) + counter (4) + rand (6) = 24
-    # ts może czasem być dłuższy — wtedy ucinamy z końca (nowsze bity)
+    # ts może czasem być dłuższy - wtedy ucinamy z końca (nowsze bity)
     ts_len = 9
     if len(ts_part) < ts_len:
         ts_part = ts_part.rjust(ts_len, _ALPHABET[0])

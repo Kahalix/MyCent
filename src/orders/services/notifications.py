@@ -33,7 +33,7 @@ def notify_order_confirmed(*, user, orders: Iterable) -> None:
       - templates/email/order_confirmed.html  (extends email/_base.html)
       - templates/email/order_confirmed.txt
     """
-    site = getattr(settings, "SITE_NAME", "Lown")
+    site = getattr(settings, "SITE_NAME", "MyCent")
     subject = f"[{site}] Potwierdzenie zamówienia"
 
     items = [{"order": o, "order_url": _order_url(o.public_id)} for o in orders]
@@ -59,7 +59,7 @@ def notify_order_shipped(*, user, order) -> None:
       - templates/email/order_shipped.html   (extends email/_base.html)
       - templates/email/order_shipped.txt
     """
-    site = getattr(settings, "SITE_NAME", "Lown")
+    site = getattr(settings, "SITE_NAME", "MyCent")
     subject = f"[{site}] Twoje zamówienie zostało wysłane"
 
     ctx = {

@@ -99,7 +99,7 @@ def extend_pawn(*, pawn: Pawn, days: int, operator) -> None:
     if pawn.status != "ACTIVE":
         raise Conflict("Nie można przedłużyć nieaktywnego zastawu.")
     if pawn_is_expired(pawn):
-        raise Conflict("Zastaw wygasł — nie można przedłużyć.")
+        raise Conflict("Zastaw wygasł - nie można przedłużyć.")
     if days not in (7, 14, 30):
         raise DomainError("Dozwolone przedłużenia: 7/14/30 dni.")
 
@@ -143,7 +143,7 @@ def redeem_pawn(*, pawn: Pawn, operator) -> Pawn:
 @dbtx.atomic
 def forfeit_pawn(*, pawn: Pawn, operator, create_listing: bool = True) -> Pawn:
     """
-    Przepadek po terminie. Opcjonalnie tworzy draft ItemSet do sprzedaży.
+    Niewykupiony zastaw po terminie. Opcjonalnie tworzy draft ItemSet do sprzedaży.
     """
     if pawn.status != "ACTIVE":
         raise Conflict("Zastaw nie jest aktywny.")
@@ -181,12 +181,12 @@ def forfeit_pawn(*, pawn: Pawn, operator, create_listing: bool = True) -> Pawn:
 def create_extension_transaction(*, pawn: Pawn, days: int, operator) -> Transaction:
     """
     Tworzy PENDING Transaction (PAWN_EXTENSION) dla online płatności.
-    Nie zmienia jeszcze Pawn.due_date – to nastąpi po SUCCEEDED płatności.
+    Nie zmienia jeszcze Pawn.due_date - to nastąpi po SUCCEEDED płatności.
     """
     if pawn.status != "ACTIVE":
         raise Conflict("Zastaw nie jest aktywny.")
     if pawn_is_expired(pawn):
-        raise Conflict("Zastaw wygasł — nie można przedłużyć.")
+        raise Conflict("Zastaw wygasł - nie można przedłużyć.")
     if days not in (7, 14, 30):
         raise DomainError("Dozwolone przedłużenia: 7/14/30 dni.")
 

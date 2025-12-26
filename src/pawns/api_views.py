@@ -173,7 +173,7 @@ class SellerPawnViewSet(mixins.ListModelMixin,
         )
         if res.get("result") == "conflict":
             return Response(
-                {"detail": "Znaleziono wielu kandydatów — wybierz ręcznie.", "candidates": res["candidates"]},
+                {"detail": "Znaleziono wielu kandydatów - wybierz ręcznie.", "candidates": res["candidates"]},
                 status=409
             )
         return Response({

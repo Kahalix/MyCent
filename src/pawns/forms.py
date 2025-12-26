@@ -74,14 +74,14 @@ class PawnAdminForm(CallModelCleanMixin, forms.ModelForm):
                 self.add_error("forfeited_item", "Pole „forfeited_item” dozwolone tylko dla statusu FORFEITED.")
 
         if cleaned.get("redeemed_at") and cleaned.get("forfeited_at"):
-            self.add_error(None, "Zastaw nie może być jednocześnie wykupiony i przepadnięty.")
+            self.add_error(None, "Zastaw nie może być jednocześnie wykupiony i niewykupiony.")
 
         return cleaned
 
 
 class PawnLineAdminForm(CallModelCleanMixin, forms.ModelForm):
     """
-    Gdy podano ItemSet — musi należeć do tego samego sprzedawcy co Pawn.
+    Gdy podano ItemSet - musi należeć do tego samego sprzedawcy co Pawn.
     Dodatkowo automatyczna nazwa tytułu z ItemSet gdy tytuł pusty.
     """
     class Meta:
@@ -135,7 +135,7 @@ class PawnExtensionAdminForm(forms.ModelForm):
         if pawn.status != "ACTIVE":
             raise ValidationError("Nie można przedłużyć nieaktywnego zastawu.")
         if timezone.now().date() > pawn.due_date:
-            raise ValidationError("Zastaw jest już po terminie — przedłużenie niedozwolone.")
+            raise ValidationError("Zastaw jest już po terminie - przedłużenie niedozwolone.")
 
         if days not in (7, 14, 30):
             raise ValidationError("Dozwolone wartości days: 7, 14 lub 30.")

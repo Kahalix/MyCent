@@ -1,4 +1,5 @@
 window.app = window.app || {};
+
 app.moderationUserOffersList = function () {
   return {
     items: [],
@@ -22,9 +23,14 @@ app.moderationUserOffersList = function () {
       this.reload();
       this.$nextTick(() => this._setupObserver());
     },
+
     destroy() {
-      if (this._obs) { try { this._obs.disconnect(); } catch {} this._obs = null; }
+      if (this._obs) {
+        try { this._obs.disconnect(); } catch {}
+        this._obs = null;
+      }
     },
+
     _setupObserver() {
       if (!('IntersectionObserver' in window)) return;
       const el = this.$refs?.sentinel;
@@ -34,34 +40,51 @@ app.moderationUserOffersList = function () {
       }, { rootMargin: '240px' });
       this._obs.observe(el);
     },
+
     onSearchInput() {
       clearTimeout(this._debounce);
       this._debounce = setTimeout(() => this.reload(), 350);
     },
+
     toggleStatusFilter(code) {
       if (this.statusSel.has(code)) this.statusSel.delete(code);
       else this.statusSel.add(code);
       this.reload();
     },
+
     clearStatuses() {
       this.statusSel.clear();
       this.reload();
     },
+
     resetAll() {
       this.q = '';
       this.ordering = '-created_at';
       this.statusSel.clear();
       this.reload();
     },
-    sort(by) { this.ordering = by; this.reload(); },
-    reload() { this.load(null, true); },
+
+    sort(by) {
+      this.ordering = by;
+      this.reload();
+    },
+
+    reload() {
+      this.load(null, true);
+    },
+
     async more() {
       if (!this.next || this.loading) return;
       await this.load(this.next, false);
     },
+
     async load(url = null, replace = false) {
       this.loading = replace ? true : this.loading;
-      if (replace) { this.err = ''; this.items = []; this.next = null; }
+      if (replace) {
+        this.err = '';
+        this.items = [];
+        this.next = null;
+      }
       const myReq = ++this._reqId;
       try {
         if (!url) {
@@ -85,11 +108,15 @@ app.moderationUserOffersList = function () {
         if (myReq === this._reqId) this.loading = false;
       }
     },
+
     img(it) {
       const first = (Array.isArray(it.images) && it.images.length) ? it.images[0] : null;
-      const pic = it.cover_image_url || first?.image_path || first?.url || first?.image_url || it.catalog_item?.image_path || '';
+      const pic = it.cover_image_url
+        || first?.image_path || first?.url || first?.image_url
+        || it.catalog_item?.image_path || '';
       return app.imgUrl ? app.imgUrl(pic) : (pic || '');
     },
+
     priceText(it) {
       if (it && typeof it.price === 'object') {
         const a = it.price.amount ?? '';
@@ -99,15 +126,18 @@ app.moderationUserOffersList = function () {
       if (typeof it?.price === 'number' || typeof it?.price === 'string') return `${it.price} PLN`;
       return '—';
     },
+
     ownerText(it) {
       const u = it?.owner;
       if (!u) return '';
       const n = [u.first_name, u.last_name].filter(Boolean).join(' ').trim();
       return n || u.email || '';
     },
+
     statusLabel(code) {
       return this.statusesAll.find(s => s.code === code)?.label || code || '—';
     },
+
     statusDotClass(code) {
       return {
         'AVAILABLE': 'bg-success',
@@ -116,6 +146,7 @@ app.moderationUserOffersList = function () {
         'SUSPENDED': 'bg-neutral'
       }[code] || 'bg-base-300';
     },
+
     async setStatus(it, newStatus) {
       const id = it.public_id || it.id;
       const r = await app.api(`/api/moderation/item-sets/${id}/set-status/`, {
@@ -130,12 +161,18 @@ app.moderationUserOffersList = function () {
       }
       const idx = this.items.findIndex(x => (x.public_id||x.id) === id);
       if (idx >= 0) this.items[idx] = j;
-      app.ok && app.ok('Zmieniono status');
+      if (app.ok) app.ok('Zmieniono status');
     },
+
     async changeStatus(it, newStatus) {
       if (newStatus === it.status) return;
-      try { await this.setStatus(it, newStatus); }
-      catch (e) { this.err = e?.message || 'Błąd zmiany statusu'; app.error && app.error(this.err); setTimeout(()=>{ this.err=''; }, 3000); }
+      try {
+        await this.setStatus(it, newStatus);
+      } catch (e) {
+        this.err = e?.message || 'Błąd zmiany statusu';
+        if (app.error) app.error(this.err);
+        setTimeout(()=>{ this.err=''; }, 3000);
+      }
     }
   };
 };

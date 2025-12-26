@@ -117,6 +117,20 @@ def set_status(*, itemset: ItemSet, status: str) -> ItemSet:
     return it
 
 @transaction.atomic
+def moderator_set_status(*, itemset: ItemSet, status: str) -> ItemSet:
+    if itemset.added_by != "USER":
+        raise Forbidden("Moderator operuje wyłącznie na ogłoszeniach użytkowników.")
+    if itemset.status == SOFT_DELETED or status == SOFT_DELETED:
+        raise Forbidden("Moderator nie operuje na ogłoszeniach usuniętych.")
+    if status not in {"AVAILABLE", SUSPENDED}:
+        raise Forbidden("Moderator może wyłącznie zawieszać lub aktywować ogłoszenia.")
+    itemset.status = status
+    it = _clean_and_save(itemset)
+    ensure_slot_matches_state(user=it.owner_user, itemset=it)
+    return it
+
+
+@transaction.atomic
 def soft_delete_itemset(*, itemset: ItemSet) -> ItemSet:
     """
     Soft delete: status=DELETED, zwolnienie slotu (USER).

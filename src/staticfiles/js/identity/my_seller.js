@@ -1,22 +1,18 @@
-// static/js/identity/my_seller.js
 window.app = window.app || {};
 
 app.mySeller = function () {
   return {
-    // --- zakładki ---
     tab: 'overview',
     perms: { overview:false, data:false, graphics:false, accounts:false, members:false, offers:false },
     can(t){ return !!this.perms[t]; },
     setTab(t) { this.tab = t },
 
-    // --- wyszukiwanie kandydatów / lista członków ---
     memberLookupQuery: '',
     memberLookupResults: [],
     lookupBusy: false,
 
     memberQuery: '',
 
-    // --- state ---
     loading: true,
     busy: false,
     imgBusy: false,
@@ -26,7 +22,6 @@ app.mySeller = function () {
     imgOk: '',
     seller: null,
 
-    // formularz create
     form: {
       company_name: '',
       slug: '',
@@ -36,15 +31,13 @@ app.mySeller = function () {
       website_url: ''
     },
 
-    // --- BANK ACCOUNTS ---
     accounts: [],
     accBusy: false,
     accErr: '',
     accOk: '',
     accForm: { iban: '', bank_name: '', account_holder: '', is_default: false },
 
-    // --- MEMBERS ---
-    roles: ['OWNER','MANAGER','MODERATOR','EMPLOYEE'], // OWNER widoczny tylko jeśli już jest
+    roles: ['OWNER','MANAGER','MODERATOR','EMPLOYEE'],
     roleLabels: {
       OWNER: 'Właściciel',
       MANAGER: 'Menedżer',
@@ -65,7 +58,6 @@ app.mySeller = function () {
     membersOk: '',
     memberForm: { email: '', user_public_id: '', role: 'EMPLOYEE' },
 
-    // ---------- helpers ----------
     _ensureArray(d) {
       if (Array.isArray(d)) return d;
       if (d && Array.isArray(d.results)) return d.results;
@@ -76,13 +68,9 @@ app.mySeller = function () {
       if (!d) return 'Wystąpił błąd';
       if (typeof d === 'string') return d;
       if (d.detail) return String(d.detail);
-
-      // najpierw klasyk DRF
       if (Array.isArray(d.non_field_errors) && d.non_field_errors.length) {
         return d.non_field_errors.join('\n');
       }
-
-      // weź pierwsze pole -> komunikat
       const keys = Object.keys(d);
       if (keys.length) {
         const v = d[keys[0]];
@@ -96,11 +84,9 @@ app.mySeller = function () {
       return 'Wystąpił błąd';
     },
 
-    // ---------- lifecycle ----------
     async load() {
       this.loading = true; this.err = '';
       try {
-        // 1) perms + kontekst
         let ctx = null;
         try {
           const rc = await app.api('/api/sellers/context/');
@@ -112,15 +98,14 @@ app.mySeller = function () {
           }
         } catch {}
 
-        // 2) źródło danych sklepu:
-        //    OWNER -> prywatne /mine (edycja)
-        //    inni -> publiczny widok po slugu (podgląd)
         if (ctx?.role === 'OWNER') {
           const r = await app.api('/api/sellers/mine/');
           if (r.ok) {
             this.seller = await r.json();
           } else if (r.status !== 404) {
-            const d = await app.readJson(r); this.err = this._fmtErr(d);
+            const d = await app.readJson(r);
+            this.err = this._fmtErr(d);
+            if (this.err) app.error(this.err);
           }
         } else if (ctx?.seller_slug) {
           const r = await app.api(`/api/public/sellers/${encodeURIComponent(ctx.seller_slug)}/`);
@@ -129,16 +114,17 @@ app.mySeller = function () {
           }
         }
 
-        // 3) doładowania tylko jeśli są uprawnienia do zakładek
         const proms = [];
         if (this.can('accounts')) proms.push(this.loadAccounts());
         if (this.can('members'))  proms.push(this.loadMembers(1));
         await Promise.all(proms);
-      } catch { this.err = 'Błąd sieci'; }
+      } catch {
+        this.err = 'Błąd sieci';
+        app.error(this.err);
+      }
       this.loading = false;
     },
 
-    // ---------- CREATE / UPDATE ----------
     async create() {
       this.busy = true; this.err = ''; this.ok = '';
       try {
@@ -152,10 +138,12 @@ app.mySeller = function () {
         if (!r.ok) throw new Error(this._fmtErr(d));
         this.seller = d;
         this.ok = 'Utworzono profil';
+        app.ok(this.ok);
         await Promise.all([this.loadAccounts(), this.loadMembers(1)]);
         window.dispatchEvent(new CustomEvent('auth:changed', { detail: { authed: true } }));
       } catch (e) {
         this.err = e.message || 'Błąd tworzenia';
+        app.error(this.err);
       } finally {
         this.busy = false;
       }
@@ -179,18 +167,19 @@ app.mySeller = function () {
         const d = await app.readJson(r);
         if (!r.ok) throw new Error(this._fmtErr(d));
         this.ok = 'Zapisano';
+        app.ok(this.ok);
       } catch (e) {
         this.err = e.message || 'Błąd zapisu';
+        app.error(this.err);
       } finally {
         this.busy = false;
       }
     },
 
-    // ---------- KANDYDACI ----------
     async searchCandidates() {
       if (!this.seller) return;
       const q = (this.memberLookupQuery || '').trim();
-      if (q.length < 2) { this.memberLookupResults = []; return; } // anti-spam
+      if (q.length < 2) { this.memberLookupResults = []; return; }
       this.lookupBusy = true;
       try {
         const r = await app.api(`/api/sellers/${this.seller.public_id}/members/candidates/?search=${encodeURIComponent(q)}&role=EMPLOYEE`);
@@ -205,7 +194,7 @@ app.mySeller = function () {
 
     selectCandidate(u) {
       this.memberForm.user_public_id = u.public_id;
-      this.memberForm.email = ''; // preferujemy public_id po wyborze
+      this.memberForm.email = '';
       const name = [u.first_name||'', u.last_name||''].join(' ').trim();
       this.memberLookupQuery = `${name ? name+' ' : ''}<${u.email}>`;
       this.memberLookupResults = [];
@@ -223,17 +212,18 @@ app.mySeller = function () {
         const d = await app.readJson(r);
         if (!r.ok) throw new Error(this._fmtErr(d));
         this.membersOk = 'Dodano członka';
+        app.ok(this.membersOk);
         this.memberLookupResults = [];
         this.memberLookupQuery = '';
         await this.loadMembers(1);
       } catch (e) {
         this.membersErr = e.message || 'Błąd dodawania';
+        app.error(this.membersErr);
       } finally {
         this.membersBusy = false;
       }
     },
 
-    // ---------- ACCOUNTS ----------
     async loadAccounts() {
       if (!this.seller) { this.accounts = []; return; }
       try {
@@ -264,10 +254,12 @@ app.mySeller = function () {
         const d = await app.readJson(r);
         if (!r.ok) throw new Error(this._fmtErr(d));
         this.accOk = 'Dodano konto';
+        app.ok(this.accOk);
         this.accForm = { iban: '', bank_name: '', account_holder: '', is_default: false };
         await this.loadAccounts();
       } catch (e) {
         this.accErr = e.message || 'Błąd dodawania';
+        app.error(this.accErr);
       } finally {
         this.accBusy = false;
       }
@@ -284,9 +276,11 @@ app.mySeller = function () {
         const d = await app.readJson(r);
         if (!r.ok) throw new Error(this._fmtErr(d));
         this.accOk = 'Zapisano';
+        app.ok(this.accOk);
         await this.loadAccounts();
       } catch (e) {
         this.accErr = e.message || 'Błąd zapisu';
+        app.error(this.accErr);
       } finally {
         this.accBusy = false;
       }
@@ -299,9 +293,11 @@ app.mySeller = function () {
         const d = await app.readJson(r);
         if (!r.ok) throw new Error(this._fmtErr(d));
         this.accOk = 'Ustawiono jako domyślne';
+        app.ok(this.accOk);
         await this.loadAccounts();
       } catch (e) {
         this.accErr = e.message || 'Błąd operacji';
+        app.error(this.accErr);
       } finally {
         this.accBusy = false;
       }
@@ -315,16 +311,17 @@ app.mySeller = function () {
           const d = await app.readJson(r);
           throw new Error(this._fmtErr(d));
         }
-        this.accOk = 'Usunięto';
+        this.accOk = 'Usunięto konto';
+        app.ok(this.accOk);
         await this.loadAccounts();
       } catch (e) {
         this.accErr = e.message || 'Błąd usuwania';
+        app.error(this.accErr);
       } finally {
         this.accBusy = false;
       }
     },
 
-    // ---------- MEMBERS ----------
     async loadMembers(page = null) {
       if (!this.seller) { this.members = []; return; }
       if (page) this.membersPage = page;
@@ -336,7 +333,6 @@ app.mySeller = function () {
         const d = await app.readJson(r);
         const list = this._ensureArray(d).filter(Boolean);
         this.members = list;
-        // paginacja z DRF PageNumberPagination
         this.membersHasNext = Boolean(d?.next);
         this.membersHasPrev = Boolean(d?.previous);
         this.membersTotal   = Number.isFinite(d?.count) ? d.count : list.length;
@@ -349,10 +345,9 @@ app.mySeller = function () {
     nextMembers(){ if (this.membersHasNext) this.loadMembers(this.membersPage + 1); },
     prevMembers(){ if (this.membersHasPrev) this.loadMembers(this.membersPage - 1); },
 
-    // zmiana roli
     handleRoleChange(m, newRole) {
       const prev = m._roleBefore ?? m.role;
-      const role = (newRole === 'OWNER') ? 'MANAGER' : newRole; // bezpieczeństwo
+      const role = (newRole === 'OWNER') ? 'MANAGER' : newRole;
       this.changeMemberRole(m.public_id, role, m, prev);
     },
 
@@ -367,12 +362,15 @@ app.mySeller = function () {
         });
         const d = await app.readJson(r);
         if (!r.ok) {
-          if (mRef && prevRole != null) mRef.role = prevRole; // REVERT UI
+          if (mRef && prevRole != null) mRef.role = prevRole;
           throw new Error(this._fmtErr(d));
         }
         this.membersOk = 'Zmieniono rolę';
+        app.ok(this.membersOk);
       } catch (e) {
+        if (mRef && prevRole != null) mRef.role = prevRole;
         this.membersErr = e.message || 'Błąd zmiany roli';
+        app.error(this.membersErr);
       } finally {
         this.membersBusy = false;
       }
@@ -382,7 +380,6 @@ app.mySeller = function () {
       if (!this.seller) return;
       this.membersBusy = true; this.membersErr = ''; this.membersOk = '';
       try {
-        // OWNER nie nadajemy – backend i tak zablokuje; przestawmy defensywnie
         const role = (this.memberForm.role === 'OWNER') ? 'MANAGER' : this.memberForm.role;
         const payload = {
           email: (this.memberForm.email || '').trim() || undefined,
@@ -397,10 +394,12 @@ app.mySeller = function () {
         const d = await app.readJson(r);
         if (!r.ok) throw new Error(this._fmtErr(d));
         this.membersOk = 'Dodano członka';
+        app.ok(this.membersOk);
         this.memberForm = { email: '', user_public_id: '', role: 'EMPLOYEE' };
         await this.loadMembers(1);
       } catch (e) {
         this.membersErr = e.message || 'Błąd dodawania';
+        app.error(this.membersErr);
       } finally {
         this.membersBusy = false;
       }
@@ -415,16 +414,17 @@ app.mySeller = function () {
           const d = await app.readJson(r);
           throw new Error(this._fmtErr(d));
         }
-        this.membersOk = 'Usunięto';
+        this.membersOk = 'Usunięto członka';
+        app.ok(this.membersOk);
         await this.loadMembers(this.membersPage);
       } catch (e) {
         this.membersErr = e.message || 'Błąd usuwania';
+        app.error(this.membersErr);
       } finally {
         this.membersBusy = false;
       }
     },
 
-    // ---------- GRAFIKA ----------
     async uploadLogo() {
       const file = this.$refs.logoInput?.files?.[0];
       if (!file) return;
@@ -436,8 +436,10 @@ app.mySeller = function () {
         if (!r.ok) throw new Error(this._fmtErr(d));
         this.seller.logo_image = d.logo_url;
         this.imgOk = 'Zmieniono logo';
+        app.ok(this.imgOk);
       } catch (e) {
         this.imgErr = e.message || 'Błąd uploadu';
+        app.error(this.imgErr);
       } finally {
         this.imgBusy = false;
         if (this.$refs.logoInput) this.$refs.logoInput.value = '';
@@ -455,8 +457,10 @@ app.mySeller = function () {
         if (!r.ok) throw new Error(this._fmtErr(d));
         this.seller.banner_image = d.banner_url;
         this.imgOk = 'Zmieniono banner';
+        app.ok(this.imgOk);
       } catch (e) {
         this.imgErr = e.message || 'Błąd uploadu';
+        app.error(this.imgErr);
       } finally {
         this.imgBusy = false;
         if (this.$refs.bannerInput) this.$refs.bannerInput.value = '';

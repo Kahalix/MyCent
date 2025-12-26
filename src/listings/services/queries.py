@@ -1,4 +1,3 @@
-# src/listings/services/queries.py
 from __future__ import annotations
 from django.db.models import Prefetch
 from listings.models import ItemSet, ItemSetImage, ItemSetShipping

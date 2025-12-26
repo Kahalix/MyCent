@@ -33,6 +33,14 @@ def get_or_create_user_pkg(user: User, package: ListingPackage) -> UserListingPa
 def get_active_usage_for_itemset(itemset: ItemSet) -> Optional[ListingUsageHistory]:
     return ListingUsageHistory.objects.filter(item_set=itemset, released_at__isnull=True).first()
 
+def get_any_paid_usage_for_itemset(itemset: ItemSet) -> Optional[ListingUsageHistory]:
+    return (
+        ListingUsageHistory.objects
+        .filter(item_set=itemset, is_bought=True)
+        .order_by("created_at")
+        .first()
+    )
+
 # --------- LOCKING ---------
 
 @transaction.atomic
@@ -102,6 +110,14 @@ def create_usage(user: User, item_type: ItemType, itemset: ItemSet, *, is_bought
     return ListingUsageHistory.objects.create(
         user=user, item_type=item_type, item_set=itemset, is_bought=is_bought
     )
+
+def reopen_usage(usage: ListingUsageHistory) -> ListingUsageHistory:
+    if usage.released_at is not None:
+        from django.utils import timezone
+        usage.released_at = None
+        usage.updated_at = timezone.now()
+        usage.save(update_fields=["released_at", "updated_at"])
+    return usage
 
 def release_usage(usage: ListingUsageHistory) -> None:
     if usage.released_at is None:

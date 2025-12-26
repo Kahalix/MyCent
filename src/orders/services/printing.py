@@ -1,4 +1,3 @@
-# src/orders/services/printing.py
 from __future__ import annotations
 import io
 from pathlib import Path

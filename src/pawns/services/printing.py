@@ -1,4 +1,3 @@
-# src/pawns/services/printing.py
 from __future__ import annotations
 from pathlib import Path
 from django.conf import settings

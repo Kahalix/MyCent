@@ -439,11 +439,7 @@ class ModeratorItemSetViewSet(viewsets.ModelViewSet):
         ser = ItemSetStatusUpdateRequest(data=request.data)
         ser.is_valid(raise_exception=True)
         new_status = ser.validated_data["status"]
-        if it.status == "DELETED" or new_status == "DELETED":
-            return Response({"detail": "Moderator nie operuje na ogłoszeniach usuniętych."}, status=403)
-        if new_status not in ("SUSPENDED", "AVAILABLE"):
-            return Response({"detail": "Moderator może wyłącznie zawieszać lub aktywować ogłoszenia."}, status=403)
-        it = commands.set_status(itemset=it, status=new_status)
+        it = commands.moderator_set_status(itemset=it, status=new_status)
         return Response(ItemSetAdminResponse(it).data, status=200)
 
     @action(detail=True, methods=["get"], url_path="images")

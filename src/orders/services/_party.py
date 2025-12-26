@@ -1,4 +1,3 @@
-# src/orders/services/_party.py
 def make_customer_snapshot(*, first_name="", last_name="", email="", phone="",
                            address=None, doc_type="", doc_number="", birth_date=None):
     address = address or {}

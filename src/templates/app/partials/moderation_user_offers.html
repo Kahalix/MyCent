@@ -75,6 +75,7 @@
     <template x-for="it in items" :key="it.public_id || it.id">
       <div class="p-3 rounded-lg border list-row flex items-start gap-3 relative overflow-hidden">
         <img :src="img(it)" alt="" class="list-thumb object-cover rounded border">
+
         <div class="grow min-w-0">
           <div class="font-medium truncate" x-text="it.set_name || '(bez nazwy)'"></div>
           <div class="text-sm opacity-70">
@@ -93,7 +94,7 @@
           </div>
         </div>
 
-        <div class="list-actions">
+        <div class="list-actions flex flex-col items-end gap-2">
           <div class="join">
             <button
               class="btn btn-sm join-item"
@@ -110,6 +111,16 @@
               Zawieś
             </button>
           </div>
+
+          <a
+            class="btn btn-sm btn-primary btn-gold"
+            :href="'/i/' + (it.slug || it.public_id || '')"
+            hx-boost="true"
+            hx-target="#app-root"
+            hx-push-url="true"
+          >
+            Zobacz ogłoszenie
+          </a>
         </div>
       </div>
     </template>

@@ -35,7 +35,7 @@ def set_quantity(*, user, item_public_id: str, quantity: int):
 
     cart = repo.get_or_create_active_cart(user)
 
-    # Usunięcie / wyzerowanie – pozwól nawet, jeśli item przestał być kupowalny
+    # Usunięcie / wyzerowanie - pozwól nawet, jeśli item przestał być kupowalny
     if quantity <= 0:
         return repo.set_item_qty(cart=cart, item=item, qty=0)
 

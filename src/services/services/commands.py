@@ -110,19 +110,26 @@ def consume_slot_for_itemset(*, user: User, itemset: ItemSet) -> ListingUsageHis
     if existing:
         return existing
 
-    # bezpieczeństwo: tylko właściciel może konsumować slot
     if getattr(itemset, "owner_user_id", None) != getattr(user, "id", None):
         raise Forbidden("Możesz zarządzać slotami tylko dla własnych ogłoszeń.")
 
     item_type = itemset.type
 
-    # kluczowe blokady
+    prev_paid = repo.get_any_paid_usage_for_itemset(itemset)
+    if (
+            prev_paid
+            and getattr(prev_paid, "user_id", None) == getattr(user, "id", None)
+            and getattr(prev_paid, "item_type_id", None) == getattr(item_type, "id", None)
+    ):
+        repo.reopen_usage(prev_paid)
+        return prev_paid
+
     repo.lock_user_packages_for_type(user, item_type)
     repo.lock_active_usages_for_type(user, item_type)
 
     free_total, paid_total = repo.totals_for_user_and_type(user, item_type)
-    free_used  = repo.active_free_used_count(user, item_type)
-    paid_used  = repo.paid_consumed_count(user, item_type)
+    free_used = repo.active_free_used_count(user, item_type)
+    paid_used = repo.paid_consumed_count(user, item_type)
 
     free_left = max(0, free_total - free_used)
     paid_left = max(0, paid_total - paid_used)

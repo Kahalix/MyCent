@@ -1,4 +1,3 @@
-// static/js/home/landing.js
 window.app = window.app || {};
 
 app.landing = function () {

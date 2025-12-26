@@ -1,4 +1,3 @@
-# chat/consumers.py
 from __future__ import annotations
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -109,7 +108,7 @@ class ThreadConsumer(AsyncWebsocketConsumer):
 
 class InboxConsumer(AsyncWebsocketConsumer):
     """
-    WS: /ws/chat/inbox/ — kanał skrzynki użytkownika (badge/unread/preview/liczniki zakładek).
+    WS: /ws/chat/inbox/ - kanał skrzynki użytkownika (badge/unread/preview/liczniki zakładek).
     Dołączamy do grupy: chat.inbox.<user_public_id>
     """
     async def connect(self):

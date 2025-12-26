@@ -1,4 +1,4 @@
-// SPRZEDAŻ OFFLINE — wybór przedmiotu z ofert + autouzupełnianie klienta
+// SPRZEDAŻ OFFLINE - wybór przedmiotu z ofert + autouzupełnianie klienta
 window.app = window.app || {};
 
 app.sellerOrderOfflineForm = function(){
@@ -33,7 +33,7 @@ app.sellerOrderOfflineForm = function(){
           if (!url){
             const qs = [];
             const qq = (this.q||'').trim();
-            if (qq) qs.push(`q=${encodeURIComponent(qq)}`);   // <— ważne: q= zamiast search=
+            if (qq) qs.push(`q=${encodeURIComponent(qq)}`);
             qs.push('ordering=last_name');
             url = `/api/sellers/mine/customers/?${qs.join('&')}`;
           }

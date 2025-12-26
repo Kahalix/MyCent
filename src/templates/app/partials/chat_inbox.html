@@ -82,13 +82,37 @@
       <a
         :href="`/chat/t/${encodeURIComponent(th.public_id)}`"
         hx-boost="true" hx-target="#app-root" hx-push-url="true"
-        class="p-3 rounded-lg border list-row flex items-start gap-3"
+        class="relative p-3 rounded-lg border list-row flex items-start gap-3"
       >
+        <!-- akcje: mute + delete w prawym górnym rogu -->
+        <div class="absolute right-3 top-3 flex items-center gap-1">
+          <!-- mute / unmute -->
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs"
+            @click.stop.prevent="toggleMute(th)"
+            :title="isMuted(th) ? 'Włącz powiadomienia' : 'Wyłącz powiadomienia'"
+          >
+            <span x-show="!isMuted(th)">🔔</span>
+            <span x-show="isMuted(th)">🔕</span>
+          </button>
+
+          <!-- delete -->
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs"
+            @click.stop.prevent="deleteThread(th)"
+            title="Usuń rozmowę z listy"
+          >
+            🗑
+          </button>
+        </div>
+
         <!-- miniatura -->
         <img :src="thumb(th)" alt="" class="list-thumb list-thumb--sm object-cover rounded border">
 
         <!-- środek -->
-        <div class="min-w-0 grow">
+        <div class="min-w-0 grow pr-16">
           <div class="flex items-center gap-2">
             <div class="font-medium truncate" x-text="title(th)"></div>
             <span class="text-xs cm-muted truncate" x-text="party(th)"></span>

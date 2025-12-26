@@ -4,7 +4,7 @@
 
   <!-- Pasek tytułowy -->
   <div class="flex items-center gap-2 mb-4">
-    <a class="btn btn-ghost" href="/me/pawns" hx-boost="true" hx-target="#app-root" hx-push-url="true">← Wróć</a>
+    <a class="btn btn-ghost" href="/pawns" hx-boost="true" hx-target="#app-root" hx-push-url="true">← Wróć</a>
     <h1 class="text-2xl font-semibold">Zastaw</h1>
     <span class="ml-auto text-xs">ID: <span class="font-mono" x-text="pawn?.public_id || '—'"></span></span>
   </div>
@@ -32,7 +32,7 @@
                      'badge-warning': pawn?.status==='FORFEITED' || expired,
                      'badge-ghost'  : !pawn?.status
                    }"
-                   x-text="({ACTIVE:'Aktywny', REDEEMED:'Wykupiony', FORFEITED:'Przepadek', EXPIRED:'Wygasły'}[pawn?.status] || (pawn?.status || '—'))">
+                   x-text="({ACTIVE:'Aktywny', REDEEMED:'Wykupiony', FORFEITED:'Niewykupiony', EXPIRED:'Wygasły'}[pawn?.status] || (pawn?.status || '—'))">
               </div>
             </div>
 
