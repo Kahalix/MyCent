@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+from django.test import override_settings
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate
@@ -19,6 +20,7 @@ from .factories import (
     create_item_set,
 )
 
+from listings.tests.test_security import TEST_CACHES
 
 def get_results(resp):
     data = resp.data
@@ -26,7 +28,7 @@ def get_results(resp):
         return data["results"]
     return data
 
-
+@override_settings(CACHES=TEST_CACHES)
 class PublicItemSetApiTests(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()

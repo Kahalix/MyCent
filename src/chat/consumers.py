@@ -97,10 +97,10 @@ class ThreadConsumer(AsyncWebsocketConsumer):
                 avatar = None
 
         return {
-            "public_id": msg.public_id,
+            "public_id": str(msg.public_id),
             "content": msg.content,
             "sent_at": msg.sent_at.isoformat(),
-            "sender_public_id": user.public_id,
+            "sender_public_id": str(user.public_id),
             "sender_display_name": display_name,
             "sender_user_image": avatar,
         }

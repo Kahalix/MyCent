@@ -32,6 +32,9 @@ from rest_framework.filters import OrderingFilter
 
 from .services.queries import itemset_by_slug
 
+import copy
+from listings.services.cache_utils import get_cache_key, invalidate_public_itemsets_cache, get_public_itemsets_cache_version
+
 User = get_user_model()
 
 
@@ -44,87 +47,200 @@ class PublicItemSetViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
     filterset_class = ItemSetFilter
     ordering_fields = ("created_at", "price")
 
+    # ---------- queryset ----------
     def get_queryset(self):
         qs = queries.public_itemsets_qs()
         user = getattr(self.request, "user", None)
+        # Dla zalogowanych można annotate'ować (optymalizacja), ale i tak nie cache'ujemy user-specific
         if user and user.is_authenticated:
             qs = qs.annotate(is_saved=Exists(
                 SavedListing.objects.filter(user=user, item_set=OuterRef("pk"))
             ))
         return qs
 
-    def list(self, request, *args, **kwargs):
-        user = getattr(request, "user", None)
-        if user and user.is_authenticated:
-            return super().list(request, *args, **kwargs)
-        cache_key = f"public_itemsets:list:{request.get_full_path()}"
-        cached = cache.get(cache_key)
-        if cached is not None:
-            return Response(cached)
-        response = super().list(request, *args, **kwargs)
-        ttl = getattr(settings, "PUBLIC_ITEMSETS_LIST_CACHE_TTL", 20)
-        cache.set(cache_key, response.data, ttl)
-        return response
+    # ---------- helpers ----------
+    def _cache_key(self, prefix: str, request) -> str:
+        return get_cache_key(prefix, request.get_full_path())
 
+    def _cache_ttl_list(self) -> int:
+        return getattr(settings, "PUBLIC_ITEMSETS_LIST_CACHE_TTL", 20)
+
+    def _cache_ttl_detail(self) -> int:
+        return getattr(settings, "PUBLIC_ITEMSETS_DETAIL_CACHE_TTL", 5)
+
+    def _strip_user_fields_from_payload(self, data):
+        """
+        Usuń pola user-specific (ostrzeżenie: defensywnie)
+        """
+        # paginacja DRF zwykle zwraca dict z 'results'
+        if isinstance(data, dict) and isinstance(data.get("results"), list):
+            for row in data["results"]:
+                if isinstance(row, dict):
+                    row.pop("is_saved", None)
+        elif isinstance(data, list):
+            for row in data:
+                if isinstance(row, dict):
+                    row.pop("is_saved", None)
+        elif isinstance(data, dict):
+            # single object response
+            data.pop("is_saved", None)
+        return data
+
+    def _inject_is_saved(self, data, user):
+        """
+        Dograj per-user flagę is_saved. Wywołuje tylko jedno zapytanie do SavedListing (IN).
+        Modyfikuje lokalną kopię.
+        """
+        if not (user and getattr(user, "is_authenticated", False)):
+            # jeśli nie auth -> dla paginacji i list zwróć False
+            if isinstance(data, dict) and isinstance(data.get("results"), list):
+                for row in data["results"]:
+                    if isinstance(row, dict):
+                        row["is_saved"] = False
+            elif isinstance(data, list):
+                for row in data:
+                    if isinstance(row, dict):
+                        row["is_saved"] = False
+            elif isinstance(data, dict):
+                data["is_saved"] = False
+            return data
+
+        # collect ids
+        if isinstance(data, dict) and isinstance(data.get("results"), list):
+            rows = data["results"]
+        elif isinstance(data, list):
+            rows = data
+        else:
+            # single object
+            rows = [data] if isinstance(data, dict) else []
+
+        ids = [r.get("public_id") for r in rows if isinstance(r, dict) and r.get("public_id")]
+        if not ids:
+            for r in rows:
+                if isinstance(r, dict):
+                    r["is_saved"] = False
+            return data
+
+        saved_ids = set(
+            SavedListing.objects
+            .filter(user=user, item_set__public_id__in=ids)
+            .values_list("item_set__public_id", flat=True)
+        )
+
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+            r["is_saved"] = r.get("public_id") in saved_ids
+
+        # if single object and rows was list form, map back
+        if isinstance(data, dict) and not isinstance(data.get("results"), list) and rows:
+            # data was single-object dict
+            # nothing else to do
+            pass
+
+        return data
+
+    # ---------- LIST ----------
+    def list(self, request, *args, **kwargs):
+        cache_key = self._cache_key("public_itemsets:list", request)
+        cached = cache.get(cache_key)
+
+        if cached is not None:
+            # deepcopy to avoid mutating cached object
+            data = copy.deepcopy(cached)
+        else:
+            response = super().list(request, *args, **kwargs)
+            data = response.data
+
+            safe_data = copy.deepcopy(data)
+            safe_data = self._strip_user_fields_from_payload(safe_data)
+
+            # zapisujemy tylko anonymized payload
+            cache.set(cache_key, safe_data, self._cache_ttl_list())
+
+            data = safe_data
+
+        # dograj user-specific flagi na kopii
+        data = self._inject_is_saved(data, request.user)
+        return Response(data)
+
+    # ---------- RETRIEVE ----------
     def retrieve(self, request, *args, **kwargs):
         user = getattr(request, "user", None)
         if user and user.is_authenticated:
             return super().retrieve(request, *args, **kwargs)
-        cache_key = f"public_itemsets:detail:{request.get_full_path()}"
+
+        cache_key = self._cache_key("public_itemsets:detail", request)
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached)
-        response = super().retrieve(request, *args, **kwargs)
-        ttl = getattr(settings, "PUBLIC_ITEMSETS_DETAIL_CACHE_TTL", 5)
-        cache.set(cache_key, response.data, ttl)
-        return response
 
+        response = super().retrieve(request, *args, **kwargs)
+        data = response.data
+
+        safe = copy.deepcopy(data)
+        if isinstance(safe, dict):
+            safe.pop("is_saved", None)
+        cache.set(cache_key, safe, self._cache_ttl_detail())
+        return Response(data)
+
+    # ---------- BY SLUG ----------
     @action(detail=False, methods=["get"], url_path=r"by-slug/(?P<slug>[^/]+)")
     def by_slug(self, request, slug=None):
-        user = getattr(request, "user", None)
-        use_cache = not (user and user.is_authenticated)
-        cache_key = None
-        if use_cache:
-            cache_key = f"public_itemsets:detail_slug:{request.get_full_path()}"
-            cached = cache.get(cache_key)
-            if cached is not None:
-                return Response(cached, status=200)
+        cache_key = self._cache_key("public_itemsets:detail_slug", request)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            data = copy.deepcopy(cached)
+            data = self._inject_is_saved(data, request.user)
+            return Response(data, status=200)
+
         obj = itemset_by_slug(slug or "")
         if not obj:
             return Response({"detail": "Not found"}, status=404)
+
         data = ItemSetPublicResponse(obj, context={"request": request}).data
-        if use_cache and cache_key:
-            ttl = getattr(settings, "PUBLIC_ITEMSETS_DETAIL_CACHE_TTL", 5)
-            cache.set(cache_key, data, ttl)
+
+        safe = copy.deepcopy(data)
+        if isinstance(safe, dict):
+            safe.pop("is_saved", None)
+        cache.set(cache_key, safe, self._cache_ttl_detail())
+
+        data = self._inject_is_saved(data, request.user)
         return Response(data, status=200)
 
+    # ---------- ITEMS IN CATEGORY ----------
     @action(detail=False, methods=["get"], url_path=r"categories/by-path/(?P<category_path>.+)/items")
     def items_in_category(self, request, category_path=None):
-        user = getattr(request, "user", None)
-        use_cache = not (user and user.is_authenticated)
-        cache_key = None
-        if use_cache:
-            cache_key = f"public_itemsets:category:{request.get_full_path()}"
-            cached = cache.get(cache_key)
-            if cached is not None:
-                return Response(cached)
-        base = self.get_queryset()
+        cache_key = self._cache_key("public_itemsets:category", request)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            data = copy.deepcopy(cached)
+            data = self._inject_is_saved(data, request.user)
+            return Response(data)
+
+        base = queries.public_itemsets_qs()
         params = request.query_params.copy()
         params["type_path"] = category_path
         fs = self.filterset_class(data=params, queryset=base, request=request)
         qs = fs.qs
         qs = OrderingFilter().filter_queryset(request, qs, self)
+
         page = self.paginate_queryset(qs)
         ser = ItemSetPublicResponse(page or qs, many=True, context={"request": request})
         if page is not None:
             response = self.get_paginated_response(ser.data)
+            data = response.data
         else:
-            response = Response(ser.data)
-        if use_cache and cache_key:
-            ttl = getattr(settings, "PUBLIC_ITEMSETS_LIST_CACHE_TTL", 20)
-            cache.set(cache_key, response.data, ttl)
-        return response
+            data = ser.data if isinstance(ser.data, list) else ser.data
 
+        safe_data = copy.deepcopy(data)
+        safe_data = self._strip_user_fields_from_payload(safe_data)
+        cache.set(cache_key, safe_data, self._cache_ttl_list())
+
+        data = self._inject_is_saved(safe_data, request.user)
+        return Response(data)
+
+    # ---------- START CHAT ----------
     @action(detail=True, methods=["post"], url_path="start-chat", permission_classes=[permissions.IsAuthenticated])
     def start_chat(self, request, public_id=None):
         item = get_object_or_404(ItemSet, public_id=public_id, status="AVAILABLE")

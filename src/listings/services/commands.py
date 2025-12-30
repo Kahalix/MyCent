@@ -21,6 +21,8 @@ from .repositories import (
     upsert_shipping_link, delete_shipping_link as repo_delete_shipping_link,
 )
 
+from listings.services.cache_utils import invalidate_public_itemsets_cache
+
 SOFT_DELETED = "DELETED"
 SUSPENDED = "SUSPENDED"
 
@@ -39,7 +41,13 @@ def _clean_and_save(obj: Any):
 @transaction.atomic
 def seller_create_itemset(*, seller: SellerProfile, data: dict) -> ItemSet:
     it = create_itemset_staff(seller=seller, data=data)
-    return _clean_and_save(it)
+    it = _clean_and_save(it)
+    # invalidate cache
+    try:
+        invalidate_public_itemsets_cache()
+    except Exception:
+        pass
+    return it
 
 @transaction.atomic
 def user_create_itemset(*, owner: User, data: dict) -> ItemSet:
@@ -50,6 +58,10 @@ def user_create_itemset(*, owner: User, data: dict) -> ItemSet:
     it = create_itemset_user(owner=owner, data=data)
     it = _clean_and_save(it)
     ensure_slot_matches_state(user=owner, itemset=it)
+    try:
+        invalidate_public_itemsets_cache()
+    except Exception:
+        pass
     return it
 
 @transaction.atomic
@@ -110,8 +122,13 @@ def set_status(*, itemset: ItemSet, status: str) -> ItemSet:
             raise Forbidden("Tego statusu nie można ustawić dla ogłoszenia użytkownika.")
 
     itemset.status = status
-    it = _clean_and_save(itemset)
 
+    it = _clean_and_save(itemset)
+    # invalidacja bo status wpływa na listy
+    try:
+        invalidate_public_itemsets_cache()
+    except Exception:
+        pass
     # utrzymanie spójności slotów dla USER
     ensure_slot_matches_state(user=it.owner_user, itemset=it)
     return it
@@ -126,29 +143,36 @@ def moderator_set_status(*, itemset: ItemSet, status: str) -> ItemSet:
         raise Forbidden("Moderator może wyłącznie zawieszać lub aktywować ogłoszenia.")
     itemset.status = status
     it = _clean_and_save(itemset)
+    try:
+        invalidate_public_itemsets_cache()
+    except Exception:
+        pass
     ensure_slot_matches_state(user=it.owner_user, itemset=it)
     return it
 
 
 @transaction.atomic
 def soft_delete_itemset(*, itemset: ItemSet) -> ItemSet:
-    """
-    Soft delete: status=DELETED, zwolnienie slotu (USER).
-    """
     if itemset.status != SOFT_DELETED:
         itemset.status = SOFT_DELETED
         _clean_and_save(itemset)
     if itemset.added_by == "USER":
         release_slot_for_itemset(itemset=itemset)
+    try:
+        invalidate_public_itemsets_cache()
+    except Exception:
+        pass
     return itemset
 
 @transaction.atomic
 def hard_delete_itemset(*, itemset: ItemSet) -> None:
-    """
-    Twarde usunięcie (dla ADMIN).
-    """
     if itemset.added_by == "USER":
         release_slot_for_itemset(itemset=itemset)
+    # before delete
+    try:
+        invalidate_public_itemsets_cache()
+    except Exception:
+        pass
     itemset.delete()
 
 @transaction.atomic
@@ -178,6 +202,10 @@ def add_image(*, itemset: ItemSet, image=None, image_path: str | None = None, im
         fields["image_order"] = image_order
 
     img = repo_create_image(itemset=itemset, **fields)
+    try:
+        invalidate_public_itemsets_cache()
+    except Exception:
+        pass
     return img
 
 def delete_image(*, image: ItemSetImage) -> None:
@@ -191,6 +219,10 @@ def delete_image(*, image: ItemSetImage) -> None:
         except Exception:
             pass
     repo_delete_image(image)
+    try:
+        invalidate_public_itemsets_cache()
+    except Exception:
+        pass
 
 @transaction.atomic
 def reorder_images(*, itemset: ItemSet, ordered_public_ids: list[str]) -> list[ItemSetImage]:

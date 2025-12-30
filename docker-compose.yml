@@ -1,3 +1,4 @@
+version: "3.9"
 services:
   db:
     image: postgres:16
@@ -5,7 +6,7 @@ services:
     ports: ["5432:5432"]
     volumes: ["pgdata:/var/lib/postgresql/data"]
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U lown -d lown" ]
+      test: ["CMD-SHELL", "pg_isready -U lown -d lown"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -29,24 +30,24 @@ services:
     image: stripe/stripe-cli:latest
     env_file: .env.docker
     depends_on:
-      web:
+      web-http:
         condition: service_started
     command:
       - listen
       - --api-key
       - ${STRIPE_SECRET_KEY}
       - --forward-to
-      - web:8000/api/payments/webhooks/stripe/
+      - web-http:8000/api/payments/webhooks/stripe/
       - --events
       - payment_intent.succeeded,payment_intent.payment_failed,charge.refunded
     restart: unless-stopped
 
-  web:
+  web-http:
     build: .
     command: >
       sh -c "python src/manage.py migrate --noinput &&
              python src/manage.py seed_admin &&
-             gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --workers ${WEB_CONCURRENCY:-3} --max-requests 1000 --max-requests-jitter 100"
+             gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --workers ${WEB_CONCURRENCY:-3}"
     expose:
       - "8000"
     depends_on:
@@ -60,14 +61,33 @@ services:
       ENV_FILE: /app/.env.docker
     volumes:
       - ./:/app
-  
+
+  web-ws:
+    build: .
+    command: >
+      sh -c "python src/manage.py migrate --noinput &&
+             python src/manage.py seed_admin &&
+             daphne -b 0.0.0.0 -p 8001 config.asgi:application"
+    expose:
+      - "8001"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file: .env.docker
+    volumes:
+      - ./:/app
+
   caddy:
     image: caddy:2
-    ports: [ "443:443","80:80" ]
+    ports: ["443:443","80:80"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./src/media:/srv/media:ro
-    depends_on: [ web ]
+    depends_on:
+      - web-http
+      - web-ws
 
   worker:
     build: .
@@ -83,12 +103,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      web:
+      web-http:
         condition: service_started
     env_file: .env.docker
-    environment:
-      DJANGO_SETTINGS_MODULE: config.settings
-      ENV_FILE: /app/.env.docker
     volumes: ["./:/app"]
 
   beat:
@@ -105,12 +122,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      web:
+      web-http:
         condition: service_started
     env_file: .env.docker
-    environment:
-      DJANGO_SETTINGS_MODULE: config.settings
-      ENV_FILE: /app/.env.docker
     volumes: ["./:/app"]
 
 volumes:
