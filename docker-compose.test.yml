@@ -1,0 +1,83 @@
+services:
+  db-test:
+    image: postgres:16
+    env_file: .env.docker
+    environment:
+      POSTGRES_DB: lown_perf
+      POSTGRES_USER: lown
+      POSTGRES_PASSWORD: lownpass
+    ports: ["5433:5432"]
+    volumes: ["pgdata_perf:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lown -d lown_perf"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    command:
+      [
+        "postgres",
+        "-c",
+        "max_connections=300",
+        "-c",
+        "shared_buffers=256MB",
+      ]
+
+  redis-test:
+    image: redis:7
+    ports: ["6380:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web-test:
+    build: .
+    command: >
+      sh -c '
+        python src/manage.py migrate --noinput &&
+        python src/manage.py seed_admin &&
+        python src/manage.py seed_perf_data --num-users=500 --num-sellers=20 --items-per-seller=200 --password=PerfPass123! --prefix=perf &&
+        gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --workers ${WEB_CONCURRENCY:-4} --max-requests 1000 --max-requests-jitter 100
+      '
+    expose:
+      - "8000"
+    depends_on:
+      db-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    env_file: .env.docker
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      ENV_FILE: /app/.env.docker
+      DATABASE_URL: postgresql://lown:lownpass@db-test:5432/lown_perf
+      POSTGRES_DB: lown_perf
+      POSTGRES_HOST: db-test
+      POSTGRES_PORT: 5432
+      REDIS_URL: redis://redis-test:6379/1
+      CELERY_BROKER_URL: redis://redis-test:6379/0
+      CELERY_RESULT_BACKEND: redis://redis-test:6379/2
+      CACHE_URL: redis://redis-test:6379/3
+      SECURE_SSL_REDIRECT: "False"
+      SITE_URL: http://web-test:8000
+      DJANGO_ALLOWED_HOSTS: "127.0.0.1,localhost,web,web-test,0.0.0.0"
+      WEB_CONCURRENCY: 4
+    volumes:
+      - ./:/app
+
+  locust:
+    image: locustio/locust:latest
+    working_dir: /mnt/locust
+    volumes:
+      - ./src/listings/perf:/mnt/locust
+    depends_on:
+      - web-test
+    ports:
+      - "8089:8089"
+    command: >
+      -f locustfile.py
+      --host=http://web-test:8000
+
+volumes:
+  pgdata_perf:

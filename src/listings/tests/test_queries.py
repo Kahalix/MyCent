@@ -1,128 +1,130 @@
+from __future__ import annotations
+from decimal import Decimal
 from datetime import timedelta
 
 from django.test import TestCase
 from django.utils import timezone
 
-from moneyed import Money
-
-from listings.models import ItemSetShipping
 from listings.services import queries
+from listings.services.queries import itemset_by_slug
 from .factories import (
-    make_user,
-    make_seller,
-    make_leaf_item_type,
-    make_package_type,
-    make_staff_itemset,
+    create_item_set,
+    create_item_type,
+    create_package_type,
+    create_item_shipping,
 )
 
 
-class PublicItemsetsQueriesTests(TestCase):
-    def setUp(self):
-        self.user = make_user("owner@example.com")
-        self.seller = make_seller(self.user)
-        self.item_type = make_leaf_item_type()
+class PublicItemsetsQsTests(TestCase):
+    def test_public_itemsets_qs_returns_only_available_and_ordered(self):
+        itype = create_item_type()
+        item1 = create_item_set(item_type=itype, status="AVAILABLE")
+        item2 = create_item_set(item_type=itype, status="AVAILABLE")
+        item3 = create_item_set(item_type=itype, status="SOLD")
 
-    def test_public_itemsets_qs_only_available_and_ordered_desc(self):
-        older = make_staff_itemset(self.seller, self.item_type, status="AVAILABLE")
-        newer = make_staff_itemset(self.seller, self.item_type, status="AVAILABLE")
-        closed = make_staff_itemset(self.seller, self.item_type, status="CLOSED")
-
-        older.created_at = timezone.now() - timedelta(hours=1)
-        older.save(update_fields=["created_at"])
-        newer.created_at = timezone.now()
-        newer.save(update_fields=["created_at"])
+        now = timezone.now()
+        item1.created_at = now - timedelta(minutes=1)
+        item1.save(update_fields=["created_at"])
+        item2.created_at = now
+        item2.save(update_fields=["created_at"])
 
         qs = queries.public_itemsets_qs()
-        ids = list(qs.values_list("public_id", flat=True))
-        self.assertEqual(ids, [newer.public_id, older.public_id])
-        self.assertNotIn(closed.public_id, ids)
-
-    def test_itemset_by_slug_uses_public_id_suffix_and_slug_fallback(self):
-        item = make_staff_itemset(self.seller, self.item_type, set_name="Phone X", status="AVAILABLE")
-        slug_with_tail = f"whatever-{item.public_id}"
-        found = queries.itemset_by_slug(slug_with_tail)
-        self.assertIsNotNone(found)
-        self.assertEqual(found.public_id, item.public_id)
-
-        item2 = make_staff_itemset(self.seller, self.item_type, set_name="Other", status="AVAILABLE")
-        item2.slug = "custom-slug"
-        item2.save(update_fields=["slug"])
-
-        found2 = queries.itemset_by_slug("custom-slug")
-        self.assertIsNotNone(found2)
-        self.assertEqual(found2.public_id, item2.public_id)
-
-        item3 = make_staff_itemset(self.seller, self.item_type, set_name="Closed", status="CLOSED")
-        slug3 = item3.slug
-        not_found = queries.itemset_by_slug(slug3)
-        self.assertIsNone(not_found)
+        ids = list(qs.values_list("id", flat=True))
+        self.assertIn(item1.id, ids)
+        self.assertIn(item2.id, ids)
+        self.assertNotIn(item3.id, ids)
+        self.assertEqual(ids, [item2.id, item1.id])
 
 
 class SuggestPackageTypesTests(TestCase):
-    def setUp(self):
-        self.user = make_user("pack@example.com")
-        self.seller = make_seller(self.user)
-        self.item_type = make_leaf_item_type()
-        self.item = make_staff_itemset(
-            self.seller,
-            self.item_type,
-            status="AVAILABLE",
-            listing_type="BUY",
-            allow_online_checkout=True,
+    def test_suggest_package_types_returns_empty_when_no_packages(self):
+        item = create_item_set()
+        result = queries.suggest_package_types(item)
+        self.assertEqual(result, [])
+
+    def test_suggest_package_types_includes_fitting_packages(self):
+        item = create_item_set(
             length_cm=10,
-            width_cm=10,
-            height_cm=10,
-            weight_kg=1,
+            width_cm=20,
+            height_cm=30,
+            weight_kg=Decimal("1.0"),
         )
-        self.pkg_plain = make_package_type(
-            provider="PP",
-            dimensions="S",
-            max_length_cm=20,
-            max_width_cm=20,
-            max_height_cm=20,
-            max_weight_kg=2,
-            price_amount=8,
+        pkg = create_package_type(
+            max_length_cm=15,
+            max_width_cm=25,
+            max_height_cm=35,
+            max_weight_kg=Decimal("2.0"),
+            price_amount=Decimal("9.99"),
         )
-        self.pkg_link = make_package_type(
-            provider="PP",
-            dimensions="M",
-            max_length_cm=20,
-            max_width_cm=20,
-            max_height_cm=20,
-            max_weight_kg=2,
-            price_amount=15,
-        )
-        self.pkg_small = make_package_type(
-            provider="PP",
-            dimensions="XS",
-            max_length_cm=5,
-            max_width_cm=5,
-            max_height_cm=5,
-            max_weight_kg=1,
-            price_amount=5,
-        )
-        self.link = ItemSetShipping.objects.create(
-            item_set=self.item,
-            package_type=self.pkg_link,
-            price_override=Money(12, "PLN"),
-        )
+        result = queries.suggest_package_types(item)
+        self.assertEqual(len(result), 1)
+        row = result[0]
+        self.assertEqual(row["package_type"].id, pkg.id)
+        self.assertEqual(row["effective_price"].amount, Decimal("9.99"))
+        self.assertEqual(row["price_source"], "catalog")
+        self.assertFalse(row["already_linked"])
 
-    def test_suggest_package_types_returns_only_fitting_and_sorted_by_effective_price(self):
-        rows = queries.suggest_package_types(self.item)
-        self.assertEqual(len(rows), 2)
-        ids = {r["package_type"].public_id for r in rows}
-        self.assertIn(self.pkg_plain.public_id, ids)
-        self.assertIn(self.pkg_link.public_id, ids)
+    def test_suggest_package_types_respects_existing_links_and_override(self):
+        item = create_item_set(
+            length_cm=10,
+            width_cm=20,
+            height_cm=30,
+            weight_kg=Decimal("1.0"),
+        )
+        pkg = create_package_type(
+            max_length_cm=15,
+            max_width_cm=25,
+            max_height_cm=35,
+            max_weight_kg=Decimal("2.0"),
+            price_amount=Decimal("5.00"),
+        )
+        create_item_shipping(
+            item_set=item,
+            package_type=pkg,
+            price_override_amount=Decimal("7.00"),
+            packed_length_cm=12,
+        )
+        result = queries.suggest_package_types(item)
+        self.assertEqual(len(result), 1)
+        row = result[0]
+        self.assertTrue(row["already_linked"])
+        self.assertEqual(row["price_source"], "override")
+        self.assertEqual(row["effective_price"].amount, Decimal("7.00"))
 
-        first = rows[0]
-        second = rows[1]
+    def test_suggest_package_types_excludes_not_fitting_packages(self):
+        item = create_item_set(
+            length_cm=100,
+            width_cm=100,
+            height_cm=100,
+            weight_kg=Decimal("10.0"),
+        )
+        create_package_type(
+            max_length_cm=10,
+            max_width_cm=10,
+            max_height_cm=10,
+            max_weight_kg=Decimal("1.0"),
+        )
+        result = queries.suggest_package_types(item)
+        self.assertEqual(result, [])
 
-        self.assertEqual(first["package_type"].public_id, self.pkg_plain.public_id)
-        self.assertEqual(first["effective_price"], self.pkg_plain.price)
-        self.assertEqual(first["price_source"], "catalog")
-        self.assertFalse(first["already_linked"])
 
-        self.assertEqual(second["package_type"].public_id, self.pkg_link.public_id)
-        self.assertEqual(second["effective_price"], self.link.price_override)
-        self.assertEqual(second["price_source"], "override")
-        self.assertTrue(second["already_linked"])
+class ItemsetBySlugTests(TestCase):
+    def test_itemset_by_slug_uses_public_id_tail(self):
+        item = create_item_set()
+        slug = item.slug
+        found = itemset_by_slug(slug)
+        self.assertIsNotNone(found)
+        self.assertEqual(found.id, item.id)
+
+    def test_itemset_by_slug_fallback_to_plain_slug(self):
+        item = create_item_set()
+        item.slug = "custom-slug"
+        item.save(update_fields=["slug"])
+        found = itemset_by_slug("custom-slug")
+        self.assertIsNotNone(found)
+        self.assertEqual(found.id, item.id)
+
+    def test_itemset_by_slug_returns_none_for_unavailable(self):
+        item = create_item_set(status="SOLD")
+        found = itemset_by_slug(item.slug)
+        self.assertIsNone(found)

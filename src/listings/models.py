@@ -72,6 +72,7 @@ class ItemSet(PublicIdModel):
             models.Index(fields=["owner_user", "slug"], name="ix_item_sets_user_slug_idx"),
             models.Index(fields=["added_by"], name="ix_item_sets_added_by"),
             models.Index(fields=["allow_online_checkout"], name="ix_item_sets_online_idx"),
+            models.Index(fields=["status", "-created_at"], name="ix_item_sets_status_created"),
         ]
 
     # --- helper: SEO slug ---

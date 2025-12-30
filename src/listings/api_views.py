@@ -2,6 +2,8 @@ from __future__ import annotations
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from django.db.models import Exists, OuterRef
+from django.conf import settings
+from django.core.cache import cache
 from rest_framework import viewsets, mixins, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -51,31 +53,77 @@ class PublicItemSetViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
             ))
         return qs
 
-    # DETAIL po slugu: /api/public/item-sets/by-slug/<slug>
+    def list(self, request, *args, **kwargs):
+        user = getattr(request, "user", None)
+        if user and user.is_authenticated:
+            return super().list(request, *args, **kwargs)
+        cache_key = f"public_itemsets:list:{request.get_full_path()}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        ttl = getattr(settings, "PUBLIC_ITEMSETS_LIST_CACHE_TTL", 20)
+        cache.set(cache_key, response.data, ttl)
+        return response
+
+    def retrieve(self, request, *args, **kwargs):
+        user = getattr(request, "user", None)
+        if user and user.is_authenticated:
+            return super().retrieve(request, *args, **kwargs)
+        cache_key = f"public_itemsets:detail:{request.get_full_path()}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+        response = super().retrieve(request, *args, **kwargs)
+        ttl = getattr(settings, "PUBLIC_ITEMSETS_DETAIL_CACHE_TTL", 5)
+        cache.set(cache_key, response.data, ttl)
+        return response
+
     @action(detail=False, methods=["get"], url_path=r"by-slug/(?P<slug>[^/]+)")
     def by_slug(self, request, slug=None):
+        user = getattr(request, "user", None)
+        use_cache = not (user and user.is_authenticated)
+        cache_key = None
+        if use_cache:
+            cache_key = f"public_itemsets:detail_slug:{request.get_full_path()}"
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached, status=200)
         obj = itemset_by_slug(slug or "")
         if not obj:
-            return Response({"detail":"Not found"}, status=404)
-        return Response(ItemSetPublicResponse(obj, context={"request": request}).data, status=200)
+            return Response({"detail": "Not found"}, status=404)
+        data = ItemSetPublicResponse(obj, context={"request": request}).data
+        if use_cache and cache_key:
+            ttl = getattr(settings, "PUBLIC_ITEMSETS_DETAIL_CACHE_TTL", 5)
+            cache.set(cache_key, data, ttl)
+        return Response(data, status=200)
 
-    # LISTA wg ścieżki kategorii (ścieżkowy alias):
-    # /api/public/item-sets/categories/by-path/<category_path>/items?search=...&...
     @action(detail=False, methods=["get"], url_path=r"categories/by-path/(?P<category_path>.+)/items")
     def items_in_category(self, request, category_path=None):
+        user = getattr(request, "user", None)
+        use_cache = not (user and user.is_authenticated)
+        cache_key = None
+        if use_cache:
+            cache_key = f"public_itemsets:category:{request.get_full_path()}"
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
         base = self.get_queryset()
-
         params = request.query_params.copy()
-        params["type_path"] = category_path  # delegujemy do ItemSetFilter.filter_type_path
-
+        params["type_path"] = category_path
         fs = self.filterset_class(data=params, queryset=base, request=request)
         qs = fs.qs
-
         qs = OrderingFilter().filter_queryset(request, qs, self)
-
         page = self.paginate_queryset(qs)
         ser = ItemSetPublicResponse(page or qs, many=True, context={"request": request})
-        return self.get_paginated_response(ser.data) if page is not None else Response(ser.data)
+        if page is not None:
+            response = self.get_paginated_response(ser.data)
+        else:
+            response = Response(ser.data)
+        if use_cache and cache_key:
+            ttl = getattr(settings, "PUBLIC_ITEMSETS_LIST_CACHE_TTL", 20)
+            cache.set(cache_key, response.data, ttl)
+        return response
 
     @action(detail=True, methods=["post"], url_path="start-chat", permission_classes=[permissions.IsAuthenticated])
     def start_chat(self, request, public_id=None):
