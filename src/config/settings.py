@@ -9,7 +9,7 @@ ENV_FILE = os.environ.get("ENV_FILE", os.path.join(BASE_DIR.parent, ".env"))
 env = environ.Env(
     DJANGO_DEBUG=(bool, False),
     DJANGO_SECRET_KEY=(str, "change-me"),
-    DJANGO_ALLOWED_HOSTS=(str, "127.0.0.1,localhost,web"),
+    DJANGO_ALLOWED_HOSTS=(str, "127.0.0.1,localhost,web,web-http,caddy,0.0.0.0"),
     DATABASE_URL=(str, ""),
     REDIS_URL=(str, "redis://localhost:6379/1"),
 )

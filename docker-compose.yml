@@ -30,16 +30,17 @@ services:
     image: stripe/stripe-cli:latest
     env_file: .env.docker
     depends_on:
-      web-http:
+      caddy:
         condition: service_started
     command:
       - listen
       - --api-key
       - ${STRIPE_SECRET_KEY}
       - --forward-to
-      - web-http:8000/api/payments/webhooks/stripe/
+      - https://caddy/api/payments/webhooks/stripe/
+      - --skip-verify
       - --events
-      - payment_intent.succeeded,payment_intent.payment_failed,charge.refunded
+      - payment_intent.succeeded,payment_intent.payment_failed,payment_intent.canceled,payment_intent.processing,payment_intent.requires_action
     restart: unless-stopped
 
   web-http:

@@ -6,6 +6,8 @@ from django.core.exceptions import ValidationError
 from django.db.models.functions import Length
 from common.models import PublicIdModel
 from typing import Any, Tuple, Dict
+import math
+import re
 
 def _default_for(spec: dict) -> Any:
     if "default" in spec: return spec["default"]
@@ -138,65 +140,205 @@ class ItemType(PublicIdModel):
                 child.path = child.compute_path(child.slug)
                 super(ItemType, child).save(update_fields=["path"])
 
+_TYPE_PL = {
+    "number": "liczbą",
+    "integer": "liczbą całkowitą",
+    "string": "tekstem",
+    "boolean": "wartością logiczną",
+    "object": "obiektem",
+    "array": "listą",
+    "null": "pustą wartością",
+}
 
-def _normalize_and_validate_attrs(attrs: dict, schema: dict, *, where: str,
-                                  require_same_fields: bool = True) -> dict:
-    """
-    Wspieramy wyłącznie pełny JSON Schema:
-      {"type":"object","properties":{...},"required":[...]}
-    Zasady:
-      - wypełniamy brakujące pola defaultami (jeśli są w properties[*].default),
-      - jeśli require_same_fields=True: wszystkie keys z `properties` MUSZĄ wystąpić,
-        a dodatkowe pola są zabronione,
-      - walidujemy jsonschema (typy, min/max, enum, minLength...).
-    """
+_REQUIRED_RE = re.compile(r"^'([^']+)' is a required property$")
+_ADDITIONAL_RE = re.compile(r"^\(.+?\)$")
+_UNEXPECTED_RE = re.compile(r"\('([^']+)' was unexpected\)")
+
+
+def _is_empty_value(v: Any) -> bool:
+    if v is None:
+        return True
+    if isinstance(v, str) and v.strip() == "":
+        return True
+    if isinstance(v, (list, dict)) and len(v) == 0:
+        return True
+    if isinstance(v, float) and math.isnan(v):
+        return True
+    return False
+
+
+def _coerce_to_schema_type(val: Any, typ: str | None) -> Any:
+    if typ is None or val is None:
+        return val
+
+    if typ == "string":
+        return str(val)
+
+    if typ == "boolean":
+        if isinstance(val, bool):
+            return val
+        if isinstance(val, str):
+            s = val.strip().lower()
+            if s in ("1", "true", "tak", "yes", "y", "t"):
+                return True
+            if s in ("0", "false", "nie", "no", "n", "f"):
+                return False
+        return val
+
+    if typ == "integer":
+        if isinstance(val, int) and not isinstance(val, bool):
+            return val
+        if isinstance(val, float) and val.is_integer():
+            return int(val)
+        if isinstance(val, str):
+            s = val.strip().replace(",", ".")
+            if s == "":
+                return val
+            try:
+                f = float(s)
+                if f.is_integer():
+                    return int(f)
+            except Exception:
+                return val
+        return val
+
+    if typ == "number":
+        if isinstance(val, (int, float)) and not isinstance(val, bool):
+            return float(val)
+        if isinstance(val, str):
+            s = val.strip().replace(",", ".")
+            if s == "":
+                return val
+            try:
+                return float(s)
+            except Exception:
+                return val
+        return val
+
+    return val
+
+
+def _pl_jsonschema_error(e) -> tuple[str, str]:
+    validator = getattr(e, "validator", None)
+    message = getattr(e, "message", "") or ""
+    path = ".".join(str(p) for p in list(getattr(e, "path", [])))
+
+    if validator == "required":
+        m = _REQUIRED_RE.match(message)
+        if m:
+            return m.group(1), "wymagane"
+        return path, "wymagane"
+
+    if validator == "type":
+        exp = getattr(e, "validator_value", None)
+        inst = getattr(e, "instance", None)
+        if inst is None:
+            return path, "nie może być puste"
+        if isinstance(exp, list):
+            exp_txt = ", ".join(_TYPE_PL.get(t, str(t)) for t in exp)
+            return path, f"musi być jednym z typów: {exp_txt}"
+        return path, f"musi być {_TYPE_PL.get(exp, str(exp))}"
+
+    if validator == "minimum":
+        return path, f"musi być ≥ {getattr(e, 'validator_value', '')}"
+
+    if validator == "exclusiveMinimum":
+        return path, f"musi być > {getattr(e, 'validator_value', '')}"
+
+    if validator == "maximum":
+        return path, f"musi być ≤ {getattr(e, 'validator_value', '')}"
+
+    if validator == "exclusiveMaximum":
+        return path, f"musi być < {getattr(e, 'validator_value', '')}"
+
+    if validator == "minLength":
+        return path, f"minimalna długość: {getattr(e, 'validator_value', '')}"
+
+    if validator == "maxLength":
+        return path, f"maksymalna długość: {getattr(e, 'validator_value', '')}"
+
+    if validator == "pattern":
+        return path, "nieprawidłowy format"
+
+    if validator == "enum":
+        vals = getattr(e, "validator_value", None) or []
+        return path, f"musi być jedną z: {', '.join(map(str, vals))}"
+
+    if validator == "additionalProperties":
+        um = _UNEXPECTED_RE.search(message)
+        if um:
+            bad = um.group(1)
+            return bad, "nieznane pole"
+        cleaned = _ADDITIONAL_RE.sub("", message).strip()
+        return path, cleaned or "nieznane pole"
+
+    return path, message or "błąd walidacji"
+
+
+def _normalize_and_validate_attrs(
+    attrs: dict,
+    schema: dict,
+    *,
+    where: str,
+    require_same_fields: bool = True,
+) -> dict:
     if not schema:
         return attrs or {}
 
-    # twarde oczekiwanie na pełny format
-    if not isinstance(schema, dict) or schema.get("type") != "object" or "properties" not in schema or not isinstance(schema["properties"], dict):
+    if (
+        not isinstance(schema, dict)
+        or schema.get("type") != "object"
+        or "properties" not in schema
+        or not isinstance(schema["properties"], dict)
+    ):
         raise ValidationError({where: "Nieprawidłowy format schematu (wymagane: {type:'object', properties:{...}})."})
 
     props = schema["properties"]
     keys_schema = set(props.keys())
+    required = set((schema.get("required") or []) if isinstance(schema.get("required"), list) else [])
+
     out = dict(attrs or {})
 
-    # uzupełnij defaulty
+    if not require_same_fields:
+        out = {k: v for k, v in out.items() if not _is_empty_value(v)}
+
+    for k, spec in props.items():
+        if k in out and isinstance(spec, dict):
+            out[k] = _coerce_to_schema_type(out.get(k), spec.get("type"))
+
     for k, spec in props.items():
         if k not in out and isinstance(spec, dict) and "default" in spec:
             out[k] = spec["default"]
 
-    # pilnuj zestawu pól (wszyscy mają jednakowy kształt)
     if require_same_fields:
         extras = [k for k in out.keys() if k not in keys_schema]
         if extras:
-            raise ValidationError({where: f"Nieznane pola: {', '.join(sorted(extras))}. Dozwolone: {', '.join(sorted(keys_schema))}."})
+            raise ValidationError({where: f"Nieznane pola: {', '.join(sorted(extras))}."})
         missing = [k for k in props.keys() if k not in out]
         if missing:
             raise ValidationError({where: f"Brak pól wymaganych przez schemat: {', '.join(missing)}."})
 
-    # walidacja jsonschema
     try:
-        from jsonschema import Draft7Validator, ValidationError as JSONSchemaError
+        from jsonschema import Draft7Validator
     except Exception:
-        # jeśli pakietu nie ma, jasno powiedz
         raise ValidationError({where: "Walidacja atrybutów wymaga pakietu 'jsonschema'."})
 
-    effective = dict(schema)  # kopia
+    effective = dict(schema)
     if require_same_fields:
-        # wymagamy WSZYSTKICH properties (nie tylko schema.required)
         effective["required"] = list(keys_schema)
         effective.setdefault("additionalProperties", False)
 
-    try:
-        Draft7Validator(effective).validate(out)
-    except JSONSchemaError as e:
-        path = ".".join(str(p) for p in list(e.path))
-        msg = f"{path}: {e.message}" if path else e.message
-        raise ValidationError({where: f"Niepoprawne atrybuty: {msg}"})
+    validator = Draft7Validator(effective)
+    errs = sorted(validator.iter_errors(out), key=lambda er: (list(er.path), er.validator or ""))
+
+    if errs:
+        msgs = []
+        for er in errs[:5]:
+            p, m = _pl_jsonschema_error(er)
+            msgs.append(f"{p}: {m}" if p else m)
+        raise ValidationError({where: "Niepoprawne atrybuty: " + "; ".join(msgs)})
 
     return out
-
 
 def _validate_against_schema(attrs: dict, schema_or_itemtype, *, where: str = "attributes",
                              require_same_fields: bool = True) -> dict:

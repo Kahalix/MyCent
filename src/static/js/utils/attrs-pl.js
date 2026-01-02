@@ -10,25 +10,27 @@ window.app = window.app || {};
   };
 
   const ALIASES = {
-    cpu:"CPU", gpu:"GPU", os:"System",
-    ram_gb:"Pamięć RAM", storage_gb:"Pamięć", ssd_gb:"Dysk SSD", hdd_gb:"Dysk HDD",
-    capacity_gb:"Pojemność", battery_mah:"Bateria", battery_ah:"Bateria",
-    screen_inches:"Przekątna ekranu", size_inches:"Przekątna",
-    screen_refresh_hz:"Częstotliwość odświeżania", refresh_hz:"Częstotliwość odświeżania",
-    camera_mp:"Aparat",
-    five_g:"5G", dual_sim:"Dual SIM", power_w:"Moc",
-    length_cm:"Długość", width_cm:"Szerokość", height_cm:"Wysokość",
-    brightness_lm:"Jasność", case_diameter_mm:"Średnica koperty",
-    water_resistance_m:"Wodoszczelność", wheel_inches:"Rozmiar koła",
-    capacity_l:"Pojemność", vram_gb:"VRAM",
-    // sprzęt audio/rtv/foto – miłe fallbacki gdy ui_schema nie dojdzie
-    channels:"Kanały", edition:"Edycja", waterproof:"Wodoodporność",
-    mic:"Mikrofon", noise_cancelling:"Aktywna redukcja szumów (ANC)",
-    smart_tv:"Smart TV", hdr:"HDR", panel:"Panel", resolution:"Rozdzielczość",
-    mount:"Bagnet", ibis:"IBIS", stabilization:"Stabilizacja", throw_ratio:"Throw ratio",
-    movement:"Mechanizm", focal_mm:"Ogniskowa", aperture:"Przysłona",
-    frame_size:"Rozmiar ramy", speeds:"Biegi"
-  };
+      brand:"Marka",
+      model:"Model",
+
+      cpu:"CPU", gpu:"GPU", os:"System",
+      ram_gb:"Pamięć RAM", storage_gb:"Pamięć", ssd_gb:"Dysk SSD", hdd_gb:"Dysk HDD",
+      capacity_gb:"Pojemność", battery_mah:"Bateria", battery_ah:"Bateria",
+      screen_inches:"Przekątna ekranu", size_inches:"Przekątna",
+      screen_refresh_hz:"Częstotliwość odświeżania", refresh_hz:"Częstotliwość odświeżania",
+      camera_mp:"Aparat",
+      five_g:"5G", dual_sim:"Dual SIM", power_w:"Moc",
+      length_cm:"Długość", width_cm:"Szerokość", height_cm:"Wysokość",
+      brightness_lm:"Jasność", case_diameter_mm:"Średnica koperty",
+      water_resistance_m:"Wodoszczelność", wheel_inches:"Rozmiar koła",
+      capacity_l:"Pojemność", vram_gb:"VRAM",
+      channels:"Kanały", edition:"Edycja", waterproof:"Wodoodporność",
+      mic:"Mikrofon", noise_cancelling:"Aktywna redukcja szumów (ANC)",
+      smart_tv:"Smart TV", hdr:"HDR", panel:"Panel", resolution:"Rozdzielczość",
+      mount:"Bagnet", ibis:"IBIS", stabilization:"Stabilizacja", throw_ratio:"Throw ratio",
+      movement:"Mechanizm", focal_mm:"Ogniskowa", aperture:"Przysłona",
+      frame_size:"Rozmiar ramy", speeds:"Biegi"
+    };
 
   const UNITS = {
     ram_gb:"GB", storage_gb:"GB", ssd_gb:"GB", hdd_gb:"GB", capacity_gb:"GB", vram_gb:"GB",

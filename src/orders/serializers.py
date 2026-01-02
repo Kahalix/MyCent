@@ -197,3 +197,4 @@ class SellerPawnPurchaseRequest(serializers.Serializer):
         default="CASH"
     )
     create_itemsets = serializers.BooleanField(required=False, default=True)  # auto-inwentarz?
+

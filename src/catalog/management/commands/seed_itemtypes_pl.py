@@ -99,11 +99,15 @@ TREE: Dict[str, Any] = {
                 }, required=["brand","model","cpu","ram_gb","ssd_gb"]),
                 UI(
                     labels={
-                        "cpu":"CPU","gpu":"GPU","ram_gb":"Pamięć RAM","ssd_gb":"Dysk SSD",
-                        "screen_inches":"Przekątna ekranu","screen_refresh_hz":"Częstotliwość odświeżania","os":"System","condition":"Stan"
+                        "brand": "Marka",
+                        "model": "Model",
+                        "cpu": "CPU", "gpu": "GPU", "ram_gb": "Pamięć RAM", "ssd_gb": "Dysk SSD",
+                        "screen_inches": "Przekątna ekranu", "screen_refresh_hz": "Częstotliwość odświeżania",
+                        "os": "System", "condition": "Stan"
                     },
-                    units={"ram_gb":"GB","ssd_gb":"GB","screen_inches":"cal","screen_refresh_hz":"Hz"},
-                    order=["brand","model","cpu","gpu","ram_gb","ssd_gb","screen_inches","screen_refresh_hz","os","condition"]
+                    units={"ram_gb": "GB", "ssd_gb": "GB", "screen_inches": "cal", "screen_refresh_hz": "Hz"},
+                    order=["brand", "model", "cpu", "gpu", "ram_gb", "ssd_gb", "screen_inches", "screen_refresh_hz",
+                           "os", "condition"]
                 )
             ),
             "Komponenty / Karty graficzne": leaf(

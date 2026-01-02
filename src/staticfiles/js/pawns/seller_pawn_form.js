@@ -1,32 +1,97 @@
-// static/js/pawns/seller_pawn_form.js
 window.app = window.app || {};
+
+app.imgUrl = app.imgUrl || (p => p || 'https://placehold.co/600x600?text=%20');
+app.api = app.api || ((url, opts = {}) => fetch(url, { credentials: 'include', ...opts }));
+app.readJson = app.readJson || (async (r) => { try { return await r.json(); } catch { return {}; } });
+
+app.moneyNormalize = app.moneyNormalize || (({ amount, currency = 'PLN' } = {}) => {
+  const s = (amount ?? '').toString().trim().replace(',', '.');
+  if (!s) return null;
+  const n = Number(s);
+  if (!Number.isFinite(n)) return null;
+  return { amount: n, currency };
+});
+app.moneyAmount = app.moneyAmount || (m => (m && Number.isFinite(m.amount)) ? m.amount : null);
+
+function _toErrorString(v) {
+  if (!v) return '';
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) return v.map(String).join(' ');
+  if (typeof v === 'object') {
+    const parts = [];
+    for (const val of Object.values(v)) {
+      if (!val) continue;
+      if (Array.isArray(val)) parts.push(val.map(String).join(' '));
+      else parts.push(String(val));
+    }
+    return parts.filter(Boolean).join(' ');
+  }
+  return String(v);
+}
+
+function _compact(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    const a = obj.map(_compact).filter(v => v !== undefined);
+    return a.length ? a : undefined;
+  }
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const vv = _compact(v);
+    if (vv === undefined) continue;
+    out[k] = vv;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+function _formatAttrErrors(errVal, row) {
+  if (!errVal) return '';
+  if (typeof errVal === 'string') return errVal;
+  if (Array.isArray(errVal)) return errVal.map(String).join('\n');
+
+  if (typeof errVal === 'object') {
+    const labels = row?._ui_schema?.labels || {};
+    const lines = [];
+
+    for (const [k, v] of Object.entries(errVal)) {
+      const label = labels[k] || k;
+      if (typeof v === 'string') lines.push(`${label}: ${v}`);
+      else if (Array.isArray(v)) lines.push(`${label}: ${v.map(String).join(' ')}`);
+      else if (v && typeof v === 'object') lines.push(`${label}: ${_toErrorString(v)}`);
+      else lines.push(`${label}: ${String(v)}`);
+    }
+
+    return lines.join('\n');
+  }
+
+  return String(errVal);
+}
 
 app.sellerPawnForm = function () {
   return {
     busy:false, err:'', ok:'',
     fv: { principal_amount:'', due_in_days:'' },
 
-    // pickery (modale)
-    catPicker:{open:false}, ciPicker:{open:false},
+    catPicker: { open:false, loading:false, nodes:[], crumbs:[], onPick(){}, openAtRoot(){}, load(){}, enter(){}, backTo(){}, pick(){}, close(){} },
+    ciPicker:  { open:false, q:'', typePath:'', loading:false, items:[], next:null, uiNonce:0, onPick(){}, openWith(){}, search(){}, more(){}, pairsFor(){ return []; }, pick(){}, close(){} },
 
-    // sklep
     sellerPublicId:'',
 
-    // klient
     customer_public_id:'',
     customer:{ first_name:'', last_name:'', email:'', phone:'',
                address_line1:'', address_line2:'', postal_code:'', city:'', country:'' },
 
-    // parametry zastawu
     principal_amount: '', principal_currency: 'PLN',
     due_in_days: 30,
 
-    // linie (N)
     lines: [],
 
     async init(){
-      this.catPicker = app._makeCategoryPicker?.() || this.catPicker;
-      this.ciPicker  = app._makeCatalogPicker?.()  || this.ciPicker;
+      if (app._makeCategoryPicker) Object.assign(this.catPicker, app._makeCategoryPicker());
+      if (app._makeCatalogPicker)  Object.assign(this.ciPicker,  app._makeCatalogPicker());
+
+      this.cust._ctx = this;
+
       await this._loadSeller();
       if (!this.lines.length) this.addLine();
     },
@@ -35,33 +100,47 @@ app.sellerPawnForm = function () {
       try {
         const r = await app.api('/api/sellers/mine/', {method:'GET'});
         if (r.ok) {
-          const j = await r.json();
+          const j = await app.readJson(r);
           this.sellerPublicId = j.public_id || '';
           window.dispatchEvent(new CustomEvent('seller:exists'));
         }
       } catch {}
     },
 
-    // === klient (jak w offline) ===
     cust:{
+      _ctx:null,
       q:'', results:[], loading:false, next:null,
-      async search(url=null){
-        this.loading=true; this.results=[]; this.next=null;
+
+      async search(url=null, append=false){
+        if (this.loading) return;
+        this.loading=true;
         try{
+          if (!append){ this.results=[]; this.next=null; }
           if (!url){
-            const qs = []; const qq = (this.q||'').trim(); if (qq) qs.push(`q=${encodeURIComponent(qq)}`);
+            const qs = [];
+            const qq = (this.q||'').trim();
+            if (qq) qs.push(`q=${encodeURIComponent(qq)}`);
             qs.push('ordering=last_name');
             url = `/api/sellers/mine/customers/?${qs.join('&')}`;
           }
           const r = await app.api(url, {method:'GET'});
-          const j = await r.json().catch(()=> ({}));
-          this.results = j.results ?? (Array.isArray(j)? j : []);
+          const j = await app.readJson(r);
+          const fresh = j.results ?? (Array.isArray(j)? j : []);
+          this.results = append ? [...this.results, ...fresh] : fresh;
           this.next = j.next ?? null;
-        } finally { this.loading=false; }
+        } finally {
+          this.loading=false;
+        }
       },
-      async more(){ if (this.next) await this.search(this.next); },
-      pick: (c) => {
-        const ctx = Alpine.$data(document.querySelector('[x-data^="app.sellerPawnForm"]'));
+
+      async more(){
+        if (!this.next || this.loading) return;
+        await this.search(this.next, true);
+      },
+
+      pick(c){
+        const ctx = this._ctx;
+        if (!ctx) return;
         ctx.customer_public_id = c.public_id || '';
         Object.assign(ctx.customer, {
           first_name: c.first_name || '',
@@ -75,13 +154,14 @@ app.sellerPawnForm = function () {
           country:       c.country       || ''
         });
       },
+
       clearLink(){
-        const ctx = Alpine.$data(document.querySelector('[x-data^="app.sellerPawnForm"]'));
+        const ctx = this._ctx;
+        if (!ctx) return;
         ctx.customer_public_id = '';
       }
     },
 
-    // helpery — obrazek/cena dla kart ofert (jak w offline)
     img(it){
       const first = (Array.isArray(it.images) && it.images.length) ? it.images[0] : null;
       const pic = it.cover_image_url
@@ -89,59 +169,76 @@ app.sellerPawnForm = function () {
         || it.catalog_item?.image_path || '';
       return app.imgUrl ? app.imgUrl(pic) : (pic || 'https://placehold.co/600x600?text=%20');
     },
+
     priceText(it){
       if (it && typeof it.price === 'object') {
-        const a = it.price.amount ?? ''; const c = it.price.currency || 'PLN';
+        const a = it.price.amount ?? '';
+        const c = it.price.currency || 'PLN';
         return (a !== '' ? a : '—') + ' ' + c;
       }
       if (typeof it?.price === 'number' || typeof it?.price === 'string') return `${it.price} PLN`;
       return '—';
     },
 
-    // === L I N I E ===
     _newRow(){
       const uid = Math.random().toString(36).slice(2,10);
       return {
         uid,
-        mode: 'SET', // 'SET' | 'CAT'
-        // wspólne
+        mode: 'SET',
         title:'', description:'', quantity:1, appraisal_amount:'', appraisal_currency:'PLN',
-
-        // SET
         item_set: { q:'', results:[], next:null, loading:false, selected:null },
-
-        // CAT (modal pickery + SSF)
         _selectedType:null, _selectedTypePk:'',
         _selectedCatalog:null, catalog_public_id:'',
-        _schema:{type:'object', properties:{}}, attributes:{}, _schemaErr:'',
-
-        // błędy wyświetlane przy wierszu
+        _schema:{type:'object', properties:{}}, _ui_schema:{}, attributes:{}, _schemaErr:'',
         _errs:{ selected:'', quantity:'', appraisal_amount:'' }
       };
     },
-    addLine(){ this.lines.push(this._newRow()); this.$nextTick(()=> this._mountRowSSF(this.lines.length-1)); },
-    removeLine(i){ this.lines.splice(i,1); },
 
-    // --- SET search ---
-    async searchItemSets(row, url=null){
-      row.item_set.loading = true; row.item_set.results=[]; row.item_set.next=null;
+    addLine(){
+      this.lines.push(this._newRow());
+      this.$nextTick(()=> this._mountRowSSF(this.lines.length-1));
+    },
+
+    removeLine(i){
+      this.lines.splice(i,1);
+    },
+
+    async searchItemSets(row, url=null, append=false){
+      if (row.item_set.loading) return;
+      row.item_set.loading = true;
       try{
+        if (!append){ row.item_set.results=[]; row.item_set.next=null; }
         if (!url){
           const qs = ['ordering=-created_at'];
-          const qq = (row.item_set.q||'').trim(); if (qq) qs.push(`search=${encodeURIComponent(qq)}`);
+          const qq = (row.item_set.q||'').trim();
+          if (qq) qs.push(`search=${encodeURIComponent(qq)}`);
           url = `/api/sellers/mine/item-sets/?${qs.join('&')}`;
         }
         const r = await app.api(url, {method:'GET'});
-        const j = await r.json().catch(()=> ({}));
-        row.item_set.results = j.results ?? (Array.isArray(j)? j : []);
+        const j = await app.readJson(r);
+        const fresh = j.results ?? (Array.isArray(j)? j : []);
+        row.item_set.results = append ? [...row.item_set.results, ...fresh] : fresh;
         row.item_set.next = j.next ?? null;
-      } finally { row.item_set.loading=false; }
+      } finally {
+        row.item_set.loading=false;
+      }
     },
-    async moreItemSets(row){ if (row.item_set.next) await this.searchItemSets(row, row.item_set.next); },
-    pickItemSet(row, it){ row.item_set.selected = it; row._errs.selected=''; if (!row.title) row.title = it.set_name || row.title; },
-    clearItemSet(row){ row.item_set.selected = null; },
 
-    // --- CATEGORY picker (modal) ---
+    async moreItemSets(row){
+      if (!row.item_set.next || row.item_set.loading) return;
+      await this.searchItemSets(row, row.item_set.next, true);
+    },
+
+    pickItemSet(row, it){
+      row.item_set.selected = it;
+      row._errs.selected = '';
+      if (!row.title) row.title = it.set_name || row.title;
+    },
+
+    clearItemSet(row){
+      row.item_set.selected = null;
+    },
+
     openRowCategoryPicker(i){
       const row = this.lines[i]; if (!row) return;
       this.catPicker.onPick = async (node) => {
@@ -151,101 +248,127 @@ app.sellerPawnForm = function () {
       };
       this.catPicker.openAtRoot();
     },
+
     clearRowCategory(i){
       const row = this.lines[i]; if (!row) return;
-      row._selectedType=null; row._selectedTypePk=''; row._schema={type:'object',properties:{}};
+      row._selectedType=null;
+      row._selectedTypePk='';
+      row._schema={type:'object',properties:{}};
+      row._ui_schema={};
+      row._schemaErr='';
       this._mountRowSSF(i);
     },
 
     async _applyTypeForRow(i, path, name=''){
       const row = this.lines[i]; if (!row) return;
       row._selectedType = { name, path, children_count:0 };
+      row._schemaErr = '';
 
       try{
-        const rs = await app.api(`/api/public/catalog/categories/schema/by-path/${encodeURIComponent(path)}`, {method:'GET'});
-        if (rs.ok){
-          const d = await rs.json().catch(()=> ({}));
-          row._schema = d.schema || {type:'object',properties:{}};
-        } else row._schema = {type:'object',properties:{}};
-      } catch { row._schema = {type:'object',properties:{}}; }
+        const cached = app.getSchemaCached ? await app.getSchemaCached(path) : null;
+        row._schema    = cached?.schema    || {type:'object',properties:{}};
+        row._ui_schema = cached?.ui_schema || {};
+      } catch {
+        row._schema    = {type:'object',properties:{}};
+        row._ui_schema = {};
+      }
 
       try{
         const rr = await app.api(`/api/public/catalog/categories/resolve?path=${encodeURIComponent(path)}`, {method:'GET'});
-        const j  = await rr.json().catch(()=> ({}));
+        const j  = await app.readJson(rr);
         row._selectedTypePk = j?.type_id || '';
-      } catch { row._selectedTypePk=''; }
+      } catch {
+        row._selectedTypePk='';
+      }
     },
 
-    // --- CATALOG ITEM picker (modal) ---
     openRowCatalogPicker(i){
       const row = this.lines[i]; if (!row) return;
+
       this.ciPicker.onPick = async (it) => {
+        row._schemaErr = '';
+
+        const catAttrs = it.attributes || it.attrs || it.specs || it.properties || {};
         row.catalog_public_id = it.public_id || '';
         row._selectedCatalog = {
           id: it.id || it.uuid || '',
           public_id: row.catalog_public_id,
           item_name: it.item_name || it.name || '',
           type: it.type || {},
-          image_path: it.image_path || it.image_url || it.image || ''
+          image_path: it.image_path || it.image_url || it.image || '',
+          attributes: catAttrs
         };
-        if (!row.title) row.title = row._selectedCatalog.item_name || row.title;
 
+        if (!row.title) row.title = row._selectedCatalog.item_name || row.title;
         if (it?.type?.path) await this._applyTypeForRow(i, it.type.path, it.type.name || '');
 
-        // prefill atrybutów
+        row.attributes = app._mergeAttrsPreferCurrent
+          ? app._mergeAttrsPreferCurrent(row.attributes, catAttrs)
+          : { ...(catAttrs||{}), ...(row.attributes||{}) };
+
         try{
           if (row.catalog_public_id) {
             const r = await app.api(`/api/sellers/mine/item-sets/prefill?catalog_public_id=${encodeURIComponent(row.catalog_public_id)}`, {method:'GET'});
             if (r.ok){
-              const d = await r.json().catch(()=> ({}));
-              row.attributes = app._mergeAttrsPreferCurrent?.(row.attributes, d.attributes || {}) || (d.attributes || {});
+              const d = await app.readJson(r);
+              row.attributes = app._mergeAttrsPreferCurrent
+                ? app._mergeAttrsPreferCurrent(row.attributes, d.attributes || {})
+                : { ...(d.attributes||{}), ...(row.attributes||{}) };
             }
           }
         } catch {}
 
         this._mountRowSSF(i);
       };
+
       this.ciPicker.openWith(row._selectedType?.path || '');
     },
+
     clearRowCatalog(i){
       const row = this.lines[i]; if (!row) return;
-      row._selectedCatalog=null; row.catalog_public_id='';
+      row._selectedCatalog=null;
+      row.catalog_public_id='';
     },
 
-    // --- SSF (atrybuty)
     _mountRowSSF(i){
       const row = this.lines[i]; if (!row) return;
       const el = document.getElementById('pawn_attrs_ssf_'+row.uid);
-      if (!el) return;
+      if (!el || !app.ssf?.mount) return;
       const val = (row.attributes && Object.keys(row.attributes).length) ? row.attributes : {};
-      app.ssf.mount(el, row._schema, val);
+      app.ssf.mount(el, row._schema, val, row._ui_schema);
     },
+
     _readRowSSF(i){
-      const el = document.getElementById('pawn_attrs_ssf_'+this.lines[i].uid);
+      const row = this.lines[i]; if (!row) return {};
+      const el = document.getElementById('pawn_attrs_ssf_'+row.uid);
+      if (!el || !app.ssf?.read) return {};
       try { return app.ssf.read(el) || {}; } catch { return {}; }
     },
 
-    // === PAYLOAD ===
     _customerPayload(){
       const c = this.customer;
       const any = Object.values(c).some(v => (v ?? '') !== '');
       if (!any && !this.customer_public_id) return undefined;
-      return {
-        ...(this.customer_public_id ? {customer_public_id: this.customer_public_id} : {}),
-        customer_snapshot: this.customer_public_id ? undefined : {
-          first_name: c.first_name || undefined,
-          last_name:  c.last_name  || undefined,
-          email:      c.email      || undefined,
-          phone:      c.phone      || undefined,
-          address: {
-            line1: c.address_line1 || undefined,
-            line2: c.address_line2 || undefined,
-            postal_code: c.postal_code || undefined,
-            city: c.city || undefined,
-            country: c.country || undefined
-          }
-        }
+
+      if (this.customer_public_id) {
+        return { customer_public_id: this.customer_public_id };
       }
+
+      const snap = _compact({
+        first_name: (c.first_name||'').trim() || undefined,
+        last_name:  (c.last_name||'').trim()  || undefined,
+        email:      (c.email||'').trim()      || undefined,
+        phone:      (c.phone||'').trim()      || undefined,
+        address: {
+          line1: (c.address_line1||'').trim() || undefined,
+          line2: (c.address_line2||'').trim() || undefined,
+          postal_code: (c.postal_code||'').trim() || undefined,
+          city: (c.city||'').trim() || undefined,
+          country: (c.country||'').trim() || undefined
+        }
+      });
+
+      return snap ? { customer_snapshot: snap } : undefined;
     },
 
     _linePayload(row, idx){
@@ -268,18 +391,16 @@ app.sellerPawnForm = function () {
 
       const t  = row._selectedType;
       const ci = row._selectedCatalog;
-      const snap = {
+
+      const snap = _compact({
         set_name: (row.title||ci?.item_name||'Pozycja'),
         description: row.description || '',
-        price: null, currency: null,
         condition: 'USED',
-        length_cm: null, width_cm: null, height_cm: null,
-        weight_kg: null,
         type_path: t?.path || t?.full_path || null,
         catalog_item_public_id: ci?.public_id || null,
-        attributes: row.attributes || {},
-        seller_slug: null
-      };
+        attributes: row.attributes || {}
+      }) || {};
+
       return {
         title: (row.title||'').trim() || undefined,
         description: (row.description||'').trim() || '',
@@ -289,7 +410,6 @@ app.sellerPawnForm = function () {
       };
     },
 
-    // === WALIDACJA ===
     _validate(){
       this.err=''; this.fv = { principal_amount:'', due_in_days:'' };
       let ok = true;
@@ -302,10 +422,19 @@ app.sellerPawnForm = function () {
       }
 
       const dd = parseInt(this.due_in_days||0,10);
-      if (!Number.isFinite(dd) || dd < 1){ this.fv.due_in_days = 'Termin (dni) musi być liczbą ≥ 1.'; ok=false; }
+      if (!Number.isFinite(dd) || dd < 1){
+        this.fv.due_in_days = 'Termin (dni) musi być liczbą ≥ 1.';
+        ok = false;
+      }
 
-      if (!this.lines.length){ this.err = 'Dodaj co najmniej jedną pozycję.'; return false; }
+      if (!this.lines.length){
+        this.err = 'Dodaj co najmniej jedną pozycję.';
+        app.warn?.(this.err);
+        return false;
+      }
+
       for (const r of this.lines){
+        r._schemaErr = '';
         r._errs = { selected:'', quantity:'', appraisal_amount:'' };
 
         if (r.mode === 'SET' && !r.item_set?.selected){ r._errs.selected = 'Wybierz pozycję z ofert.'; ok=false; }
@@ -323,24 +452,33 @@ app.sellerPawnForm = function () {
 
       const em = (this.customer.email||'').trim();
       if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){ this.err = 'Nieprawidłowy email klienta.'; ok=false; }
+
       const ph = (this.customer.phone||'').trim();
-      const digits = ph.replace(/\D+/g,''); if (!this.err && ph && digits.length<6){ this.err='Telefon wygląda na zbyt krótki.'; ok=false; }
+      const digits = ph.replace(/\D+/g,'');
+      if (!this.err && ph && digits.length<6){ this.err='Telefon wygląda na zbyt krótki.'; ok=false; }
 
       if (!ok){
         if (!this.err) this.err = 'Popraw zaznaczone pola.';
+        app.warn?.(this.err);
         this._focusFirstError();
       }
+
       return ok;
     },
 
     _focusFirstError(){
-      this.$nextTick(()=>{
+      this.$nextTick(()=> {
         if (this.fv.principal_amount) { document.getElementById('pawn_principal_amount')?.focus(); return; }
         if (this.fv.due_in_days)       { document.getElementById('pawn_due_days')?.focus(); return; }
-        const row = this.lines.find(r => r._errs.selected || r._errs.quantity || r._errs.appraisal_amount);
+        const row = this.lines.find(r => r._errs.selected || r._errs.quantity || r._errs.appraisal_amount || r._schemaErr);
         if (!row) return;
+
         if (row._errs.quantity) { document.getElementById(`pawn_qty_${row.uid}`)?.focus(); return; }
         if (row._errs.appraisal_amount) { document.getElementById(`pawn_app_${row.uid}`)?.focus(); return; }
+
+        if (row._schemaErr) {
+          document.getElementById(`pawn_attrs_ssf_${row.uid}`)?.scrollIntoView({behavior:'smooth', block:'center'});
+        }
       });
     },
 
@@ -348,43 +486,81 @@ app.sellerPawnForm = function () {
       const root = j?.errors || j || {};
       const nf = (root.non_field_errors && Array.isArray(root.non_field_errors)) ? root.non_field_errors.join('; ') : '';
 
-      if (root.principal){
-        this.fv.principal_amount = Array.isArray(root.principal) ? root.principal.join('; ') : String(root.principal);
-      }
-      if (root.due_in_days){ this.fv.due_in_days = Array.isArray(root.due_in_days) ? root.due_in_days.join('; ') : String(root.due_in_days); }
+      let hadFieldErrors = false;
 
-      if (Array.isArray(root.lines)){
+      if (root.principal){
+        this.fv.principal_amount = _toErrorString(root.principal);
+        hadFieldErrors = true;
+      }
+      if (root.due_in_days){
+        this.fv.due_in_days = _toErrorString(root.due_in_days);
+        hadFieldErrors = true;
+      }
+
+      const applyLine = (idx, e) => {
+        if (!Number.isFinite(idx) || idx < 0 || idx >= this.lines.length) return;
+        const row = this.lines[idx];
+
+        if (!row._errs) row._errs = { selected:'', quantity:'', appraisal_amount:'' };
+
+        if (e.quantity) { row._errs.quantity = _toErrorString(e.quantity); hadFieldErrors = true; }
+
+        if (e.appraisal_value) {
+          row._errs.appraisal_amount = _toErrorString(e.appraisal_value);
+          hadFieldErrors = true;
+        }
+
+        if (e.item_set_public_id) { row._errs.selected = _toErrorString(e.item_set_public_id); hadFieldErrors = true; }
+        if (e.item_snapshot) { row._errs.selected = _toErrorString(e.item_snapshot); hadFieldErrors = true; }
+
+        if (e.attributes) {
+          row._schemaErr = _formatAttrErrors(e.attributes, row);
+          hadFieldErrors = true;
+        }
+
+        if (e.non_field_errors) {
+          const s = _toErrorString(e.non_field_errors);
+          if (s) { row._errs.selected = row._errs.selected ? (row._errs.selected + ' ' + s) : s; hadFieldErrors = true; }
+        }
+      };
+
+      if (root.lines && Array.isArray(root.lines)) {
         for (let i=0; i<root.lines.length && i<this.lines.length; i++){
-          const e = root.lines[i] || {};
-          const row = this.lines[i];
-          if (!row._errs) row._errs = { selected:'', quantity:'', appraisal_amount:'' };
-          if (e.quantity) row._errs.quantity = Array.isArray(e.quantity) ? e.quantity.join('; ') : String(e.quantity);
-          if (e.appraisal_value){
-            row._errs.appraisal_amount = Array.isArray(e.appraisal_value) ? e.appraisal_value.join('; ') : String(e.appraisal_value);
-          }
-          if (e.item_set_public_id) row._errs.selected = Array.isArray(e.item_set_public_id) ? e.item_set_public_id.join('; ') : String(e.item_set_public_id);
-          if (e.item_snapshot)      row._errs.selected = Array.isArray(e.item_snapshot) ? e.item_snapshot.join('; ') : String(e.item_snapshot);
-          if (e.attributes){ row._schemaErr = Array.isArray(e.attributes) ? e.attributes.join('\n') : String(e.attributes); }
+          applyLine(i, root.lines[i] || {});
+        }
+      } else if (root.lines && typeof root.lines === 'object') {
+        for (const [k, v] of Object.entries(root.lines)) {
+          const idx = parseInt(k, 10);
+          if (!Number.isFinite(idx)) continue;
+          applyLine(idx, v || {});
         }
       }
 
-      this.err = app.errText?.(j) || nf || j?.detail || 'Błąd walidacji.';
+      const general = app.errText?.(j) || nf || j?.detail || '';
+
+      if (!hadFieldErrors) {
+        this.err = general || 'Błąd walidacji.';
+      } else {
+        this.err = nf || j?.detail || '';
+      }
+
+      app.warn?.(this.err || 'Popraw zaznaczone pola.');
       this._focusFirstError();
     },
 
-    // === SAVE ===
     async save(){
       this.busy=true; this.err=''; this.ok='';
       try{
-        if (!this.sellerPublicId){ this.err='Brak sklepu.'; return; }
+        if (!this.sellerPublicId){ this.err='Brak sklepu.'; app.warn?.(this.err); return; }
 
         for (let i=0;i<this.lines.length;i++){
           if (this.lines[i].mode === 'CAT') this.lines[i].attributes = this._readRowSSF(i);
         }
+
         if (!this._validate()) return;
 
         const pn = app.moneyNormalize({ amount: (this.principal_amount ?? '').toString().trim(), currency: this.principal_currency || 'PLN' });
-        const principal = pn?.amount || '';
+        const principal = pn ? String(pn.amount) : '';
 
         const payload = {
           seller_public_id: this.sellerPublicId,
@@ -397,16 +573,23 @@ app.sellerPawnForm = function () {
         if (cp?.customer_public_id) payload.customer_public_id = cp.customer_public_id;
         if (cp?.customer_snapshot)  payload.customer_snapshot  = cp.customer_snapshot;
 
-        const r = await app.api('/api/sellers/mine/pawns/create/', { method:'POST', body: JSON.stringify(payload) });
-        const j = await r.json().catch(()=> ({}));
+        const r = await app.api('/api/sellers/mine/pawns/create/', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        });
+
+        const j = await app.readJson(r);
         if (!r.ok){ this._applyBackendErrors(j); return; }
 
-        app.ok('Utworzono zastaw.');
-        app.goto(`/seller/pawns/${j.public_id}`);
+        app.ok?.('Utworzono zastaw.');
+        app.goto?.(`/seller/pawns/${j.public_id}`);
       } catch(e){
         this.err=e?.message || 'Błąd';
         app.error?.(this.err);
-      } finally { this.busy=false; }
+      } finally {
+        this.busy=false;
+      }
     }
   };
 };

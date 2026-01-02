@@ -792,12 +792,15 @@ app.sellerOfferForm = function (opts = {}) {
           const j = await app.readJson(r);
 
           if (!r.ok){
-            if (j?.errors?.attributes){ this.schemaErr = _toErrorString(j.errors.attributes); this._scrollToAttrs(); }
-            this._mapServerErrorsToFields(j);
-            app.warn?.('Popraw zaznaczone pola.');
-            this._scrollToFirstError();
-            return;
-          }
+              if (j?.errors?.attributes){
+                this.schemaErr = this._prettyAttrError(_toErrorString(j.errors.attributes));
+                this._scrollToAttrs();
+              }
+              this._mapServerErrorsToFields(j);
+              app.warn?.('Popraw zaznaczone pola.');
+              this._scrollToFirstError();
+              return;
+            }
         } else {
           const payload = { ...base, seller_public_id: String(this.seller_public_id) };
           if (this.catalogItemUUID) payload.catalog_item = String(this.catalogItemUUID);
