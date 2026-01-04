@@ -1,8 +1,9 @@
 from __future__ import annotations
+
 import django_filters
-from django.db.models import TextField
-from django.db.models.functions import Cast
+from django.db.models import Q
 from pawns.models import Pawn
+
 
 class PawnFilter(django_filters.FilterSet):
     status = django_filters.CharFilter(field_name="status", lookup_expr="exact")
@@ -18,5 +19,13 @@ class PawnFilter(django_filters.FilterSet):
         v = (value or "").strip()
         if not v:
             return qs
-        qs = qs.annotate(_snapshot_txt=Cast("customer_snapshot", output_field=TextField()))
-        return qs.filter(_snapshot_txt__icontains=v)
+        return qs.filter(
+            Q(customer__email__icontains=v) |
+            Q(customer__phone__icontains=v) |
+            Q(customer__first_name__icontains=v) |
+            Q(customer__last_name__icontains=v) |
+            Q(customer_snapshot__email__icontains=v) |
+            Q(customer_snapshot__phone__icontains=v) |
+            Q(customer_snapshot__first_name__icontains=v) |
+            Q(customer_snapshot__last_name__icontains=v)
+        )

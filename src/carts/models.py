@@ -27,6 +27,7 @@ class CartItem(PublicIdModel):
         indexes = [
             models.Index(fields=["cart"], name="ix_cartitem_cart"),
             models.Index(fields=["item_set"], name="ix_cartitem_item"),
+            models.Index(fields=["cart", "item_set"], name="ix_cartitem_cart_item"),
         ]
 
     def __str__(self): return f"{self.item_set.set_name} x{self.quantity}"

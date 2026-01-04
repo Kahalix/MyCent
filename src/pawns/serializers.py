@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from rest_framework import serializers
 from djmoney.contrib.django_rest_framework import MoneyField as DRFMoneyField
 
@@ -21,6 +22,35 @@ class PawnExtensionResponse(serializers.ModelSerializer):
         model = PawnExtension
         fields = ("public_id","days","fee","previous_due","new_due","created_at","updated_at")
         read_only_fields = fields
+
+
+class PawnListResponse(serializers.ModelSerializer):
+    principal = DRFMoneyField(max_digits=19, decimal_places=2, default_currency="PLN")
+    appraisal_total = DRFMoneyField(max_digits=19, decimal_places=2, default_currency="PLN")
+    is_active = serializers.SerializerMethodField()
+    customer_public_id = serializers.CharField(source="customer.public_id", read_only=True)
+    seller_public_id = serializers.CharField(source="seller_profile.public_id", read_only=True)
+    operator_public_id = serializers.CharField(source="operator.public_id", read_only=True)
+    lines_count = serializers.IntegerField(read_only=True)
+    extensions_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Pawn
+        fields = (
+            "public_id",
+            "seller_public_id","operator_public_id",
+            "customer_public_id",
+            "principal","appraisal_total",
+            "start_date","due_date",
+            "redeemed_at","forfeited_at",
+            "status","is_active",
+            "lines_count","extensions_count",
+            "created_at","updated_at",
+        )
+        read_only_fields = fields
+
+    def get_is_active(self, obj: Pawn) -> bool:
+        return obj.is_active
 
 
 class PawnResponse(serializers.ModelSerializer):
@@ -46,8 +76,6 @@ class PawnResponse(serializers.ModelSerializer):
         return obj.is_active
 
 
-# ==== input ====
-
 class PawnLineIn(serializers.Serializer):
     title = serializers.CharField(max_length=255, required=False, allow_blank=True)
     description = serializers.CharField(required=False, allow_blank=True)
@@ -56,6 +84,7 @@ class PawnLineIn(serializers.Serializer):
     item_set_public_id = serializers.CharField(required=False, allow_blank=True)
     item_snapshot = serializers.DictField(required=False)
 
+
 class PawnCreateRequest(serializers.Serializer):
     seller_public_id = serializers.CharField()
     customer_public_id = serializers.CharField(required=False, allow_blank=True)
@@ -63,6 +92,7 @@ class PawnCreateRequest(serializers.Serializer):
     principal = DRFMoneyField(max_digits=19, decimal_places=2, default_currency="PLN")
     due_in_days = serializers.IntegerField(min_value=1, default=30)
     lines = serializers.ListField(child=PawnLineIn(), min_length=1)
+
 
 class PawnExtendRequest(serializers.Serializer):
     days = serializers.ChoiceField(choices=(7,14,30))

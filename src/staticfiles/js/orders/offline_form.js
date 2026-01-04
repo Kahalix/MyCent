@@ -1,30 +1,31 @@
-// SPRZEDAŻ OFFLINE — wybór przedmiotu z ofert + autouzupełnianie klienta
 window.app = window.app || {};
 
 app.sellerOrderOfflineForm = function(){
   return {
     busy:false, err:'', ok:'',
 
-    // walidacja pól
-    fv: { selected:'', quantity:'', payment_method:'', customer_email:'', customer_phone:'' },
+    fv: { lines:'', payment_method:'', customer_email:'', customer_phone:'', total:'' },
 
-    // oferty
     q:'', items:[], next:null, loading:false, selected:null,
 
-    // FILTR STATUSU
     status: { available: true, reserved: true },
 
-    // sprzedaż
-    quantity:1, payment_method:'CASH',
+    cart: [],
+    currency: 'PLN',
+    baseTotal: 0,
+    targetTotal: 0,
+    targetTotalInput: '',
+    totalMode: 'AUTO',
+    discountAmount: 0,
 
-    // klient
-    customer_public_id:'', // link do istniejącego klienta (opcjonalnie)
+    payment_method:'CASH',
+
+    customer_public_id:'',
     customer:{
       first_name:'', last_name:'', email:'', phone:'',
       address_line1:'', address_line2:'', postal_code:'', city:'', country:''
     },
 
-    // ====== KLIENCI (wyszukiwarka) ======
     cust:{
       q:'', results:[], loading:false, next:null,
       async search(url=null){
@@ -33,7 +34,7 @@ app.sellerOrderOfflineForm = function(){
           if (!url){
             const qs = [];
             const qq = (this.q||'').trim();
-            if (qq) qs.push(`q=${encodeURIComponent(qq)}`);   // <— ważne: q= zamiast search=
+            if (qq) qs.push(`q=${encodeURIComponent(qq)}`);
             qs.push('ordering=last_name');
             url = `/api/sellers/mine/customers/?${qs.join('&')}`;
           }
@@ -67,12 +68,10 @@ app.sellerOrderOfflineForm = function(){
 
     async init(){ await this.search(); },
 
-    // ====== OFERTY (lista + filtry) ======
     _statusQuery(){
       const vals = [];
       if (this.status.available) vals.push('AVAILABLE');
       if (this.status.reserved)  vals.push('RESERVED');
-      // nic nie zaznaczone? — pokaż oba, żeby lista nie była pusta
       if (!vals.length) vals.push('AVAILABLE','RESERVED');
       return vals;
     },
@@ -88,7 +87,6 @@ app.sellerOrderOfflineForm = function(){
         if (!url){
           const qs = ['ordering=-created_at'];
           const qq = (this.q||'').trim(); if (qq) qs.push(`search=${encodeURIComponent(qq)}`);
-          // <— filtr statusów
           this._statusQuery().forEach(s => qs.push(`statuses=${encodeURIComponent(s)}`));
           url = `/api/sellers/mine/item-sets/?${qs.join('&')}`;
         }
@@ -101,7 +99,7 @@ app.sellerOrderOfflineForm = function(){
     },
     async more(){ if (this.next) await this.search(this.next); },
 
-    pick(it){ this.selected = it || null; this.fv.selected=''; },
+    pick(it){ this.selected = it || null; },
     clear(){ this.selected = null; },
 
     img(it){
@@ -111,13 +109,153 @@ app.sellerOrderOfflineForm = function(){
         || it.catalog_item?.image_path || '';
       return app.imgUrl(pic);
     },
-    priceText(it){
-      if (it && typeof it.price === 'object') {
-        const a = it.price.amount ?? ''; const c = it.price.currency || 'PLN';
-        return (a !== '' ? a : '—') + ' ' + c;
+
+    _moneyFromAny(v){
+      if (!v) return { amount: 0, currency: this.currency || 'PLN' };
+      if (typeof v === 'object'){
+        const a = v.amount ?? 0;
+        const c = v.currency || this.currency || 'PLN';
+        const n = Number(String(a).replace(',', '.'));
+        return { amount: Number.isFinite(n) ? n : 0, currency: c };
       }
-      if (typeof it?.price === 'number' || typeof it?.price === 'string') return `${it.price} PLN`;
-      return '—';
+      const n = Number(String(v).replace(',', '.'));
+      return { amount: Number.isFinite(n) ? n : 0, currency: this.currency || 'PLN' };
+    },
+
+    priceText(it){
+      const p = this._moneyFromAny(it?.price);
+      return `${p.amount.toFixed(2)} ${p.currency}`;
+    },
+
+    _round2(x){
+      const n = Number(x);
+      if (!Number.isFinite(n)) return 0;
+      return Math.round((n + Number.EPSILON) * 100) / 100;
+    },
+
+    moneyText(amount, currency){
+      const a = this._round2(amount);
+      return `${a.toFixed(2)} ${currency || this.currency || 'PLN'}`;
+    },
+
+    addSelectedToCart(){
+      if (!this.selected) return;
+
+      const pid = String(this.selected.public_id || this.selected.id || '').trim();
+      if (!pid) return;
+
+      const p = this._moneyFromAny(this.selected.price);
+      if (p.currency) this.currency = p.currency;
+
+      const ln = {
+        _key: `${pid}_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+        item_public_id: pid,
+        set_name: this.selected.set_name || '',
+        type_path: this.selected.type?.path || '',
+        quantity: 1,
+        currency: p.currency || this.currency || 'PLN',
+        base_unit_price: this._round2(p.amount),
+        unit_price: this._round2(p.amount),
+        line_total: this._round2(p.amount)
+      };
+
+      this.cart.push(ln);
+      this.selected = null;
+      this.fv.lines = '';
+      this._recalcTotals();
+    },
+
+    removeLine(idx){
+      this.cart.splice(idx, 1);
+      this._recalcTotals();
+    },
+
+    onQtyChange(idx){
+      const ln = this.cart[idx];
+      if (!ln) return;
+      const q = Math.max(1, parseInt(ln.quantity || 1, 10));
+      ln.quantity = Number.isFinite(q) ? q : 1;
+      this._recalcTotals();
+    },
+
+    resetTotalToBase(){
+      this.totalMode = 'AUTO';
+      this._recalcTotals();
+    },
+
+    onTargetTotalInput(){
+      const raw = String(this.targetTotalInput || '').trim();
+      const n = Number(raw.replace(',', '.'));
+      if (!Number.isFinite(n) || n < 0){
+        this.fv.total = 'Podaj poprawną sumę (0 lub więcej).';
+        return;
+      }
+      this.fv.total = '';
+      this.totalMode = 'MANUAL';
+      this.targetTotal = this._round2(n);
+      this._applyRatio();
+    },
+
+    _recalcTotals(){
+      const cur = this.currency || 'PLN';
+      this.currency = cur;
+
+      const base = this.cart.reduce((acc, ln) => {
+        const q = Math.max(1, parseInt(ln.quantity || 1, 10));
+        const lineBase = this._round2((ln.base_unit_price || 0) * q);
+        return acc + lineBase;
+      }, 0);
+
+      this.baseTotal = this._round2(base);
+
+      if (this.totalMode === 'AUTO'){
+        this.targetTotal = this.baseTotal;
+        this.targetTotalInput = this.targetTotal.toFixed(2);
+      } else {
+        if (!this.targetTotalInput){
+          this.targetTotalInput = (this.targetTotal || 0).toFixed(2);
+        }
+      }
+
+      this._applyRatio();
+    },
+
+    _applyRatio(){
+      const base = this._round2(this.baseTotal);
+      const target = this._round2(this.totalMode === 'AUTO' ? base : (this.targetTotal || 0));
+
+      if (this.totalMode !== 'AUTO'){
+        this.targetTotalInput = target.toFixed(2);
+      }
+
+      const ratio = base > 0 ? (target / base) : 1;
+
+      let sum = 0;
+      for (let i=0;i<this.cart.length;i++){
+        const ln = this.cart[i];
+        const q = Math.max(1, parseInt(ln.quantity || 1, 10));
+        ln.quantity = q;
+
+        const u = this._round2((ln.base_unit_price || 0) * ratio);
+        ln.unit_price = u < 0 ? 0 : u;
+
+        const lt = this._round2(ln.unit_price * q);
+        ln.line_total = lt;
+        sum += lt;
+      }
+
+      sum = this._round2(sum);
+      const diff = this._round2(target - sum);
+      if (this.cart.length && diff !== 0){
+        const last = this.cart[this.cart.length - 1];
+        const q = Math.max(1, parseInt(last.quantity || 1, 10));
+        const newLineTotal = this._round2((last.line_total || 0) + diff);
+        last.line_total = newLineTotal < 0 ? 0 : newLineTotal;
+        last.unit_price = this._round2(last.line_total / q);
+      }
+
+      const curSum = this._round2(this.cart.reduce((a, ln) => a + (ln.line_total || 0), 0));
+      this.discountAmount = this._round2(this.baseTotal - curSum);
     },
 
     _collectCustomer(){
@@ -141,70 +279,75 @@ app.sellerOrderOfflineForm = function(){
     },
 
     _validate(){
-      // wyczyść
-      this.fv = { selected:'', quantity:'', payment_method:'', customer_email:'', customer_phone:'' };
+      this.fv = { lines:'', payment_method:'', customer_email:'', customer_phone:'', total:'' };
       let ok = true;
 
-      if (!this.selected){
-        this.fv.selected = 'Wybierz przedmiot z listy.';
+      if (!this.cart.length){
+        this.fv.lines = 'Dodaj co najmniej jedną pozycję do koszyka.';
         ok = false;
+      } else {
+        for (const ln of this.cart){
+          const q = Math.max(1, parseInt(ln.quantity||1, 10));
+          if (!Number.isFinite(q) || q < 1){
+            this.fv.lines = 'Każda pozycja musi mieć ilość co najmniej 1.';
+            ok = false;
+            break;
+          }
+        }
       }
-      const qty = Math.max(1, parseInt(this.quantity||1, 10));
-      if (!Number.isFinite(qty) || qty < 1){
-        this.fv.quantity = 'Ilość musi być liczbą ≥ 1.';
-        ok = false;
-      }
+
       if (!this.payment_method){
         this.fv.payment_method = 'Wybierz metodę płatności.';
         ok = false;
       }
+
       const em = (this.customer.email||'').trim();
       if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){
         this.fv.customer_email = 'Nieprawidłowy adres email.';
         ok = false;
       }
+
       const ph = (this.customer.phone||'').trim();
       const digits = ph.replace(/\D+/g, '');
       if (ph && digits.length < 6){
         this.fv.customer_phone = 'Telefon wygląda na zbyt krótki.';
         ok = false;
       }
+
+      if (this.totalMode === 'MANUAL'){
+        const n = Number(String(this.targetTotalInput||'').replace(',', '.'));
+        if (!Number.isFinite(n) || n < 0){
+          this.fv.total = 'Podaj poprawną sumę (0 lub więcej).';
+          ok = false;
+        }
+      }
+
       if (!ok){
         this.err = 'Popraw zaznaczone pola.';
-        this._focusFirstError();
       }
       return ok;
     },
 
-    _focusFirstError(){
-      // proste heurystyki focusu
-      if (this.fv.selected){ return; }
-      if (this.fv.quantity){ this.$nextTick(()=> document.getElementById('offline_qty')?.focus()); return; }
-      if (this.fv.payment_method){ this.$nextTick(()=> document.getElementById('offline_pay')?.focus()); return; }
-      if (this.fv.customer_email){ this.$nextTick(()=> document.getElementById('offline_cust_email')?.focus()); return; }
-      if (this.fv.customer_phone){ this.$nextTick(()=> document.getElementById('offline_cust_phone')?.focus()); return; }
-    },
-
     _applyBackendErrors(j){
-      // DRF zwraca zwykle {"errors": {...}} lub bezpośrednio mapę pól
       const root = j?.errors || j || {};
-      const nf = (root.non_field_errors && Array.isArray(root.non_field_errors)) ? root.non_field_errors.join('; ') : '';
 
-      // ilość
-      if (root.quantity){
-        this.fv.quantity = Array.isArray(root.quantity) ? root.quantity.join('; ') : String(root.quantity);
-      }
-      // payment
       if (root.payment_method){
         this.fv.payment_method = Array.isArray(root.payment_method) ? root.payment_method.join('; ') : String(root.payment_method);
       }
-      // customer.* (w naszym request to zagnieżdżone)
+
+      if (root.lines){
+        const msg = typeof root.lines === 'string'
+          ? root.lines
+          : (Array.isArray(root.lines) ? root.lines.join('; ') : 'Sprawdź pozycje w koszyku.');
+        this.fv.lines = msg;
+      }
+
       const c = root.customer || {};
       if (c.email){ this.fv.customer_email = Array.isArray(c.email) ? c.email.join('; ') : String(c.email); }
       if (c.phone){ this.fv.customer_phone = Array.isArray(c.phone) ? c.phone.join('; ') : String(c.phone); }
 
+      const nf = (root.non_field_errors && Array.isArray(root.non_field_errors)) ? root.non_field_errors.join('; ') : '';
       this.err = app.errText?.(j) || nf || j?.detail || 'Błąd walidacji.';
-      this._focusFirstError();
     },
 
     async save(){
@@ -212,11 +355,20 @@ app.sellerOrderOfflineForm = function(){
       try{
         if (!this._validate()){ return; }
 
+        const lines = this.cart.map(ln => ({
+          item_public_id: String(ln.item_public_id || '').trim(),
+          quantity: Math.max(1, parseInt(ln.quantity||1, 10)),
+          unit_price: {
+            amount: this._round2(ln.unit_price || 0).toFixed(2),
+            currency: ln.currency || this.currency || 'PLN'
+          }
+        }));
+
         const payload = {
-          item_public_id: String(this.selected.public_id || this.selected.id || '').trim(),
-          quantity: Math.max(1, parseInt(this.quantity||1, 10)),
+          lines,
           payment_method: this.payment_method || 'CASH'
         };
+
         const cust = this._collectCustomer();
         if (cust) payload.customer = cust;
 
@@ -226,11 +378,13 @@ app.sellerOrderOfflineForm = function(){
           autoToast: true,
           toastOn: [400,404,409,422]
         });
+
         const j = await r.json().catch(()=> ({}));
         if (!r.ok){
           this._applyBackendErrors(j);
           return;
         }
+
         this.ok='Dodano.'; app.ok('Dodano.');
         app.goto(`/seller/orders/${j.public_id}`);
       }catch(e){

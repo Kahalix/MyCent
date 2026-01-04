@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from rest_framework import viewsets, mixins, permissions
@@ -16,35 +17,40 @@ from pawns.services.commands import (
     attach_customer_to_pawn, detach_customer_from_pawn, ensure_customer_for_pawn,
 )
 
-
 from common.services.idempotency import get_existing, save_result
-from pawns.models import Pawn
-from pawns.serializers import PawnResponse, PawnCreateRequest, PawnExtendRequest
+from pawns.serializers import PawnResponse, PawnListResponse, PawnCreateRequest, PawnExtendRequest
 from pawns.services import commands, queries
 from pawns.filters import PawnFilter
 from identity.models import SellerProfile
 from customers.models import Customer
 from listings.models import ItemSet
+from transactions.models import Transaction
 from transactions.serializers import TransactionResponse
 
 User = get_user_model()
 
+
 def _ensure_membership(user, seller: SellerProfile) -> bool:
     return seller.memberships.filter(user=user, is_active=True).exists()
 
-# ===== SELLER =====
+
 class SellerPawnViewSet(mixins.ListModelMixin,
                         mixins.RetrieveModelMixin,
                         viewsets.GenericViewSet):
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = PawnResponse
     lookup_field = "public_id"
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filterset_class = PawnFilter
     ordering_fields = ("created_at","due_date","start_date")
 
+    def get_serializer_class(self):
+        if self.action == "list":
+            return PawnListResponse
+        return PawnResponse
+
     def get_queryset(self):
-        return queries.seller_pawns_qs(self.request.user)
+        with_related = self.action in ("retrieve","extend","redeem","forfeit","attach_customer","detach_customer","ensure_customer")
+        return queries.seller_pawns_qs(self.request.user, with_related=with_related)
 
     @action(detail=False, methods=["post"], url_path="create")
     def create_pawn(self, request):
@@ -57,7 +63,6 @@ class SellerPawnViewSet(mixins.ListModelMixin,
         if ser.validated_data.get("customer_public_id"):
             cust = get_object_or_404(Customer, public_id=ser.validated_data["customer_public_id"])
 
-        # mapuj pozycje
         lines = []
         for row in ser.validated_data["lines"]:
             iset = None
@@ -107,7 +112,7 @@ class SellerPawnViewSet(mixins.ListModelMixin,
     def receipt_pdf(self, request, public_id=None):
         pawn = self.get_object()
         try:
-            data = build_pawn_receipt_pdf(pawn)  # bytes
+            data = build_pawn_receipt_pdf(pawn)
         except RuntimeError as e:
             return Response({"detail": str(e)}, status=500)
         filename = f"pawn_{pawn.public_id}.pdf"
@@ -127,14 +132,12 @@ class SellerPawnViewSet(mixins.ListModelMixin,
 
     @action(detail=False, methods=["get"], url_path="export.csv")
     def export_csv(self, request):
-        # eksport listy (z uwzględnieniem filtrów)
         qs = self.filter_queryset(self.get_queryset())
         data = export_pawns_list_csv(qs)
         resp = HttpResponse(data, content_type="text/csv; charset=utf-8")
         resp["Content-Disposition"] = 'attachment; filename="pawns_export.csv"'
         return resp
 
-     # ==== AKCJE KLIENTA ====
     @action(detail=True, methods=["post"], url_path="attach-customer")
     def attach_customer(self, request, public_id=None):
         pawn = self.get_object()
@@ -183,33 +186,28 @@ class SellerPawnViewSet(mixins.ListModelMixin,
         }, status=200 if res["result"] == "attached" else 201)
 
 
-
-# ===== USER (klient) =====
 class UserPawnViewSet(mixins.ListModelMixin,
                       mixins.RetrieveModelMixin,
                       viewsets.GenericViewSet):
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = PawnResponse
     lookup_field = "public_id"
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filterset_class = PawnFilter
     ordering_fields = ("created_at","due_date","start_date")
 
-    def get_queryset(self):
-        return queries.user_pawns_qs(self.request.user)
+    def get_serializer_class(self):
+        if self.action == "list":
+            return PawnListResponse
+        return PawnResponse
 
-    # @action(detail=True, methods=["post"], url_path="extend")
-    # def extend(self, request, public_id=None):
-    #     pawn = self.get_object()
-    #     ser = PawnExtendRequest(data=request.data); ser.is_valid(raise_exception=True)
-    #     commands.extend_pawn(pawn=pawn, days=int(ser.validated_data["days"]), operator=request.user)
-    #     pawn.refresh_from_db()
-    #     return Response(PawnResponse(pawn).data, status=200)
+    def get_queryset(self):
+        with_related = self.action == "retrieve"
+        return queries.user_pawns_qs(self.request.user, with_related=with_related)
 
     @action(detail=True, methods=["post"], url_path="extend-intent")
     def extend_intent(self, request, public_id=None):
         pawn = self.get_object()
-        ser = PawnExtendRequest(data=request.data);
+        ser = PawnExtendRequest(data=request.data)
         ser.is_valid(raise_exception=True)
         days = int(ser.validated_data["days"])
 
@@ -233,20 +231,24 @@ class UserPawnViewSet(mixins.ListModelMixin,
         return Response(TransactionResponse(tx).data, status=201)
 
 
-# ===== ADMIN =====
 class AdminPawnViewSet(mixins.ListModelMixin,
                        mixins.RetrieveModelMixin,
                        viewsets.GenericViewSet):
     permission_classes = [permissions.IsAdminUser]
-    serializer_class = PawnResponse
     lookup_field = "public_id"
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filterset_class = PawnFilter
     ordering_fields = ("created_at","due_date","start_date")
     search_fields = ("customer_snapshot",)
 
+    def get_serializer_class(self):
+        if self.action == "list":
+            return PawnListResponse
+        return PawnResponse
+
     def get_queryset(self):
-        return queries.admin_pawns_qs()
+        with_related = self.action == "retrieve"
+        return queries.admin_pawns_qs(with_related=with_related)
 
     @action(detail=False, methods=["get"], url_path="export.csv")
     def export_csv(self, request):

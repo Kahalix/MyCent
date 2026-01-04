@@ -19,13 +19,18 @@ def add_to_cart(*, user, item_public_id: str, quantity: int = 1):
     if not item:
         raise NotFound("Ogłoszenie nie istnieje.")
     _assert_item_buyable(item)
-    if quantity > _available_qty(item):
+
+    available = _available_qty(item)
+    if quantity > available:
         raise Conflict("Brak dostępnej ilości.")
+
     cart = repo.get_or_create_active_cart(user)
-    current = repo.current_qty(cart, item)
-    if current + quantity > _available_qty(item):
+    row = repo.inc_item_qty(cart=cart, item=item, qty=quantity)
+
+    if int(row.quantity) > available:
         raise Conflict("Brak dostępnej ilości.")
-    return repo.add_or_inc_item(cart=cart, item=item, qty=quantity)
+
+    return row
 
 @transaction.atomic
 def set_quantity(*, user, item_public_id: str, quantity: int):
@@ -66,11 +71,15 @@ def checkout_active_cart(*, user, payment_method: str = "ONLINE_PAYMENT"):
     cart = repo.get_cart(user)
     if not cart:
         raise DomainError("Koszyk jest pusty.")
-    rows = list(cart.items.select_related("item_set__seller_profile"))
+
+    rows = list(cart.items.select_related("item_set").all())
     if not rows:
         raise DomainError("Koszyk jest pusty.")
+
     cart_items = [(r.item_set, int(r.quantity)) for r in rows]
-    orders = orders_checkout_cart(buyer=user, cart_items=cart_items, payment_method="ONLINE_PAYMENT")
+    orders = orders_checkout_cart(buyer=user, cart_items=cart_items, payment_method=payment_method)
+
     cart.status = "CHECKED_OUT"
-    cart.save(update_fields=["status","updated_at"])
+    cart.save(update_fields=["status", "updated_at"])
+
     return orders

@@ -10,13 +10,11 @@
           @submit.prevent.stop="save()"
           novalidate>
 
-      <!-- ALERTY -->
       <template x-if="err"><div class="alert alert-error" x-text="err"></div></template>
       <template x-if="ok"><div class="alert alert-success" x-text="ok"></div></template>
 
-      <!-- PRZEDMIOT -->
       <div class="p-3 rounded border">
-        <div class="font-medium mb-2">Wybierz przedmiot z Twoich ofert</div>
+        <div class="font-medium mb-2">Wybierz przedmioty z Twoich ofert</div>
 
         <template x-if="!selected">
           <div class="space-y-2">
@@ -28,7 +26,6 @@
               <button type="button" class="btn btn-sm" @click="search()">Szukaj</button>
             </div>
 
-            <!-- FILTRY STATUSU -->
             <div class="flex items-center gap-3 flex-wrap text-sm mt-1">
               <span class="opacity-70">Status:</span>
 
@@ -48,9 +45,8 @@
                       @click="selectAllStatuses()">Wszystkie</button>
             </div>
 
-            <p class="text-xs text-error" x-show="fv.selected" x-text="fv.selected"></p>
-
             <template x-if="loading"><div class="h-20 rounded border animate-pulse bg-base-300/40"></div></template>
+
             <div class="grid sm:grid-cols-2 gap-2 max-h-[50vh] overflow-auto cm-soft-scroll">
               <template x-for="it in items" :key="it.public_id || it.id">
                 <button type="button"
@@ -65,6 +61,7 @@
                 </button>
               </template>
             </div>
+
             <div class="pt-2 flex justify-center" x-show="next">
               <button type="button" class="btn btn-outline btn-sm" @click="more()">Pokaż więcej</button>
             </div>
@@ -78,20 +75,125 @@
               <div class="font-medium truncate" x-text="selected.set_name || '(bez nazwy)'"></div>
               <div class="text-xs opacity-70" x-text="selected.type?.path || '—'"></div>
               <div class="text-xs opacity-70" x-text="'ID: ' + (selected.public_id || selected.id)"></div>
+              <div class="text-xs opacity-70" x-text="'Cena: ' + priceText(selected)"></div>
             </div>
-            <button type="button" class="btn btn-xs ml-auto" @click="clear()">Zmień</button>
+
+            <div class="ml-auto flex items-center gap-2">
+              <button type="button" class="btn btn-sm btn-primary btn-gold" @click="addSelectedToCart()">
+                Dodaj do koszyka
+              </button>
+              <button type="button" class="btn btn-sm" @click="clear()">Zmień</button>
+            </div>
           </div>
         </template>
       </div>
 
-      <!-- KLIENT — AUTOUZUPEŁNIANIE + DANE -->
+      <div class="p-3 rounded border">
+        <div class="flex items-center justify-between gap-2">
+          <div class="font-medium">Koszyk</div>
+          <div class="text-xs opacity-70" x-show="cart.length" x-text="'Pozycji: ' + cart.length"></div>
+        </div>
+
+        <p class="text-xs text-error mt-1" x-show="fv.lines" x-text="fv.lines"></p>
+
+        <template x-if="!cart.length">
+          <div class="text-sm opacity-70 mt-2">Dodaj co najmniej jeden przedmiot.</div>
+        </template>
+
+        <template x-if="cart.length">
+          <div class="mt-2 overflow-auto">
+            <table class="table table-zebra w-full">
+              <thead>
+                <tr>
+                  <th>Pozycja</th>
+                  <th class="text-right">Ilość</th>
+                  <th class="text-right">Cena z oferty</th>
+                  <th class="text-right">Cena po rabacie</th>
+                  <th class="text-right">Suma</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="(ln, idx) in cart" :key="ln._key">
+                  <tr>
+                    <td class="min-w-[240px]">
+                      <div class="font-medium truncate" x-text="ln.set_name || '(bez nazwy)'"></div>
+                      <div class="text-xs opacity-70 truncate" x-text="ln.type_path || '—'"></div>
+                      <div class="text-xs opacity-70 font-mono truncate" x-text="ln.item_public_id"></div>
+                    </td>
+
+                    <td class="text-right">
+                      <input class="input input-bordered input-sm w-24 text-right"
+                             type="number" min="1" step="1"
+                             x-model.number="ln.quantity"
+                             @input.debounce.150ms="onQtyChange(idx)">
+                    </td>
+
+                    <td class="text-right whitespace-nowrap">
+                      <span x-text="moneyText(ln.base_unit_price, ln.currency)"></span>
+                    </td>
+
+                    <td class="text-right whitespace-nowrap">
+                      <span x-text="moneyText(ln.unit_price, ln.currency)"></span>
+                    </td>
+
+                    <td class="text-right whitespace-nowrap">
+                      <span x-text="moneyText(ln.line_total, ln.currency)"></span>
+                    </td>
+
+                    <td class="text-right">
+                      <button type="button" class="btn btn-ghost btn-xs" @click="removeLine(idx)">Usuń</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </template>
+
+        <template x-if="cart.length">
+          <div class="mt-3 grid md:grid-cols-2 gap-3 items-end">
+            <div class="text-sm opacity-80">
+              <div class="flex items-center justify-between">
+                <span>Suma wg cen z ofert</span>
+                <span class="font-medium" x-text="moneyText(baseTotal, currency)"></span>
+              </div>
+
+              <div class="flex items-center justify-between mt-1" x-show="totalMode === 'MANUAL'">
+                <span>Rabat (proporcjonalnie)</span>
+                <span class="font-medium" x-text="moneyText(discountAmount, currency)"></span>
+              </div>
+            </div>
+
+            <div>
+              <label class="label"><span class="label-text">Suma do zapłaty</span></label>
+              <div class="flex items-center gap-2">
+                <input class="input input-bordered fancy-area w-full text-right"
+                       type="number" min="0" step="0.01"
+                       x-model="targetTotalInput"
+                       @input.debounce.150ms="onTargetTotalInput()">
+                <div class="w-16 text-sm opacity-70 text-right" x-text="currency"></div>
+                <button type="button" class="btn btn-sm btn-outline"
+                        x-show="totalMode === 'MANUAL'"
+                        @click="resetTotalToBase()">
+                  Reset
+                </button>
+              </div>
+              <p class="text-xs opacity-70 mt-1">
+                Zmiana sumy rozdzieli rabat proporcjonalnie do cen z ofert.
+              </p>
+              <p class="text-xs text-error mt-1" x-show="fv.total" x-text="fv.total"></p>
+            </div>
+          </div>
+        </template>
+      </div>
+
       <div class="p-3 rounded border">
         <div class="flex items-center gap-2">
           <div class="font-medium">Klient (opcjonalnie)</div>
           <span class="text-xs opacity-70">(wyszukaj po emailu, telefonie, imieniu/nazwisku)</span>
         </div>
 
-        <!-- wyszukiwarka -->
         <div class="mt-2 grid sm:grid-cols-[1fr_auto] gap-2">
           <input class="input input-bordered input-sm fancy-area"
                  placeholder="Szukaj klienta…"
@@ -104,7 +206,7 @@
           <template x-for="c in cust.results" :key="c.public_id">
             <button type="button" class="w-full text-left p-2 rounded border hover:bg-base-200/60"
                     @click="cust.pick(c)">
-              <div class="font-medium" x-text="(c.first_name||'')+' '+(c.last_name||'') || '(bez nazwy)'"></div>
+              <div class="font-medium" x-text="((c.first_name||'')+' '+(c.last_name||'')).trim() || '(bez nazwy)'"></div>
               <div class="text-xs opacity-70"
                    x-text="(c.email||'—') + ' • ' + (c.phone||'—') + ' • ' + (c.city||'')"></div>
             </button>
@@ -114,7 +216,6 @@
           </div>
         </div>
 
-        <!-- formularz klienta -->
         <div class="mt-3 grid md:grid-cols-2 gap-2">
           <input class="input input-bordered fancy-area" placeholder="Imię" x-model="customer.first_name">
           <input class="input input-bordered fancy-area" placeholder="Nazwisko" x-model="customer.last_name">
@@ -142,21 +243,7 @@
         </div>
       </div>
 
-      <!-- PARAMETRY SPRZEDAŻY -->
       <div class="grid sm:grid-cols-3 gap-3">
-        <div>
-          <label class="label"><span class="label-text">Ilość</span></label>
-          <div class="numstep numstep--md">
-            <input id="offline_qty"
-                   class="input input-bordered fancy-area w-full numstep__input"
-                   type="number" min="1" step="1"
-                   x-model.number="quantity" required>
-            <button type="button" class="numstep__btn numstep__btn--up"   aria-label="Zwiększ"></button>
-            <button type="button" class="numstep__btn numstep__btn--down" aria-label="Zmniejsz"></button>
-          </div>
-          <p class="text-xs text-error mt-1" x-show="fv.quantity" x-text="fv.quantity"></p>
-        </div>
-
         <div>
           <label class="label"><span class="label-text">Płatność</span></label>
           <select id="offline_pay" class="select select-bordered fancy-select w-full" x-model="payment_method">
@@ -172,7 +259,7 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <button class="btn btn-primary btn-gold" type="submit" :disabled="busy || !selected" x-text="busy ? 'Zapisywanie…' : 'Zapisz'"></button>
+        <button class="btn btn-primary btn-gold" type="submit" :disabled="busy || !cart.length" x-text="busy ? 'Zapisywanie…' : 'Zapisz'"></button>
         <a class="btn btn-ghost" href="/seller/orders" hx-boost="true" hx-target="#app-root" hx-push-url="true">Anuluj</a>
         <span class="text-success" x-text="ok"></span>
       </div>

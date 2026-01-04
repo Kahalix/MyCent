@@ -5,6 +5,9 @@ from djmoney.models.fields import MoneyField
 from django.utils import timezone
 from django.core.validators import MinValueValidator
 from moneyed import Money
+from decimal import Decimal
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
 
 from common.models import PublicIdModel
 from customers.models import Customer
@@ -56,28 +59,50 @@ class Order(PublicIdModel):
     # --- domena ---
     def recalc_totals(self, save: bool = True):
         try:
-            self._prefetched_objects_cache.pop('order_lines', None)
-            self._prefetched_objects_cache.pop('shippings', None)
+            self._prefetched_objects_cache.pop("order_lines", None)
+            self._prefetched_objects_cache.pop("shippings", None)
         except AttributeError:
             pass
 
         items = None
-        for l in OrderLine.objects.filter(order_id=self.id).only('line_total', 'line_total_currency').iterator():
-            items = l.line_total if items is None else (items + l.line_total)
+        for amt, cur in (
+            OrderLine.objects
+            .filter(order_id=self.id)
+            .values_list("line_total", "line_total_currency")
+            .iterator()
+        ):
+            if amt is None:
+                continue
+            m = Money(amt, cur or "PLN")
+            items = m if items is None else (items + m)
+
         self.items_total = items
 
         ship_total = None
-        for s in OrderShipping.objects.filter(order_id=self.id).only('price', 'price_currency').iterator():
-            if s.price is not None:
-                ship_total = s.price if ship_total is None else (ship_total + s.price)
-        from moneyed import Money
-        self.shipping_total = ship_total or Money(0, "PLN")
+        for amt, cur in (
+            OrderShipping.objects
+            .filter(order_id=self.id)
+            .values_list("price", "price_currency")
+            .iterator()
+        ):
+            if amt is None:
+                continue
+            m = Money(amt, cur or "PLN")
+            ship_total = m if ship_total is None else (ship_total + m)
 
-        if self.items_total is None and (ship_total is None or ship_total.amount == 0):
+        base_currency = "PLN"
+        if self.items_total is not None:
+            base_currency = str(self.items_total.currency)
+        elif ship_total is not None:
+            base_currency = str(ship_total.currency)
+
+        self.shipping_total = ship_total or Money(0, base_currency)
+
+        if self.items_total is None and (ship_total is None or Money(0, base_currency) == self.shipping_total):
             self.purchase_cost = None
         else:
-            base = self.items_total or Money(0, "PLN")
-            self.purchase_cost = base + (self.shipping_total or Money(0, "PLN"))
+            base = self.items_total or Money(0, base_currency)
+            self.purchase_cost = base + (self.shipping_total or Money(0, base_currency))
 
         if save:
             self.save(update_fields=["items_total", "shipping_total", "purchase_cost", "updated_at"])

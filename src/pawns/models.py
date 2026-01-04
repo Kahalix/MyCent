@@ -43,6 +43,8 @@ class Pawn(PublicIdModel):
             models.Index(fields=["seller_profile","status"], name="ix_pawn_seller_status"),
             models.Index(fields=["due_date"], name="ix_pawn_due"),
             models.Index(fields=["customer"], name="ix_pawn_customer"),
+            models.Index(fields=["seller_profile", "-created_at"], name="ix_pawn_seller_created"),
+            models.Index(fields=["customer", "-created_at"], name="ix_pawn_customer_created"),
         ]
         constraints = [
             models.CheckConstraint(

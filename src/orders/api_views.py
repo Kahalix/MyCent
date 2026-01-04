@@ -150,21 +150,19 @@ class SellerOrderViewSet(mixins.ListModelMixin,
         ser = SellerOfflineCheckoutRequest(data=request.data)
         ser.is_valid(raise_exception=True)
 
-        # wybierz sklep, w którym user ma aktywne członkostwo
         seller = SellerProfile.objects.filter(
             memberships__user=request.user, memberships__is_active=True
         ).first()
         if not seller:
             return Response({"detail": "Brak przypisanego profilu sprzedawcy."}, status=403)
 
-        order = cmd.seller_offline_checkout(
+        order = cmd.seller_offline_checkout_many(
             seller=seller,
             employee=request.user,
-            item_public_id=ser.validated_data["item_public_id"],
-            quantity=ser.validated_data["quantity"],
+            lines=ser.validated_data["lines"],
             payment_method=ser.validated_data["payment_method"],
             customer_payload=ser.validated_data.get("customer"),
-            status="COMPLETED",  # offline default
+            status="COMPLETED",
         )
         return Response(OrderPublicResponse(order).data, status=201)
 
