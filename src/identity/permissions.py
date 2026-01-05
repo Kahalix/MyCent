@@ -24,6 +24,15 @@ class IsAdmin(BasePermission):
         u = request.user
         return bool(u and u.is_authenticated and u.is_superuser)
 
+class IsAnyActiveSellerMember(BasePermission):
+    def has_permission(self, request, view):
+        u = request.user
+        return bool(
+            u
+            and u.is_authenticated
+            and SellerMembership.objects.filter(user=u, is_active=True).exists()
+        )
+
 class IsSellerMember(BasePermission):
     """Sprawdza członkostwo w profilu sprzedawcy przypiętym do obiektu."""
     def has_object_permission(self, request, view, obj):
@@ -98,3 +107,17 @@ class IsUserRoleOwner(BasePermission):
     def has_permission(self, request, view):
         u = request.user
         return bool(u and u.is_authenticated and getattr(u, "role", None) == "OWNER")
+
+
+class IsAnyActiveSellerManagerOrOwner(BasePermission):
+    def has_permission(self, request, view):
+        u = request.user
+        return bool(
+            u
+            and u.is_authenticated
+            and SellerMembership.objects.filter(
+                user=u,
+                is_active=True,
+                role__in=list(ADMIN_ROLES),
+            ).exists()
+        )

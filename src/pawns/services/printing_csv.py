@@ -2,18 +2,24 @@ from __future__ import annotations
 import csv
 import io
 from typing import Any, Dict
+from collections import defaultdict
+from decimal import Decimal
+from django.utils import timezone
 from djmoney.money import Money
 from pawns.models import Pawn
 
 def _money(m: Money | None) -> str:
-    if not m: return ""
+    if not m:
+        return ""
     return f"{m.amount:.2f} {m.currency}"
 
 def _attr_str(attrs: Dict[str, Any] | None) -> str:
-    if not attrs: return ""
+    if not attrs:
+        return ""
     parts = []
     for k, v in attrs.items():
-        if v is None: continue
+        if v is None:
+            continue
         parts.append(f"{k}={v}")
     return " | ".join(parts)
 
@@ -24,7 +30,6 @@ def render_receipt_csv(pawn: Pawn) -> bytes:
     cust = pawn.customer_snapshot or {}
     addr = cust.get("address", {}) if isinstance(cust.get("address", {}), dict) else {}
 
-    # NAGŁÓWEK
     w.writerow(["Dokument", "Umowa zastawu"])
     w.writerow(["ID", pawn.public_id])
     w.writerow(["Sklep", getattr(pawn.seller_profile, "company_name", "")])
@@ -32,7 +37,6 @@ def render_receipt_csv(pawn: Pawn) -> bytes:
     w.writerow(["Termin wykupu", str(pawn.due_date)])
     w.writerow(["Status", pawn.status])
 
-    # Klient
     full_name = f"{cust.get('first_name','')} {cust.get('last_name','')}".strip()
     w.writerow([])
     w.writerow(["Klient", full_name])
@@ -45,7 +49,6 @@ def render_receipt_csv(pawn: Pawn) -> bytes:
     if doc.get("number"):
         w.writerow(["Dokument tożsamości", f"{doc.get('type','')} {doc.get('number','')}".strip()])
 
-    # POZYCJE
     w.writerow([])
     w.writerow(["POZYCJE ZASTAWU"])
     w.writerow(["Lp.", "Opis", "Ilość", "Wycena", "Atrybuty / Uwagi"])
@@ -57,7 +60,6 @@ def render_receipt_csv(pawn: Pawn) -> bytes:
         extra = " | ".join([p for p in [attrs, notes] if p]).strip(" |")
         w.writerow([i, ln.title or "Pozycja", ln.quantity, _money(ln.appraisal_value), extra])
 
-    # PRZEDŁUŻENIA
     exs = list(pawn.extensions.all())
     if exs:
         w.writerow([])
@@ -66,7 +68,6 @@ def render_receipt_csv(pawn: Pawn) -> bytes:
         for ex in exs:
             w.writerow([ex.days, _money(ex.fee), str(ex.previous_due), str(ex.new_due), str(ex.created_at.date())])
 
-    # PODSUMOWANIE
     w.writerow([])
     w.writerow(["PODSUMOWANIE"])
     w.writerow(["Suma wycen", _money(pawn.appraisal_total)])
@@ -75,12 +76,8 @@ def render_receipt_csv(pawn: Pawn) -> bytes:
     return out.getvalue().encode("utf-8-sig")
 
 def export_pawns_csv(pawns) -> bytes:
-    """
-    Lista zastawów (np. do eksportu z widoku listy).
-    """
     out = io.StringIO(newline="")
     w = csv.writer(out)
-    # w.writerow(["ID", "Status", "Kapitał", "Wycena", "Data początku", "Termin wykupu", "Klient"])
     w.writerow(["public_id","status","principal","appraisal_total","start_date","due_date","customer"])
     for p in pawns:
         full_name = (p.customer_snapshot.get("first_name","") + " " + p.customer_snapshot.get("last_name","")).strip()
@@ -88,4 +85,61 @@ def export_pawns_csv(pawns) -> bytes:
             p.public_id, p.status, _money(p.principal), _money(p.appraisal_total),
             str(p.start_date), str(p.due_date), full_name
         ])
+    return out.getvalue().encode("utf-8-sig")
+
+def export_pawns_summary_csv(pawns) -> bytes:
+    out = io.StringIO(newline="")
+    w = csv.writer(out)
+
+    statuses = defaultdict(lambda: {"count": 0, "principal": None, "appraisal": None})
+    total_count = 0
+
+    total_principal = None
+    total_appraisal = None
+    base_currency = "PLN"
+
+    for p in pawns.iterator():
+        total_count += 1
+        st = str(p.status or "")
+
+        pr = getattr(p, "principal", None)
+        ap = getattr(p, "appraisal_total", None)
+
+        if pr and total_principal is None:
+            base_currency = str(pr.currency)
+        if ap and total_appraisal is None:
+            base_currency = str(ap.currency)
+
+        if pr:
+            pr_eff = pr if str(pr.currency) == base_currency else Money(pr.amount, base_currency)
+            total_principal = pr_eff if total_principal is None else (total_principal + pr_eff)
+            s_pr = statuses[st]["principal"]
+            statuses[st]["principal"] = pr_eff if s_pr is None else (s_pr + pr_eff)
+
+        if ap:
+            ap_eff = ap if str(ap.currency) == base_currency else Money(ap.amount, base_currency)
+            total_appraisal = ap_eff if total_appraisal is None else (total_appraisal + ap_eff)
+            s_ap = statuses[st]["appraisal"]
+            statuses[st]["appraisal"] = ap_eff if s_ap is None else (s_ap + ap_eff)
+
+        statuses[st]["count"] += 1
+
+    w.writerow(["report", "pawns_summary"])
+    w.writerow(["generated_at", str(timezone.localtime(timezone.now()))])
+    w.writerow([])
+    w.writerow(["total_pawns", str(total_count)])
+    w.writerow(["total_principal", _money(total_principal or Money(0, base_currency))])
+    w.writerow(["total_appraisal_total", _money(total_appraisal or Money(0, base_currency))])
+    w.writerow([])
+    w.writerow(["status", "count", "principal_sum", "appraisal_sum"])
+
+    for st in sorted(statuses.keys()):
+        row = statuses[st]
+        w.writerow([
+            st,
+            str(row["count"]),
+            _money(row["principal"] or Money(0, base_currency)),
+            _money(row["appraisal"] or Money(0, base_currency)),
+        ])
+
     return out.getvalue().encode("utf-8-sig")

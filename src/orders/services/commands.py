@@ -429,7 +429,9 @@ def seller_offline_checkout_many(
 
         qty_total_by_pid[pid] = qty_total_by_pid.get(pid, 0) + qty
 
-        price = row.get("unit_price") or _unit_price_for(item)
+        up = row.get("unit_price", None)
+        price = up if up is not None else _unit_price_for(item)
+
         if not isinstance(price, Money):
             raise DomainError("Nieprawidłowy format ceny za sztukę.")
 
@@ -520,7 +522,6 @@ def seller_offline_checkout_many(
             item.save(update_fields=["stock_quantity", "status", "updated_at"])
 
     return order
-
 
 @transaction.atomic
 def seller_offline_checkout(

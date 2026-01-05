@@ -6,7 +6,6 @@ from django.utils import timezone
 from djmoney.money import Money
 
 from pawns.models import Pawn
-
 from common.attrs_display import attrs_pairs
 from catalog.models import ItemType
 
@@ -47,7 +46,7 @@ def _ctx(pawn: Pawn) -> dict:
             "title": ln.title or "Pozycja",
             "qty": ln.quantity,
             "appraisal": ln.appraisal_value,
-            "attrs_pairs": pairs,                         # NEW
+            "attrs_pairs": pairs,
             "notes": ln.description or snap.get("notes",""),
         })
 
@@ -94,3 +93,7 @@ def render_receipt_csv(pawn: Pawn) -> bytes:
 def export_pawns_csv(pawns) -> bytes:
     from .printing_csv import export_pawns_csv as _list_csv
     return _list_csv(pawns)
+
+def export_pawns_summary_csv(pawns) -> bytes:
+    from .printing_csv import export_pawns_summary_csv as _sum_csv
+    return _sum_csv(pawns)

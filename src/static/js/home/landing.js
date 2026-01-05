@@ -15,7 +15,7 @@ app.landing = function () {
       this._loadFeed(this.staff,  '/api/public/item-sets/?added_by=STAFF&ordering=-created_at');
       this._loadFeed(this.user,   '/api/public/item-sets/?added_by=USER&ordering=-created_at');
 
-      // Kategorie (Top 6) + liczność - korzystamy z DRF .count (paginacja)
+      // Kategorie (Top 6) + liczność — korzystamy z DRF .count (paginacja)
       await this._buildCategories();
     },
 

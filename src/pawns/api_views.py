@@ -9,6 +9,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter
 from django.http import HttpResponse
 
+from identity.permissions import IsAnyActiveSellerMember, IsSellerMember, IsAnyActiveSellerManagerOrOwner
 from pawns.services.printing import render_receipt_pdf as build_pawn_receipt_pdf
 from pawns.services.printing import render_receipt_csv as build_pawn_receipt_csv
 from pawns.services.printing import export_pawns_csv as export_pawns_list_csv
@@ -21,11 +22,28 @@ from common.services.idempotency import get_existing, save_result
 from pawns.serializers import PawnResponse, PawnListResponse, PawnCreateRequest, PawnExtendRequest
 from pawns.services import commands, queries
 from pawns.filters import PawnFilter
-from identity.models import SellerProfile
+from identity.models import SellerProfile, SellerMembership
 from customers.models import Customer
 from listings.models import ItemSet
+from pawns.services.printing_csv import export_pawns_summary_csv
 from transactions.models import Transaction
 from transactions.serializers import TransactionResponse
+
+ADMIN_ROLES = {"OWNER", "MANAGER"}
+
+def can_full_export_for_queryset(*, user, qs) -> bool:
+    seller_ids = list(qs.values_list("seller_profile_id", flat=True).distinct())
+    if not seller_ids:
+        return False
+    admin_ids = set(
+        SellerMembership.objects.filter(
+            user=user,
+            is_active=True,
+            role__in=list(ADMIN_ROLES),
+            seller_profile_id__in=seller_ids
+        ).values_list("seller_profile_id", flat=True)
+    )
+    return admin_ids.issuperset(set(seller_ids))
 
 User = get_user_model()
 
@@ -34,14 +52,23 @@ def _ensure_membership(user, seller: SellerProfile) -> bool:
     return seller.memberships.filter(user=user, is_active=True).exists()
 
 
+# ==== Selller ====
 class SellerPawnViewSet(mixins.ListModelMixin,
                         mixins.RetrieveModelMixin,
                         viewsets.GenericViewSet):
     permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PawnResponse
     lookup_field = "public_id"
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filterset_class = PawnFilter
-    ordering_fields = ("created_at","due_date","start_date")
+    ordering_fields = ("created_at", "due_date", "start_date")
+
+    def get_permissions(self):
+        if self.action == "list":
+            return [permissions.IsAuthenticated(), IsAnyActiveSellerMember()]
+        if self.action == "export_csv":
+            return [permissions.IsAuthenticated(), IsAnyActiveSellerManagerOrOwner()]
+        return [permissions.IsAuthenticated(), IsSellerMember()]
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -49,12 +76,26 @@ class SellerPawnViewSet(mixins.ListModelMixin,
         return PawnResponse
 
     def get_queryset(self):
-        with_related = self.action in ("retrieve","extend","redeem","forfeit","attach_customer","detach_customer","ensure_customer")
-        return queries.seller_pawns_qs(self.request.user, with_related=with_related)
+        with_related = self.action in (
+            "retrieve", "extend", "redeem", "forfeit",
+            "attach_customer", "detach_customer", "ensure_customer"
+        )
+        qs = queries.seller_pawns_qs(self.request.user, with_related=with_related)
+
+        if self.action == "export_csv":
+            admin_seller_ids = SellerMembership.objects.filter(
+                user=self.request.user,
+                is_active=True,
+                role__in=list(ADMIN_ROLES),
+            ).values_list("seller_profile_id", flat=True)
+            qs = qs.filter(seller_profile_id__in=admin_seller_ids)
+
+        return qs
 
     @action(detail=False, methods=["post"], url_path="create")
     def create_pawn(self, request):
-        ser = PawnCreateRequest(data=request.data); ser.is_valid(raise_exception=True)
+        ser = PawnCreateRequest(data=request.data)
+        ser.is_valid(raise_exception=True)
         seller = get_object_or_404(SellerProfile, public_id=ser.validated_data["seller_public_id"])
         if not _ensure_membership(request.user, seller):
             return Response({"detail": "Brak uprawnień (wymagana aktywna rola w sklepie)."}, status=403)
@@ -81,7 +122,7 @@ class SellerPawnViewSet(mixins.ListModelMixin,
         pawn = commands.create_pawn(
             operator=request.user, seller=seller,
             principal=ser.validated_data["principal"],
-            due_in_days=int(ser.validated_data.get("due_in_days",30)),
+            due_in_days=int(ser.validated_data.get("due_in_days", 30)),
             customer=cust,
             customer_snapshot_override=ser.validated_data.get("customer_snapshot"),
             lines=lines,
@@ -91,7 +132,8 @@ class SellerPawnViewSet(mixins.ListModelMixin,
     @action(detail=True, methods=["post"], url_path="extend")
     def extend(self, request, public_id=None):
         pawn = self.get_object()
-        ser = PawnExtendRequest(data=request.data); ser.is_valid(raise_exception=True)
+        ser = PawnExtendRequest(data=request.data)
+        ser.is_valid(raise_exception=True)
         commands.extend_pawn(pawn=pawn, days=int(ser.validated_data["days"]), operator=request.user)
         pawn.refresh_from_db()
         return Response(PawnResponse(pawn).data, status=200)
@@ -184,7 +226,6 @@ class SellerPawnViewSet(mixins.ListModelMixin,
             "customer_public_id": res.get("customer_public_id"),
             "pawn": PawnResponse(pawn).data
         }, status=200 if res["result"] == "attached" else 201)
-
 
 class UserPawnViewSet(mixins.ListModelMixin,
                       mixins.RetrieveModelMixin,

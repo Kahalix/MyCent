@@ -68,7 +68,7 @@ class User(AbstractUser, PublicIdModel):
     ]
     role = models.CharField(max_length=16, choices=ROLE_CHOICES, default="CLIENT")
 
-    STATUS_CHOICES = [("ACTIVE","Active"),("INACTIVE","Inactive"),("SUSPENDED","Suspended"),("DELETED","Deleted")]
+    STATUS_CHOICES = [("ACTIVE","Active"),("SUSPENDED","Suspended"),("DELETED","Deleted")]
     user_status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="ACTIVE")
 
     USERNAME_FIELD = "email"

@@ -8,8 +8,8 @@ from customers.models import Customer
 from .services import commands as cmd
 from rest_framework.response import Response
 
-from identity.permissions import IsAdmin
-from identity.models import SellerProfile
+from identity.permissions import IsAdmin, IsSellerMember, IsAnyActiveSellerMember
+from identity.models import SellerProfile, SellerMembership
 from orders.models import Order, OrderShipping, OrderLine
 from orders.serializers import (
     OrderPublicResponse, CheckoutRequest,
@@ -27,7 +27,23 @@ from rest_framework.filters import OrderingFilter
 
 from .services.commands import seller_pawn_purchase, build_receipt_pdf, build_receipt_csv, ensure_customer_for_order, \
     detach_customer_from_order, attach_customer_to_order
-from .services.printing_csv import export_orders_csv
+from .services.printing_csv import export_orders_csv, export_orders_summary_csv
+
+ADMIN_ROLES = {"OWNER", "MANAGER"}
+
+def can_full_export_for_queryset(*, user, qs) -> bool:
+    seller_ids = list(qs.values_list("seller_profile_id", flat=True).distinct())
+    if not seller_ids:
+        return False
+    admin_ids = set(
+        SellerMembership.objects.filter(
+            user=user,
+            is_active=True,
+            role__in=list(ADMIN_ROLES),
+            seller_profile_id__in=seller_ids
+        ).values_list("seller_profile_id", flat=True)
+    )
+    return admin_ids.issuperset(set(seller_ids))
 
 User = get_user_model()
 
@@ -85,6 +101,8 @@ class BuyerOrderViewSet(mixins.ListModelMixin,
 
 
 # ===== SELLER =====
+from identity.permissions import IsSellerMember, IsAnyActiveSellerMember, IsAnyActiveSellerManagerOrOwner
+
 class SellerOrderViewSet(mixins.ListModelMixin,
                          mixins.RetrieveModelMixin,
                          viewsets.GenericViewSet):
@@ -93,28 +111,48 @@ class SellerOrderViewSet(mixins.ListModelMixin,
     lookup_field = "public_id"
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filterset_class = OrderFilter
-    ordering_fields = ("created_at","purchase_date")
+    ordering_fields = ("created_at", "purchase_date")
+
+    def get_permissions(self):
+        if self.action == "list":
+            return [permissions.IsAuthenticated(), IsAnyActiveSellerMember()]
+        if self.action == "export_csv":
+            return [permissions.IsAuthenticated(), IsAnyActiveSellerManagerOrOwner()]
+        return [permissions.IsAuthenticated(), IsSellerMember()]
 
     def get_queryset(self):
-        return Order.objects.filter(
-            seller_profile__memberships__user=self.request.user,
-            seller_profile__memberships__is_active=True
-        ).select_related("buyer","transaction","seller_profile").prefetch_related("order_lines__item_set","shippings").order_by("-created_at").distinct()
+        qs = (
+            Order.objects.filter(
+                seller_profile__memberships__user=self.request.user,
+                seller_profile__memberships__is_active=True
+            )
+            .select_related("buyer", "transaction", "seller_profile")
+            .order_by("-created_at")
+            .distinct()
+        )
 
-    # --- SHIPPING PER LINE ---
+        if self.action == "export_csv":
+            admin_seller_ids = SellerMembership.objects.filter(
+                user=self.request.user,
+                is_active=True,
+                role__in=list(ADMIN_ROLES),
+            ).values_list("seller_profile_id", flat=True)
+            qs = qs.filter(seller_profile_id__in=admin_seller_ids)
+            return qs
+
+        return qs.prefetch_related("order_lines__item_set", "shippings")
+
     @action(detail=True, methods=["post"], url_path="lines/(?P<line_public_id>[^/]+)/shipping")
     def add_line_shipping(self, request, public_id=None, line_public_id=None):
         order = self.get_object()
         line = get_object_or_404(OrderLine, order=order, public_id=line_public_id)
-
-        # sprawdź czy już była wysyłka (1:1 z linią)
         had = getattr(line, "shipping", None)
 
         ser = OrderLineShippingCreateRequest(data={**request.data, "order_line_public_id": line_public_id})
         ser.is_valid(raise_exception=True)
 
         pkg = None
-        price = ser.validated_data.get("price")  # Money albo None
+        price = ser.validated_data.get("price")
         pkg_pid = ser.validated_data.get("package_type_public_id")
         if pkg_pid:
             pkg = get_object_or_404(PackageType, public_id=pkg_pid)
@@ -168,10 +206,9 @@ class SellerOrderViewSet(mixins.ListModelMixin,
 
     @action(detail=False, methods=["post"], url_path="pawn-purchase")
     def pawn_purchase(self, request):
-        ser = SellerPawnPurchaseRequest(data=request.data);
+        ser = SellerPawnPurchaseRequest(data=request.data)
         ser.is_valid(raise_exception=True)
 
-        # wybór sklepu: explicit > pierwszy aktywny
         seller = None
         pid = ser.validated_data.get("seller_public_id")
         if pid:
@@ -197,7 +234,6 @@ class SellerOrderViewSet(mixins.ListModelMixin,
         )
         return Response(OrderPublicResponse(order).data, status=201)
 
-    # --- eksport: CSV ---
     @action(detail=True, methods=["get"], url_path="receipt.csv")
     def receipt_csv(self, request, public_id=None):
         order = self.get_object()
@@ -207,12 +243,11 @@ class SellerOrderViewSet(mixins.ListModelMixin,
         resp["Content-Disposition"] = f'attachment; filename="{filename}"'
         return resp
 
-    # --- eksport: PDF ---
     @action(detail=True, methods=["get"], url_path="receipt.pdf")
     def receipt_pdf(self, request, public_id=None):
         order = self.get_object()
         try:
-            data = build_receipt_pdf(order)  # bytes
+            data = build_receipt_pdf(order)
         except RuntimeError as e:
             return Response({"detail": str(e)}, status=500)
 
@@ -224,11 +259,11 @@ class SellerOrderViewSet(mixins.ListModelMixin,
 
     @action(detail=False, methods=["get"], url_path="export.csv")
     def export_csv(self, request):
-        # uwzględnij te same filtry co w liście
         qs = self.filter_queryset(self.get_queryset())
         data = export_orders_csv(qs)
+        filename = "orders_export.csv"
         resp = HttpResponse(data, content_type="text/csv; charset=utf-8")
-        resp["Content-Disposition"] = 'attachment; filename="orders_export.csv"'
+        resp["Content-Disposition"] = f'attachment; filename="{filename}"'
         return resp
 
     @action(detail=True, methods=["post"], url_path="attach-customer")
@@ -242,14 +277,12 @@ class SellerOrderViewSet(mixins.ListModelMixin,
         except Customer.DoesNotExist:
             return Response({"detail": "Nie znaleziono klienta."}, status=404)
         attach_customer_to_order(order=order, customer=c, update_snapshot=True)
-        from orders.serializers import OrderPublicResponse
         return Response(OrderPublicResponse(order).data, status=200)
 
     @action(detail=True, methods=["post"], url_path="detach-customer")
     def detach_customer(self, request, public_id=None):
         order = self.get_object()
         detach_customer_from_order(order=order)
-        from orders.serializers import OrderPublicResponse
         return Response(OrderPublicResponse(order).data, status=200)
 
     @action(detail=True, methods=["post"], url_path="ensure-customer")
@@ -272,9 +305,8 @@ class SellerOrderViewSet(mixins.ListModelMixin,
         if res.get("result") == "conflict":
             return Response(
                 {"detail": "Znaleziono wielu kandydatów — wybierz ręcznie.", "candidates": res["candidates"]},
-                status=409)
-        from orders.serializers import OrderPublicResponse
-        # odśwież
+                status=409
+            )
         return Response({
             "result": res["result"],
             "customer_public_id": res.get("customer_public_id"),

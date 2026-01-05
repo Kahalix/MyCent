@@ -2,22 +2,19 @@ from __future__ import annotations
 import csv
 import io
 from typing import Any, Dict
-
+from collections import defaultdict
+from django.utils import timezone
 from djmoney.money import Money
 from orders.models import Order
-
 
 def _money(m: Money | None) -> str:
     if not m:
         return ""
-    # 12.34 PLN
     return f"{m.amount:.2f} {m.currency}"
-
 
 def _attr_str(attrs: Dict[str, Any] | None) -> str:
     if not attrs:
         return ""
-    # k1=v1 | k2=v2
     pairs = []
     for k, v in attrs.items():
         if v is None:
@@ -25,23 +22,13 @@ def _attr_str(attrs: Dict[str, Any] | None) -> str:
         pairs.append(f"{k}={v}")
     return " | ".join(pairs)
 
-
 def render_receipt_csv(order: Order) -> bytes:
-    """
-    Zwraca bytes (UTF-8 z BOM, przyjazne dla Excela).
-    Sekcje:
-      - nagłówek (dokument, sklep, daty, klient)
-      - pozycje
-      - wysyłki (jeśli są)
-      - podsumowanie
-    """
     out = io.StringIO(newline="")
     w = csv.writer(out)
 
     cust = order.customer_snapshot or {}
     addr = cust.get("address", {}) if isinstance(cust.get("address", {}), dict) else {}
 
-    # ===== NAGŁÓWEK =====
     w.writerow(["Dokument", "Przyjęcie skupu"])
     w.writerow(["ID", order.public_id])
     w.writerow(["Sklep", getattr(order.seller_profile, "company_name", "")])
@@ -59,7 +46,6 @@ def render_receipt_csv(order: Order) -> bytes:
     if doc.get("number"):
         w.writerow(["Dokument tożsamości", f"{doc.get('type','')} {doc.get('number','')}".strip()])
 
-    # ===== POZYCJE =====
     w.writerow([])
     w.writerow(["POZYCJE"])
     w.writerow(["Lp.", "Tytuł", "Ilość", "Cena jedn.", "Suma", "Atrybuty / Uwagi"])
@@ -71,21 +57,11 @@ def render_receipt_csv(order: Order) -> bytes:
         attrs = _attr_str(snap.get("attributes") or {})
         notes = snap.get("notes", "")
         extra = f"{attrs} | {notes}".strip(" |")
-        w.writerow([
-            i,
-            title,
-            l.quantity,
-            _money(l.unit_price),
-            _money(l.line_total),
-            extra,
-        ])
+        w.writerow([i, title, l.quantity, _money(l.unit_price), _money(l.line_total), extra])
 
-    # ===== WYSYŁKI (jeśli są) =====
     shippings = list(order.shippings.select_related("package_type", "order_line"))
     if shippings:
-        # mapowanie: order_line_id -> lp (żeby w CSV dać numer pozycji)
         pos_by_line_id = {ln.id: i for i, ln in enumerate(lines, start=1)}
-
         w.writerow([])
         w.writerow(["WYSYŁKI"])
         w.writerow(["Pozycja (Lp.)", "Tracking", "Etykieta", "Metoda", "Cena", "Status"])
@@ -95,42 +71,23 @@ def render_receipt_csv(order: Order) -> bytes:
             if (not s.package_type) or label.upper() == "PICKUP":
                 label = "Odbiór osobisty"
             method = str(s.package_type) if s.package_type else "Odbiór osobisty"
-            w.writerow([
-                line_no,
-                s.tracking_number or "",
-                label,
-                method,
-                _money(s.price),
-                s.shipping_status,
-            ])
+            w.writerow([line_no, s.tracking_number or "", label, method, _money(s.price), s.shipping_status])
 
-    # ===== PODSUMOWANIE =====
     w.writerow([])
     w.writerow(["PODSUMOWANIE"])
     w.writerow(["Suma pozycji", _money(order.items_total)])
     w.writerow(["Suma wysyłek", _money(order.shipping_total)])
     w.writerow(["Razem", _money(order.purchase_cost)])
 
-    # UTF-8 z BOM dla Excela
-    csv_text = out.getvalue()
-    return csv_text.encode("utf-8-sig")
+    return out.getvalue().encode("utf-8-sig")
 
 def export_orders_csv(orders) -> bytes:
-    """
-    Eksport listy zamówień (UTF-8 z BOM, przyjazne dla Excela).
-    Nagłówki po angielsku (PL poniżej w komentarzu).
-    """
     out = io.StringIO(newline="")
     w = csv.writer(out)
-
-    # EN headers:
     w.writerow([
         "public_id", "status", "payment_method", "purchase_date",
         "items_total", "shipping_total", "purchase_cost", "tx_type", "customer"
     ])
-    # PL:
-    # w.writerow(["ID", "Status", "Metoda płatności", "Data zakupu",
-    #             "Suma pozycji", "Wysyłka", "Razem", "Typ transakcji", "Klient"])
 
     for o in orders:
         snap = o.customer_snapshot or {}
@@ -146,6 +103,75 @@ def export_orders_csv(orders) -> bytes:
             _money(o.purchase_cost),
             tx_type,
             full_name,
+        ])
+
+    return out.getvalue().encode("utf-8-sig")
+
+def export_orders_summary_csv(orders) -> bytes:
+    out = io.StringIO(newline="")
+    w = csv.writer(out)
+
+    total_count = 0
+    base_currency = "PLN"
+
+    totals = {
+        "items": None,
+        "shipping": None,
+        "purchase": None,
+    }
+
+    by_status = defaultdict(lambda: {"count": 0, "purchase": None})
+
+    qs = orders
+    if hasattr(qs, "prefetch_related"):
+        qs = qs.prefetch_related(None)
+
+    it = qs.iterator(chunk_size=2000) if hasattr(qs, "iterator") else iter(qs)
+
+    for o in it:
+        total_count += 1
+        st = str(getattr(o, "order_status", "") or "")
+
+        itv = getattr(o, "items_total", None)
+        sh = getattr(o, "shipping_total", None)
+        pu = getattr(o, "purchase_cost", None)
+
+        first_money = itv or sh or pu
+        if first_money and base_currency == "PLN":
+            base_currency = str(first_money.currency)
+
+        if itv:
+            it_eff = itv if str(itv.currency) == base_currency else Money(itv.amount, base_currency)
+            totals["items"] = it_eff if totals["items"] is None else (totals["items"] + it_eff)
+
+        if sh:
+            sh_eff = sh if str(sh.currency) == base_currency else Money(sh.amount, base_currency)
+            totals["shipping"] = sh_eff if totals["shipping"] is None else (totals["shipping"] + sh_eff)
+
+        if pu:
+            pu_eff = pu if str(pu.currency) == base_currency else Money(pu.amount, base_currency)
+            totals["purchase"] = pu_eff if totals["purchase"] is None else (totals["purchase"] + pu_eff)
+            s_pu = by_status[st]["purchase"]
+            by_status[st]["purchase"] = pu_eff if s_pu is None else (s_pu + pu_eff)
+
+        by_status[st]["count"] += 1
+
+    w.writerow(["report", "orders_summary"])
+    w.writerow(["generated_at", str(timezone.localtime(timezone.now()))])
+    w.writerow([])
+    w.writerow(["total_orders", str(total_count)])
+    w.writerow(["items_total_sum", _money(totals["items"] or Money(0, base_currency))])
+    w.writerow(["shipping_total_sum", _money(totals["shipping"] or Money(0, base_currency))])
+    w.writerow(["purchase_cost_sum", _money(totals["purchase"] or Money(0, base_currency))])
+    w.writerow([])
+    w.writerow(["status", "count", "purchase_cost_sum"])
+
+    for st in sorted(by_status.keys()):
+        row = by_status[st]
+        w.writerow([
+            st,
+            str(row["count"]),
+            _money(row["purchase"] or Money(0, base_currency)),
         ])
 
     return out.getvalue().encode("utf-8-sig")

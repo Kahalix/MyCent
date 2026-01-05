@@ -32,7 +32,6 @@ def snapshot_from_customer(customer) -> dict:
     )
 
 def snapshot_from_user(user) -> dict:
-    # Minimal: user.email + phone (masz phone na User), imię/nazwisko jeśli trzymasz
     return make_customer_snapshot(
         first_name=getattr(user, "first_name", "") or "",
         last_name=getattr(user, "last_name", "") or "",

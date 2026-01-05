@@ -9,7 +9,7 @@ from .models import User, SellerProfile, SellerBankAccount, UserToken, SellerMem
 
 # ========= helpers / stałe =========
 
-STATUS_THAT_DISABLE_LOGIN = {"INACTIVE", "SUSPENDED", "DELETED"}
+STATUS_THAT_DISABLE_LOGIN = {"SUSPENDED", "DELETED"}
 SPECIAL_PERM = "identity.can_set_user_status"  # niestandardowe uprawnienie „zmiana statusu”
 
 ALLOWED_ROLES_FOR_NON_SUPERUSER_EDIT = {"CLIENT", "EMPLOYEE"}
@@ -72,7 +72,7 @@ class UserAdmin(DjangoUserAdmin):
     search_fields = ("email", "first_name", "last_name")
     readonly_fields = ("image_preview",)
 
-    actions = ("mark_active", "mark_inactive", "mark_suspended", "mark_deleted")
+    actions = ("mark_active", "mark_suspended", "mark_deleted")
 
     # Formularz dodawania: celowo BEZ pól uprawnień i roli
     add_fieldsets = (
@@ -169,7 +169,7 @@ class UserAdmin(DjangoUserAdmin):
             actions.pop("delete_selected", None)
         # usuń akcje statusowe, jeśli brak SPECIAL_PERM
         if not (request.user.is_superuser or request.user.has_perm(SPECIAL_PERM)):
-            for k in ("mark_active", "mark_inactive", "mark_suspended", "mark_deleted"):
+            for k in ("mark_active", "mark_suspended", "mark_deleted"):
                 actions.pop(k, None)
         return actions
 
@@ -292,10 +292,6 @@ class UserAdmin(DjangoUserAdmin):
     @admin.action(description="Ustaw status: ACTIVE")
     def mark_active(self, request, queryset):
         self._bulk_set(request, queryset, "ACTIVE", True)
-
-    @admin.action(description="Ustaw status: INACTIVE (wyloguj)")
-    def mark_inactive(self, request, queryset):
-        self._bulk_set(request, queryset, "INACTIVE", False)
 
     @admin.action(description="Ustaw status: SUSPENDED (wyloguj)")
     def mark_suspended(self, request, queryset):

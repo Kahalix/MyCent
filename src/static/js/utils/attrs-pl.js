@@ -12,7 +12,6 @@ window.app = window.app || {};
   const ALIASES = {
       brand:"Marka",
       model:"Model",
-
       cpu:"CPU", gpu:"GPU", os:"System",
       ram_gb:"Pamięć RAM", storage_gb:"Pamięć", ssd_gb:"Dysk SSD", hdd_gb:"Dysk HDD",
       capacity_gb:"Pojemność", battery_mah:"Bateria", battery_ah:"Bateria",

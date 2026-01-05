@@ -414,7 +414,10 @@ app.payPage = function (opts = {}) {
         const host = await this._waitForHost('#payment-element', 60);
         if (!host) { this.stripeErr = 'Brak kontenera #payment-element.'; return; }
 
-        if (!this.stripe) this.stripe = Stripe(pk);
+        const locale = 'pl';
+//        if (!this.stripe) this.stripe = Stripe(pk); Auto Lang
+
+        if (!this.stripe) this.stripe = Stripe(pk, { locale });
 
         const secret = this.payment.client_secret;
         const mustRemount = forceRemount || (this._lastClientSecret && this._lastClientSecret !== secret);

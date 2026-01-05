@@ -247,7 +247,7 @@ class PublicItemSetViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
         thread = chat_cmd.start_dm(initiator=request.user, other_user=None, item=item)
         return Response(ChatThreadResponse(thread).data, status=201)
 
-# ===== SELLER (OWNER of SellerProfile) =====
+# ===== SELLER =====
 class SellerItemSetViewSet(viewsets.ModelViewSet):
     """
     /api/sellers/mine/item-sets/...
