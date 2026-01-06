@@ -1,4 +1,3 @@
-// static/js/listings/offers_list.js
 window.app = window.app || {};
 app._emitToast = app._emitToast || function (type, message) {
   const detail = { type, message };
@@ -112,7 +111,7 @@ app.sellerOffersList = function () {
       }
     },
 
-    // ——— Helpers UI ———
+    // Helpers UI
     img(it) {
       const first = (Array.isArray(it.images) && it.images.length) ? it.images[0] : null;
       const pic = it.cover_image_url
@@ -137,7 +136,7 @@ app.sellerOffersList = function () {
       return this.statusesAll.find(s => s.code === code)?.label || code || '—';
     },
 
-    // Które statusy można ustawić (zgodnie z API)
+    // Które statusy można ustawić
     allowedStatusTargets(it) {
       const staff = ['AVAILABLE','RESERVED','CLOSED','SOLD','SUSPENDED'];
       const user  = ['AVAILABLE','RESERVED','CLOSED'];
@@ -156,7 +155,7 @@ app.sellerOffersList = function () {
       }[code] || 'bg-base-300';
     },
 
-    // ——— API statusów ———
+    // API statusów
     async setStatus(it, newStatus) {
       const id = it.public_id || it.id;
       try {

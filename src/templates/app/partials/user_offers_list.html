@@ -4,7 +4,7 @@
   x-effect="() => { return () => destroy() }"
   data-protected
 >
-  <!-- Toolbar (spójny układ) -->
+  <!-- Toolbar -->
   <div class="mb-3 space-y-2">
     <div class="flex flex-wrap items-center gap-2">
       <!-- Szukaj -->
@@ -36,7 +36,7 @@
         </select>
       </div>
 
-      <!-- Statusy: dropdown (identyczny skin) -->
+      <!-- Statusy: dropdown -->
       <div
         class="relative"
         x-data="{
@@ -168,7 +168,7 @@
               <button class="btn btn-xs btn-outline" @click="end(it)">Zakończ</button>
             </div>
           </template>
-          <template x-if="it.status === 'CLOSED' || it.status === 'SUSPENDED' || it.status === 'EXPIRED'">
+          <template x-if="it.status === 'CLOSED' || it.status === 'EXPIRED'">
             <button class="btn btn-xs btn-outline" @click="resume(it)">Wznów</button>
           </template>
 

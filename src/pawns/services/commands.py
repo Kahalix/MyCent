@@ -5,6 +5,7 @@ from django.db import transaction as dbtx
 from django.utils import timezone
 from djmoney.money import Money
 
+from catalog.models import ItemType
 from pawns.models import Pawn, PawnExtension
 from pawns.services import repositories as repo
 from pawns.services.fees import calc_extension_fee
@@ -39,6 +40,28 @@ def _snapshot_from_itemset(it: ItemSet, unit_price: Optional[Money]) -> dict:
 
 def pawn_is_expired(pawn: Pawn) -> bool:
     return timezone.now().date() > pawn.due_date and pawn.status == "ACTIVE"
+
+
+def _is_leaf_itemtype(itype: ItemType) -> bool:
+    return not ItemType.objects.filter(parent_id=itype.id).exists()
+
+
+def _pick_itemtype_for_listing(pawn: Pawn) -> Optional[ItemType]:
+    lines = list(pawn.lines.select_related("item_set__type").all())
+    for ln in lines:
+        if ln.item_set_id and getattr(ln.item_set, "type_id", None):
+            itype = ln.item_set.type
+            if itype and _is_leaf_itemtype(itype):
+                return itype
+    for ln in lines:
+        snap = ln.item_snapshot or {}
+        path = (snap.get("type_path") or "").strip()
+        if not path:
+            continue
+        itype = ItemType.objects.filter(path=path).first()
+        if itype and _is_leaf_itemtype(itype):
+            return itype
+    return None
 
 
 @dbtx.atomic
@@ -142,9 +165,6 @@ def redeem_pawn(*, pawn: Pawn, operator) -> Pawn:
 
 @dbtx.atomic
 def forfeit_pawn(*, pawn: Pawn, operator, create_listing: bool = True) -> Pawn:
-    """
-    Niewykupiony zastaw po terminie. Opcjonalnie tworzy draft ItemSet do sprzedaży.
-    """
     if pawn.status != "ACTIVE":
         raise Conflict("Zastaw nie jest aktywny.")
     if not pawn_is_expired(pawn):
@@ -152,29 +172,37 @@ def forfeit_pawn(*, pawn: Pawn, operator, create_listing: bool = True) -> Pawn:
 
     pawn.status = "FORFEITED"
     pawn.forfeited_at = timezone.now()
-    pawn.save(update_fields=["status","forfeited_at","updated_at"])
+    pawn.save(update_fields=["status", "forfeited_at", "updated_at"])
 
-    if create_listing and not pawn.forfeited_item_id:
-        # spróbuj odziedziczyć typ z pierwszej linii (jeśli istnieje)
-        first_line = pawn.lines.select_related("item_set__type").first()
-        itype = first_line.item_set.type if (first_line and first_line.item_set and first_line.item_set.type_id) else None
+    if not create_listing:
+        return pawn
 
-        from listings.models import ItemSet
-        item = ItemSet.objects.create(
-            set_name=(first_line.title if first_line else "Towar z zastawu"),
-            description="Wystawione z zastawu.",
-            price=pawn.appraisal_total, stock_quantity=1,
-            condition="USED",
-            status="AVAILABLE",
-            listing_type="BUY",
-            allow_online_checkout=False,
-            added_by="STAFF",
-            seller_profile=pawn.seller_profile,
-            type=itype,
-            attributes={},
-        )
-        pawn.forfeited_item = item
-        pawn.save(update_fields=["forfeited_item","updated_at"])
+    if pawn.forfeited_item_id:
+        return pawn
+
+    itype = _pick_itemtype_for_listing(pawn)
+    if not itype:
+        raise Conflict("Brak kategorii (ItemType) w liniach zastawu. Nie można utworzyć ogłoszenia. Użyj create_listing=false.")
+
+    first_line = pawn.lines.select_related("item_set__type").first()
+
+    item = ItemSet.objects.create(
+        set_name=(first_line.title if first_line else "Towar z zastawu"),
+        description="Wystawione z zastawu.",
+        price=pawn.appraisal_total,
+        stock_quantity=1,
+        condition="USED",
+        status="RESERVED",
+        listing_type="BUY",
+        allow_online_checkout=False,
+        added_by="STAFF",
+        seller_profile=pawn.seller_profile,
+        type=itype,
+        attributes={},
+    )
+
+    pawn.forfeited_item = item
+    pawn.save(update_fields=["forfeited_item", "updated_at"])
     return pawn
 
 @dbtx.atomic

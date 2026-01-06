@@ -66,6 +66,19 @@
               <button class="btn btn-sm btn-warning" :disabled="busy || !active" @click="forfeit()">Niewykupiony</button>
             </div>
 
+            <template x-if="pawn.forfeited_item">
+              <div class="mt-2 flex items-center gap-2 md:justify-end">
+                <span class="text-xs opacity-70">Ogłoszenie z zastawu zostało już utworzone.</span>
+              </div>
+            </template>
+
+            <template x-if="!pawn.forfeited_item">
+              <div class="mt-2 flex items-center gap-2 md:justify-end">
+                <input type="checkbox" class="checkbox checkbox-sm" x-model="createListingFromPawn" :disabled="busy || !active">
+                <span class="text-xs opacity-70">Utwórz ogłoszenie z zastawu</span>
+              </div>
+            </template>
+
             <div class="mt-2 flex items-center gap-2 md:justify-end">
               <a class="btn btn-sm" href="#" @click.prevent="downloadReceipt('csv')">CSV</a>
               <a class="btn btn-sm btn-outline" href="#" @click.prevent="downloadReceipt('pdf')">PDF</a>

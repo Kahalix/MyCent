@@ -1,4 +1,3 @@
-// static/js/orders/seller_order_detail.js
 window.app = window.app || {};
 
 app.sellerOrderDetail = function (orderPublicId) {

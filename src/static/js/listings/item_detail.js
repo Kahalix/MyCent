@@ -1,4 +1,3 @@
-// static/js/listings/item_detail.js
 window.app = window.app || {};
 
 /* ---------- Fallbacki core + toasty ---------- */

@@ -8,7 +8,6 @@ class DomainError(APIException):
     default_code = "bad_request"
 
     def __init__(self, detail: Any = None, code: str | None = None, *, errors: Any = None):
-        # Pozwalamy przekazać dict {"detail": "...", "errors": {...}}
         if errors is not None:
             detail = {"detail": detail or self.default_detail, "errors": errors}
         super().__init__(detail=detail or self.default_detail, code=code or self.default_code)

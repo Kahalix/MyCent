@@ -112,7 +112,7 @@ def set_status(*, itemset: ItemSet, status: str) -> ItemSet:
         raise Forbidden("Ogłoszenie jest zawieszone. Zmiana statusu niedostępna.")
 
     allowed_staff = {"AVAILABLE", "CLOSED", "RESERVED", "SOLD", "SUSPENDED", SOFT_DELETED}
-    allowed_user  = {"AVAILABLE", "CLOSED", "RESERVED", SOFT_DELETED}
+    allowed_user = {"AVAILABLE", "CLOSED", "RESERVED", SOFT_DELETED}
 
     if itemset.added_by == "STAFF":
         if status not in allowed_staff:
@@ -121,15 +121,26 @@ def set_status(*, itemset: ItemSet, status: str) -> ItemSet:
         if status not in allowed_user:
             raise Forbidden("Tego statusu nie można ustawić dla ogłoszenia użytkownika.")
 
+    if status == "AVAILABLE":
+        sq = getattr(itemset, "stock_quantity", None)
+        try:
+            sq_i = int(sq) if sq is not None else 0
+        except Exception:
+            sq_i = 0
+        if sq_i <= 0:
+            raise BadRequest("Brak dostępnego stanu magazynowego.", errors={
+                "stock_quantity": "Ustaw wartość > 0 aby aktywować ogłoszenie."
+            })
+
     itemset.status = status
 
     it = _clean_and_save(itemset)
-    # invalidacja bo status wpływa na listy
+
     try:
         invalidate_public_itemsets_cache()
     except Exception:
         pass
-    # utrzymanie spójności slotów dla USER
+
     ensure_slot_matches_state(user=it.owner_user, itemset=it)
     return it
 

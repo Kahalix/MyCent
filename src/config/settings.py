@@ -9,7 +9,7 @@ ENV_FILE = os.environ.get("ENV_FILE", os.path.join(BASE_DIR.parent, ".env"))
 env = environ.Env(
     DJANGO_DEBUG=(bool, False),
     DJANGO_SECRET_KEY=(str, "change-me"),
-    DJANGO_ALLOWED_HOSTS=(str, "127.0.0.1,localhost,web,web-http,caddy,0.0.0.0"),
+    DJANGO_ALLOWED_HOSTS=(str, "localhost,web,web-http,caddy,0.0.0.0"),
     DATABASE_URL=(str, ""),
     REDIS_URL=(str, "redis://localhost:6379/1"),
 )
@@ -241,6 +241,11 @@ CELERY_BEAT_SCHEDULE = {
         "task": "transactions.cancel_stale_pending",
         "schedule": crontab(minute="*/15"),
     },
+    "listings_expire_stale_user_itemsets": {
+        "task": "listings.tasks.expire_stale_user_itemsets_periodic",
+        "schedule": crontab(minute=40, hour=4),
+        "kwargs": {"days": 30, "limit": 0},
+    },
 }
 
 CORS_ALLOW_CREDENTIALS = True
@@ -285,6 +290,11 @@ ORDERS_RESERVATION_TTL_MINUTES = int(
 )
 TRANSACTIONS_PENDING_TTL_MINUTES = int(
     env.int("TRANSACTIONS_PENDING_TTL_MINUTES", default=60)
+)
+
+WS_ALLOWED_ORIGINS = env.list(
+    "WS_ALLOWED_ORIGINS",
+    default=(CSRF_TRUSTED_ORIGINS or CORS_ALLOWED_ORIGINS or []),
 )
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

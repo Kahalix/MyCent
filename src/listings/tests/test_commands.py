@@ -20,7 +20,6 @@ from .factories import (
     create_item_image,
 )
 
-
 class ItemSetCreateUpdateCommandsTests(TestCase):
     def test_seller_create_itemset_creates_staff_listing(self):
         seller = create_seller_profile()

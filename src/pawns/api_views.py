@@ -10,6 +10,7 @@ from rest_framework.filters import OrderingFilter
 from django.http import HttpResponse
 
 from identity.permissions import IsAnyActiveSellerMember, IsSellerMember, IsAnyActiveSellerManagerOrOwner
+from pawns.services.exceptions import Forbidden
 from pawns.services.printing import render_receipt_pdf as build_pawn_receipt_pdf
 from pawns.services.printing import render_receipt_csv as build_pawn_receipt_csv
 from pawns.services.printing import export_pawns_csv as export_pawns_list_csv
@@ -19,7 +20,7 @@ from pawns.services.commands import (
 )
 
 from common.services.idempotency import get_existing, save_result
-from pawns.serializers import PawnResponse, PawnListResponse, PawnCreateRequest, PawnExtendRequest
+from pawns.serializers import PawnResponse, PawnListResponse, PawnCreateRequest, PawnExtendRequest, PawnForfeitRequest
 from pawns.services import commands, queries
 from pawns.filters import PawnFilter
 from identity.models import SellerProfile, SellerMembership
@@ -98,7 +99,7 @@ class SellerPawnViewSet(mixins.ListModelMixin,
         ser.is_valid(raise_exception=True)
         seller = get_object_or_404(SellerProfile, public_id=ser.validated_data["seller_public_id"])
         if not _ensure_membership(request.user, seller):
-            return Response({"detail": "Brak uprawnień (wymagana aktywna rola w sklepie)."}, status=403)
+            return Forbidden("Brak uprawnień (wymagana aktywna rola w sklepie)")
 
         cust = None
         if ser.validated_data.get("customer_public_id"):
@@ -147,7 +148,13 @@ class SellerPawnViewSet(mixins.ListModelMixin,
     @action(detail=True, methods=["post"], url_path="forfeit")
     def forfeit(self, request, public_id=None):
         pawn = self.get_object()
-        pawn = commands.forfeit_pawn(pawn=pawn, operator=request.user, create_listing=True)
+        ser = PawnForfeitRequest(data=request.data)
+        ser.is_valid(raise_exception=True)
+        pawn = commands.forfeit_pawn(
+            pawn=pawn,
+            operator=request.user,
+            create_listing=bool(ser.validated_data.get("create_listing", True)),
+        )
         return Response(PawnResponse(pawn).data, status=200)
 
     @action(detail=True, methods=["get"], url_path="receipt.pdf")

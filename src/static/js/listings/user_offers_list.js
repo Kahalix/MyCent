@@ -1,4 +1,3 @@
-// static/js/listings/user_offers_list.js
 window.app = window.app || {};
 app._emitToast = app._emitToast || function (type, message) {
   const detail = { type, message };

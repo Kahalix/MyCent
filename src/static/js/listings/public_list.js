@@ -1,4 +1,3 @@
-// static/js/listings/public_list.js
 window.app = window.app || {};
 app._emitToast = app._emitToast || function (type, message) {
   const detail = { type, message };
@@ -284,13 +283,16 @@ app.publicOffersList = function (opts = {}) {
 
     saveCurrentSearch: async function () {
       if (this.saveSearchBusy) return;
+
+      const phrase = window.prompt('Opcjonalna nazwa wyszukiwania:', this.q || '');
+      if (phrase === null) return;
+
       this.saveSearchBusy = true;
       try {
-        const phrase = window.prompt('Opcjonalna nazwa wyszukiwania:', this.q || '');
         const body = {
           category_path: this.typePath || '',
           query_string: this._qs(),
-          search_phrase: phrase || ''
+          search_phrase: phrase
         };
         const r = await app.api(`/api/users/me/saved/searches/`, {
           method: 'POST',
@@ -306,6 +308,7 @@ app.publicOffersList = function (opts = {}) {
         this.saveSearchBusy = false;
       }
     },
+
 
     resetAll() {
       this.q = '';

@@ -3,7 +3,7 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 from identity.models import SellerMembership
 
-ADMIN_ROLES = {"OWNER", "MANAGER"}        # kto ma „pełną władzę”
+ADMIN_ROLES = {"OWNER", "MANAGER"}
 MOD_ROLES   = {"MODERATOR", "MANAGER", "OWNER"}
 SHOP_MOD_ROLES = {"MANAGER", "MODERATOR", "OWNER"}
 

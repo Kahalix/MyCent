@@ -1,7 +1,7 @@
 <section class="max-w-4xl mx-auto" x-data="app.profileView()" x-init="load()" data-protected>
   <h1 class="text-2xl font-semibold mb-4">Profil</h1>
 
-  <!-- Zakładki: zawsze widoczne, czysty Tailwind -->
+  <!-- Zakładki -->
     <nav class="mb-6">
       <ul class="tabs-rail" role="tablist">
         <li><button type="button" class="tab-btn" :class="{'is-active': tab==='overview'}"  :aria-selected="tab==='overview'"  @click="setTab('overview')">Ogólne</button></li>

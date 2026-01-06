@@ -194,12 +194,26 @@ def save_order(order: Order) -> Order:
 
 @transaction.atomic
 def add_order_line_from_payload(
-    *, order: Order, title: str, quantity: int, unit_price, attributes: dict | None = None, notes: str = ""
+    *,
+    order: Order,
+    title: str,
+    quantity: int,
+    unit_price,
+    attributes: dict | None = None,
+    notes: str = "",
+    type_path: str | None = None,
+    catalog_item_public_id: str | None = None,
+    item_type_public_id: str | None = None,
 ) -> OrderLine:
     snapshot = {
         "title": title,
+        "set_name": title,
+        "description": notes or "",
+        "notes": notes or "",
+        "type_path": type_path or None,
+        "item_type_public_id": item_type_public_id or None,
+        "catalog_item_public_id": catalog_item_public_id or None,
         "attributes": attributes or {},
-        "notes": notes,
         "currency": str(unit_price.currency),
         "price": str(unit_price.amount),
     }

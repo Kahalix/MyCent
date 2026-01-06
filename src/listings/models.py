@@ -30,36 +30,30 @@ class ItemSet(PublicIdModel):
 
     allow_online_checkout = models.BooleanField(default=False)
 
-    # kto dodał
     ADDED_BY = [("STAFF", "STAFF"), ("USER", "USER")]
     added_by = models.CharField(max_length=5, choices=ADDED_BY, default="STAFF")
 
     seller_profile = models.ForeignKey(SellerProfile, null=True, blank=True, on_delete=models.PROTECT, related_name="item_sets")
     owner_user = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name="item_sets_created")
 
-    # Wymiary/masa kanoniczne
     length_cm = models.PositiveIntegerField(null=True, blank=True)
-    width_cm  = models.PositiveIntegerField(null=True, blank=True)
+    width_cm = models.PositiveIntegerField(null=True, blank=True)
     height_cm = models.PositiveIntegerField(null=True, blank=True)
     weight_kg = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True)
 
-    # Kluczowa relacja typów (tylko liść) + opcjonalny „szablon” z katalogu
     type = models.ForeignKey(ItemType, on_delete=models.PROTECT, related_name="item_sets")
     catalog_item = models.ForeignKey(CatalogItem, null=True, blank=True, on_delete=models.SET_NULL, related_name="item_sets")
 
-    # Atrybuty zgodne z JSON Schema zdefiniowanym na liściu ItemType
     attributes = models.JSONField(default=dict, blank=True)
 
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["seller_profile", "slug"], name="uq_itemset_seller_slug"),
             models.UniqueConstraint(fields=["owner_user", "slug"], condition=Q(owner_user__isnull=False), name="uq_itemset_user_slug"),
-            # (1) USER no checkout online
             models.CheckConstraint(
                 name="ck_user_no_online_checkout",
                 check=Q(added_by="STAFF") | Q(added_by="USER", allow_online_checkout=False),
             ),
-            # (2) only BUY may have checkout online
             models.CheckConstraint(
                 name="ck_nonbuy_no_online",
                 check=Q(listing_type="BUY") | Q(allow_online_checkout=False),
@@ -75,7 +69,6 @@ class ItemSet(PublicIdModel):
             models.Index(fields=["status", "-created_at"], name="ix_item_sets_status_created"),
         ]
 
-    # --- helper: SEO slug ---
     def _make_slug(self) -> str:
         base = slugify(self.set_name or "").strip("-") or "ogloszenie"
         return f"{base}-{self.public_id}"
@@ -94,24 +87,19 @@ class ItemSet(PublicIdModel):
     def clean(self):
         super().clean()
 
-        # 0) Jeżeli wybrano CatalogItem, a type jest puste (np. select zablokowany w UI) -> uzupełnij z katalogu
         if self.catalog_item_id and not self.type_id and self.catalog_item:
-            self.type = self.catalog_item.type  # ustawia self.type_id
+            self.type = self.catalog_item.type
 
-        # 1) ItemType musi być liściem
         if self.type_id and ItemType.objects.filter(parent_id=self.type_id).exists():
             raise ValidationError({"type": "Wybierz kategorię końcową (bez podkategorii)."})
 
-        # 2) Spójność: CatalogItem musi należeć do tego samego ItemType
         if self.catalog_item_id and self.type_id and self.catalog_item and self.catalog_item.type_id != self.type_id:
             raise ValidationError({"catalog_item": "CatalogItem musi należeć do tej samej kategorii (ItemType)."})
 
-        # 3) Prefill atrybutów: gdy nic nie podano, spróbuj skopiować z katalogu
         if not (self.attributes or {}):
             if self.catalog_item_id and self.catalog_item:
                 self.attributes = dict(self.catalog_item.attributes or {})
 
-        # 4) Normalizacja/validacja atrybutów wg schematu liścia
         if self.type_id:
             t = ItemType.objects.only("id", "schema_json").filter(id=self.type_id).first()
             if t and t.schema_json:
@@ -119,7 +107,6 @@ class ItemSet(PublicIdModel):
                     self.attributes or {}, t.schema_json, where="attributes", require_same_fields=False
                 )
 
-        # 5) Reguły dla USER
         if self.added_by == "USER":
             if self.allow_online_checkout:
                 raise ValidationError({"allow_online_checkout": "Użytkownik nie może włączać zakupu online."})
@@ -130,30 +117,36 @@ class ItemSet(PublicIdModel):
             if self.owner_user is None:
                 raise ValidationError({"owner_user": "Propozycja USER wymaga owner_user."})
 
-        # 6) Reguły dla ofert z checkoutem online (STAFF)
         if self.allow_online_checkout:
             if self.listing_type != "BUY":
-                raise ValidationError(
-                    {"allow_online_checkout": "Checkout online dozwolony wyłącznie dla listing_type=BUY."})
+                raise ValidationError({"allow_online_checkout": "Checkout online dozwolony wyłącznie dla listing_type=BUY."})
             if not self.seller_profile_id:
-                raise ValidationError(
-                    {"seller_profile": "Oferta z checkoutem online wymaga powiązanego SellerProfile."})
+                raise ValidationError({"seller_profile": "Oferta z checkoutem online wymaga powiązanego SellerProfile."})
 
-    # pomocnicza walidacja dopasowania do paczki
+        sq = self.stock_quantity
+        try:
+            sq_i = int(sq) if sq is not None else 0
+        except Exception:
+            sq_i = 0
+
+        if self.status == "AVAILABLE" and sq_i <= 0:
+            raise ValidationError({
+                "stock_quantity": "Aby aktywować ogłoszenie, stock_quantity musi być > 0."
+            })
+
     def fits_package(self, pkg: PackageType) -> bool:
-        def leq(a, b):  # a <= b, None = brak limitu
+        def leq(a, b):
             return b is None or a is None or a <= b
         return (
             leq(self.length_cm, pkg.max_length_cm)
-            and leq(self.width_cm,  pkg.max_width_cm)
+            and leq(self.width_cm, pkg.max_width_cm)
             and leq(self.height_cm, pkg.max_height_cm)
             and leq(float(self.weight_kg) if self.weight_kg is not None else None,
                     float(pkg.max_weight_kg) if pkg.max_weight_kg is not None else None)
         )
 
-    def __str__(self):  # pragma: no cover
+    def __str__(self):
         return self.set_name
-
 
 class ItemSetImage(PublicIdModel):
     item_set = models.ForeignKey(ItemSet, on_delete=models.CASCADE, related_name="images")

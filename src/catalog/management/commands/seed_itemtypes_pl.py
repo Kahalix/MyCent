@@ -1,4 +1,3 @@
-# src/catalog/management/commands/seed_itemtypes_pl.py
 from __future__ import annotations
 from typing import Any, Dict, Tuple
 from django.core.management.base import BaseCommand
@@ -395,7 +394,7 @@ TREE: Dict[str, Any] = {
     },
 }
 
-# ====== Pakiety (FREE i przykładowe płatne) ======
+# ====== Pakiety ======
 FREE_PACK_PATHS = [
     "Elektronika/Telefony/Smartfony",
     "Elektronika/Komputery/Laptopy / Ultrabook",
@@ -404,9 +403,9 @@ FREE_PACK_PATHS = [
 
 PAID_PACKS = [
     # (path, listings_free, price_amount, points)
-    ("Elektronika/Telefony/Smartfony", 3,  Money(29.99, "PLN"), 0),
-    ("Elektronika/Komputery/Laptopy / Ultrabook", 3, Money(39.99, "PLN"), 0),
-    ("Biżuteria i zegarki/Pierścionki/Złote pierścionki", 3, Money(24.99, "PLN"), 0),
+    ("Elektronika/Telefony/Smartfony", 3,  Money(29.99, "PLN"), 30),
+    ("Elektronika/Komputery/Laptopy / Ultrabook", 3, Money(39.99, "PLN"), 30),
+    ("Biżuteria i zegarki/Pierścionki/Złote pierścionki", 3, Money(24.99, "PLN"), 30),
 ]
 
 # ====== implementacja seeda ======
@@ -443,7 +442,7 @@ def _sanitize_schema(schema: dict, ui: dict | None) -> tuple[dict, dict]:
 
     return schema, ui
 
-# --- PODMIEŃ TĘ FUNKCJĘ (ustawianie schema na liściu) ---
+# --- ustawianie schema na liściu ---
 def _apply_leaf_payload(obj: ItemType, node: dict):
     raw_schema = node.get("schema") or {}
     raw_ui = node.get("ui_schema") or {}

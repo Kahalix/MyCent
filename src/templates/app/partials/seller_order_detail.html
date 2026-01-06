@@ -142,7 +142,8 @@
                 </div>
 
                 <div class="min-w-0 flex-1">
-                  <div class="font-medium truncate" x-text="ln.item?.set_name || ln.item_snapshot?.set_name || 'Pozycja'"></div>
+                  <div class="font-medium truncate"
+                        x-text="ln.item?.set_name || ln.item_snapshot?.title || ln.item_snapshot?.set_name || 'Pozycja'"></div>
                   <div class="text-xs opacity-70">
                     Ilość: <span x-text="ln.quantity"></span>
                     · Cena jedn.: <b x-text="app.moneyText(ln.unit_price)"></b>

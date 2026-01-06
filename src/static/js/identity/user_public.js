@@ -1,4 +1,3 @@
-// static/js/identity/user_public.js
 window.app = window.app || {};
 
 app.userPublic = function (opts = {}) {

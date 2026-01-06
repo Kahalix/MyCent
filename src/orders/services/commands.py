@@ -562,23 +562,28 @@ def seller_pawn_purchase(
     if cust_pid:
         cust_obj = Customer.objects.filter(public_id=cust_pid).first()
     cust_snap = make_customer_snapshot(
-        first_name=payload.get("first_name",""),
-        last_name=payload.get("last_name",""),
-        email=payload.get("email",""),
-        phone=payload.get("phone",""),
+        first_name=payload.get("first_name", ""),
+        last_name=payload.get("last_name", ""),
+        email=payload.get("email", ""),
+        phone=payload.get("phone", ""),
         address=payload.get("address") or {},
-        doc_type=payload.get("document_type",""),
-        doc_number=payload.get("document_number",""),
+        doc_type=payload.get("document_type", ""),
+        doc_number=payload.get("document_number", ""),
         birth_date=payload.get("birth_date"),
     )
 
     tx = Transaction.objects.create(
-        user=None, type="PAWN_PURCHASE", status="COMPLETED",
-        customer=cust_obj, customer_snapshot=cust_snap,
+        user=None,
+        type="PAWN_PURCHASE",
+        status="COMPLETED",
+        customer=cust_obj,
+        customer_snapshot=cust_snap,
     )
 
     order = repo.create_order(
-        tx=tx, seller=seller, buyer=None,
+        tx=tx,
+        seller=seller,
+        buyer=None,
         fields={
             "order_name": note or "Skup od klienta",
             "description": note or "",
@@ -587,37 +592,46 @@ def seller_pawn_purchase(
             "order_status": "COMPLETED",
             "customer": cust_obj,
             "customer_snapshot": cust_snap,
-        }
+        },
     )
 
     created_itemsets: list[ItemSet] = []
     for row in lines:
+        itype = None
+        itype_pid = (row.get("item_type_public_id") or "").strip() or None
+        if itype_pid:
+            itype = repo.get_item_type_by_public_id(itype_pid)
+
+        type_path = itype.path if itype else None
+
         ol = repo.add_order_line_from_payload(
             order=order,
             title=row["title"],
             quantity=int(row.get("quantity", 1)),
             unit_price=row["unit_price"],
             attributes=row.get("attributes") or {},
-            notes=row.get("notes",""),
+            notes=row.get("notes", ""),
+            type_path=type_path,
+            item_type_public_id=itype_pid,
         )
-        if create_itemsets and row.get("item_type_public_id"):
-            itype = repo.get_item_type_by_public_id(row["item_type_public_id"])
-            if itype:
-                listing_price = row.get("listing_price") or row["unit_price"]
-                it = repo.create_itemset_from_pawn_line(
-                    seller=seller,
-                    title=row["title"],
-                    description=row.get("notes",""),
-                    attributes=row.get("attributes") or {},
-                    listing_price=listing_price,
-                    item_type=itype,
-                )
-                created_itemsets.append(it)
+
+        if create_itemsets and itype:
+            listing_price = row.get("listing_price") or row["unit_price"]
+            it = repo.create_itemset_from_pawn_line(
+                seller=seller,
+                title=row["title"],
+                description=row.get("notes", ""),
+                attributes=row.get("attributes") or {},
+                listing_price=listing_price,
+                item_type=itype,
+            )
+            created_itemsets.append(it)
+            OrderLine.objects.filter(pk=ol.pk).update(item_set=it, updated_at=timezone.now())
 
     order.recalc_totals(save=True)
     tx.expected_total_amount = order.purchase_cost.amount if order.purchase_cost else 0
     tx.expected_total_currency = str(order.purchase_cost.currency) if order.purchase_cost else "PLN"
-    tx.save(update_fields=["expected_total_amount","expected_total_currency","updated_at"])
+    tx.save(update_fields=["expected_total_amount", "expected_total_currency", "updated_at"])
     return order
 
 

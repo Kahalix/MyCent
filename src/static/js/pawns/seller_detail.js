@@ -21,12 +21,16 @@ app.sellerPawnDetail = function (publicId) {
 
     async init(){ await this.reload(); },
 
+    createListingFromPawn: true,
+
     async reload(){
       this.loading = true; this.err='';
       try{
         const r = await app.api(`/api/sellers/mine/pawns/${publicId}/`, { method:'GET' });
         if (!r.ok){ this.err='Nie znaleziono'; return; }
         this.pawn = await r.json();
+
+        if (this.pawn?.forfeited_item) this.createListingFromPawn = false;
 
         // zasiej formularz klienta ze snapshotu
         const s = this.pawn?.customer_snapshot || {};
@@ -90,11 +94,20 @@ app.sellerPawnDetail = function (publicId) {
       if (!confirm('Oznaczyć jako niewykupiony?')) return;
       this.busy = true;
       try{
-        const r = await app.api(`/api/sellers/mine/pawns/${this.pawn.public_id}/forfeit/`, { method:'POST' });
+        const create_listing = (!!this.createListingFromPawn) && (!this.pawn?.forfeited_item);
+
+        const r = await app.api(`/api/sellers/mine/pawns/${this.pawn.public_id}/forfeit/`, {
+          method:'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ create_listing })
+        });
+
         const j = await r.json().catch(()=> ({}));
         if (!r.ok){ app.error(app.errText?.(j) || 'Nie udało się oznaczyć jako niewykupiony.'); return; }
         app.ok('Zastaw oznaczony jako niewykupiony.');
         this.pawn = j;
+
+        if (this.pawn?.forfeited_item) this.createListingFromPawn = false;
       } catch(e){ app.error(e?.message || 'Błąd'); }
       finally { this.busy = false; }
     },
