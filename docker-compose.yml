@@ -33,8 +33,6 @@ services:
         condition: service_started
     command:
       - listen
-      - --api-key
-      - ${STRIPE_SECRET_KEY}
       - --forward-to
       - https://caddy/api/payments/webhooks/stripe/
       - --skip-verify
@@ -46,8 +44,9 @@ services:
     build: .
     command: >
       sh -c "python src/manage.py migrate --noinput &&
+             python src/manage.py collectstatic --noinput &&
              python src/manage.py seed_admin &&
-             gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --workers ${WEB_CONCURRENCY:-3}"
+             gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --workers $${WEB_CONCURRENCY:-3}"
     expose:
       - "8000"
     depends_on:

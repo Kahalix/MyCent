@@ -12,6 +12,12 @@ env = environ.Env(
     DJANGO_ALLOWED_HOSTS=(str, "localhost,web,web-http,caddy,0.0.0.0"),
     DATABASE_URL=(str, ""),
     REDIS_URL=(str, "redis://localhost:6379/1"),
+    JWT_REFRESH_IN_COOKIE=(bool, True),
+    AUTH_COOKIE_NAME=(str, "refresh_token"),
+    AUTH_COOKIE_PATH=(str, "/api/auth/"),
+    AUTH_COOKIE_HTTPONLY=(bool, True),
+    CHAT_NEW_MESSAGE_WEBHOOK_URL=(str, ""),
+    CHAT_NEW_MESSAGE_WEBHOOK_SECRET=(str, ""),
 )
 environ.Env.read_env(ENV_FILE)
 
@@ -136,12 +142,12 @@ SIMPLE_JWT = {
     "ALGORITHM": "HS256",
 }
 
-JWT_REFRESH_IN_COOKIE = True
-AUTH_COOKIE_NAME = "refresh_token"
-AUTH_COOKIE_PATH = "/api/auth/"
+JWT_REFRESH_IN_COOKIE = env.bool("JWT_REFRESH_IN_COOKIE", default=True)
+AUTH_COOKIE_NAME = env.str("AUTH_COOKIE_NAME", default="refresh_token")
+AUTH_COOKIE_PATH = env.str("AUTH_COOKIE_PATH", default="/api/auth/")
 AUTH_COOKIE_SECURE = env.bool("AUTH_COOKIE_SECURE", default=not DEBUG)
 AUTH_COOKIE_DOMAIN = env.str("AUTH_COOKIE_DOMAIN", default="") or None
-AUTH_COOKIE_HTTPONLY = True
+AUTH_COOKIE_HTTPONLY = env.bool("AUTH_COOKIE_HTTPONLY", default=True)
 
 if not DEBUG:
     SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=31536000)
@@ -158,7 +164,7 @@ CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=not DEBUG)
 SESSION_COOKIE_SAMESITE = env.str("SESSION_COOKIE_SAMESITE", default="Lax")
 CSRF_COOKIE_SAMESITE = env.str("CSRF_COOKIE_SAMESITE", default="Lax")
 
-AUTH_COOKIE_HTTPONLY = True
+AUTH_COOKIE_HTTPONLY = env.bool("AUTH_COOKIE_HTTPONLY", default=True)
 AUTH_COOKIE_SAMESITE = env.str("AUTH_COOKIE_SAMESITE", default="Lax")
 
 EMAIL_BACKEND = env.str("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
@@ -285,12 +291,8 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 TEMPLATES[0]["DIRS"] = [BASE_DIR / "templates"]
 
-ORDERS_RESERVATION_TTL_MINUTES = int(
-    env.int("ORDERS_RESERVATION_TTL_MINUTES", default=30)
-)
-TRANSACTIONS_PENDING_TTL_MINUTES = int(
-    env.int("TRANSACTIONS_PENDING_TTL_MINUTES", default=60)
-)
+ORDERS_RESERVATION_TTL_MINUTES = int(env.int("ORDERS_RESERVATION_TTL_MINUTES", default=30))
+TRANSACTIONS_PENDING_TTL_MINUTES = int(env.int("TRANSACTIONS_PENDING_TTL_MINUTES", default=60))
 
 WS_ALLOWED_ORIGINS = env.list(
     "WS_ALLOWED_ORIGINS",
@@ -305,8 +307,8 @@ LOGOUT_REDIRECT_URL = "/"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REDIRECT_EXEMPT = [r"^api/payments/webhooks/stripe/$"]
 
-CHAT_NEW_MESSAGE_WEBHOOK_URL = "https://example.com/webhooks/chat/new-message"
-CHAT_NEW_MESSAGE_WEBHOOK_SECRET = "supersecret"
+CHAT_NEW_MESSAGE_WEBHOOK_URL = env.str("CHAT_NEW_MESSAGE_WEBHOOK_URL", default="")
+CHAT_NEW_MESSAGE_WEBHOOK_SECRET = env.str("CHAT_NEW_MESSAGE_WEBHOOK_SECRET", default="")
 
 STRIPE_PUBLISHABLE_KEY = env.str("STRIPE_PUBLISHABLE_KEY", default="")
 STRIPE_SECRET_KEY = env.str("STRIPE_SECRET_KEY", default="")
