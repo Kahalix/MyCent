@@ -1,4 +1,3 @@
-// static/js/core/ws_hub.js
 (function(){
   window.app = window.app || {};
 

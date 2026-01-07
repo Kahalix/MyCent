@@ -8,8 +8,12 @@ from djmoney.money import Money
 from django.conf import settings
 from moneyed import Money as M
 
+from django.db import transaction
+from django.db.models import F, Case, When, Value
+from django.utils import timezone
+
 from customers.models import Customer
-from orders.models import Order, OrderLine, OrderShipping
+from orders.models import Order, OrderLine, OrderShipping, ItemReservation
 from orders.services import repositories as repo
 from orders.services.exceptions import NotFound, Forbidden, Conflict, DomainError
 from identity.models import User, SellerProfile
@@ -205,7 +209,9 @@ def set_order_status(*, order: Order, to_status: str) -> Order:
 
 @transaction.atomic
 def sync_orders_with_transaction(*, tx: Transaction) -> None:
-    orders = list(tx.orders.select_related().prefetch_related("order_lines__item_set"))
+    tx = Transaction.objects.select_for_update().get(pk=tx.pk)
+
+    orders = list(tx.orders.prefetch_related("order_lines"))
     if not orders:
         return
     if tx.status == "PENDING":
@@ -217,18 +223,41 @@ def sync_orders_with_transaction(*, tx: Transaction) -> None:
 
     for order in orders:
         set_order_status(order=order, to_status=to_status)
-        if to_status == "COMPLETED" and tx.type == "PURCHASE":
-            for line in order.order_lines.select_related("item_set"):
-                if not line.item_set_id:
-                    continue
-                item = line.item_set
-                if item.stock_quantity is not None:
-                    new_qty = max(0, int(item.stock_quantity) - int(line.quantity))
-                    if new_qty != item.stock_quantity:
-                        item.stock_quantity = new_qty
-                        if new_qty == 0 and item.status == "AVAILABLE":
-                            item.status = "SOLD"
-                        item.save(update_fields=["stock_quantity","status","updated_at"])
+
+    if to_status == "COMPLETED" and tx.type == "PURCHASE":
+        now = timezone.now()
+        qty_by_item_id: dict[int, int] = defaultdict(int)
+
+        for item_id, qty in (
+            ItemReservation.objects.select_for_update()
+            .filter(transaction=tx, released_at__isnull=True)
+            .values_list("item_set_id", "quantity")
+        ):
+            if item_id and qty:
+                qty_by_item_id[int(item_id)] += int(qty)
+
+        for item_id, dec_qty in qty_by_item_id.items():
+            if dec_qty <= 0:
+                continue
+
+            updated = ItemSet.objects.filter(
+                id=item_id,
+                stock_quantity__isnull=False,
+                stock_quantity__gte=dec_qty,
+            ).update(
+                stock_quantity=F("stock_quantity") - dec_qty,
+                status=Case(
+                    When(
+                        stock_quantity=dec_qty,
+                        status__in=["AVAILABLE", "RESERVED"],
+                        then=Value("SOLD"),
+                    ),
+                    default=F("status"),
+                ),
+                updated_at=now,
+            )
+            if updated == 0:
+                raise Conflict("Brak wystarczającego stanu magazynowego przy finalizacji transakcji.")
 
     repo.release_all_reservations_for_tx(tx)
     _update_tx_expected_total(tx)

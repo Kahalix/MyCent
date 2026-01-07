@@ -9,33 +9,49 @@ app.landing = function () {
     cats:   { loading: true, items: [] },
 
     async init(){
-      // lekkie feedy – tylko próbki; pełna paginacja jest na /offers
-      this._loadFeed(this.latest, '/api/public/item-sets/?ordering=-created_at');
-      this._loadFeed(this.buy,    '/api/public/item-sets/?allow_online_checkout=true&ordering=-created_at');
-      this._loadFeed(this.staff,  '/api/public/item-sets/?added_by=STAFF&ordering=-created_at');
-      this._loadFeed(this.user,   '/api/public/item-sets/?added_by=USER&ordering=-created_at');
+      const el = this.$el;
+      if (el && el.dataset && el.dataset.lownInitDone === '1') return;
+      if (el && el.dataset) el.dataset.lownInitDone = '1';
 
-      // Kategorie (Top 6) + liczność — korzystamy z DRF .count (paginacja)
-      await this._buildCategories();
+      this._loadFeed(this.buy,   '/api/public/item-sets/?allow_online_checkout=true&ordering=-created_at');
+      this._loadFeed(this.staff, '/api/public/item-sets/?added_by=STAFF&ordering=-created_at');
+      this._loadFeed(this.user,  '/api/public/item-sets/?added_by=USER&ordering=-created_at');
+
+      this.latest.loading = true;
+      try {
+        const pool = await this._fetchList('/api/public/item-sets/?ordering=-created_at');
+        this.latest.items = pool;
+        await this._buildCategoriesFromPool(pool);
+      } catch {
+        this.latest.items = [];
+        this.cats.items = [];
+        this.cats.loading = false;
+      } finally {
+        this.latest.loading = false;
+      }
+    },
+
+    async _fetchList(url){
+      const r = await app.api(url, { method:'GET' });
+      const j = await r.json().catch(()=> ({}));
+      const arr = Array.isArray(j) ? j : (j.results || []);
+      return Array.isArray(arr) ? arr : [];
     },
 
     async _loadFeed(slot, url){
       slot.loading = true;
       try{
-        const r = await app.api(url, { method:'GET' });
-        const j = await r.json().catch(()=> ({}));
-        const arr = Array.isArray(j) ? j : (j.results || []);
-        slot.items = Array.isArray(arr) ? arr : [];
-      } catch { slot.items = []; }
-      finally { slot.loading = false; }
+        slot.items = await this._fetchList(url);
+      } catch {
+        slot.items = [];
+      } finally {
+        slot.loading = false;
+      }
     },
 
-    async _buildCategories(){
+    async _buildCategoriesFromPool(pool){
       this.cats.loading = true;
       try{
-        const r = await app.api('/api/public/item-sets/?ordering=-created_at', { method:'GET' });
-        const j = await r.json().catch(()=> ({}));
-        const pool = Array.isArray(j) ? j : (j.results || []);
         this.cats.items = this._deriveCategories(pool).slice(0, 6);
         await this._hydrateCategoryCounts();
       } catch {
@@ -64,7 +80,6 @@ app.landing = function () {
     },
 
     async _hydrateCategoryCounts(){
-      // POBIERAMY .count z DRF (globalna liczba rekordów), fallback na length gdyby endpoint był „gołą listą”
       const top = this.cats.items.slice(0, 6);
       await Promise.all(top.map(async (c, idx) => {
         try{
@@ -77,7 +92,6 @@ app.landing = function () {
       }));
     },
 
-    // === helpers ===
     img(it){
       const first = (Array.isArray(it.images) && it.images.length) ? it.images[0] : null;
       const pic = it.cover_image_url

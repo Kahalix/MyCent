@@ -14,6 +14,9 @@ app.navState = function () {
     chatUnread: 0,
     _threadUnread: new Map(),
     _unsubInbox: null,
+    _cartReq: null,
+    _userReq: null,
+    _chatReq: null,
 
     init() {
       window.addEventListener('theme:changed', (e) => { this.theme = e.detail.theme; });
@@ -23,6 +26,8 @@ app.navState = function () {
 
       window.addEventListener('auth:changed', async (e) => {
         const now = !!e.detail?.authed;
+        if (now === this.authed) return;
+
         this.authed = now;
         if (now) {
           await this.fetchUser();
@@ -100,26 +105,32 @@ app.navState = function () {
     toggleTheme() { app.toggleTheme && app.toggleTheme(); },
 
     async fetchCartCount() {
-      try {
-        const r = await app.api('/api/users/me/cart/', { method: 'GET' });
-        if (!r.ok) return;
-        const j = await r.json().catch(() => ({}));
-        const items = Array.isArray(j?.items) ? j.items : [];
-        this.cartCount = items.reduce((s, it) => s + (parseInt(it.quantity, 10) || 0), 0);
-      } catch {}
+      if (this._cartReq) return this._cartReq;
+      this._cartReq = (async () => {
+        try {
+          const r = await app.api('/api/users/me/cart/', { method: 'GET' });
+          if (!r.ok) return;
+          const j = await r.json().catch(() => ({}));
+          const items = Array.isArray(j?.items) ? j.items : [];
+          this.cartCount = items.reduce((s, it) => s + (parseInt(it.quantity, 10) || 0), 0);
+        } catch {}
+      })();
+      try { return await this._cartReq; } finally { this._cartReq = null; }
     },
 
     async fetchUser() {
-      try {
-        const r = await app.api('/api/users/me/');
-        if (r.ok) {
+      if (this._userReq) return this._userReq;
+      this._userReq = (async () => {
+        try {
+          const r = await app.api('/api/users/me/');
+          if (!r.ok) return;
           this.user = await r.json();
           app.me = this.user;
           this.canAdminPanel = !!(this.user?.is_staff || this.user?.is_superuser);
           await this.fetchSellerContext();
-          this.fetchCartCount();
-        }
-      } catch {}
+        } catch {}
+      })();
+      try { return await this._userReq; } finally { this._userReq = null; }
     },
 
     async fetchSellerContext() {
@@ -150,28 +161,34 @@ app.navState = function () {
         this.chatUnread = 0;
         return;
       }
-      this._threadUnread.clear();
-      let url = '/api/users/me/chats/threads/?page_size=10';
-      let pages = 0;
-      try {
-        while (url && pages < 10) {
-          pages++;
-          const r = await app.api(url, { method: 'GET' });
-          if (!r.ok) break;
-          const j = await r.json().catch(() => ({}));
-          const results = Array.isArray(j) ? j : (j.results || []);
-          const mePid = this.user?.public_id || app.me?.public_id || null;
+      if (this._chatReq) return this._chatReq;
 
-          for (const th of results) {
-            const myPart = (th.participants || []).find(p => p.user?.public_id === mePid);
-            const unread = myPart ? Number(myPart.unread_count || 0) : 0;
-            this._threadUnread.set(th.public_id, unread);
+      this._chatReq = (async () => {
+        this._threadUnread.clear();
+        let url = '/api/users/me/chats/threads/?page_size=10';
+        let pages = 0;
+        try {
+          while (url && pages < 10) {
+            pages++;
+            const r = await app.api(url, { method: 'GET' });
+            if (!r.ok) break;
+            const j = await r.json().catch(() => ({}));
+            const results = Array.isArray(j) ? j : (j.results || []);
+            const mePid = this.user?.public_id || app.me?.public_id || null;
+
+            for (const th of results) {
+              const myPart = (th.participants || []).find(p => p.user?.public_id === mePid);
+              const unread = myPart ? Number(myPart.unread_count || 0) : 0;
+              this._threadUnread.set(th.public_id, unread);
+            }
+
+            url = Array.isArray(j) ? null : (j.next || null);
           }
+        } catch {}
+        this._recalcUnreadSum();
+      })();
 
-          url = Array.isArray(j) ? null : (j.next || null);
-        }
-      } catch {}
-      this._recalcUnreadSum();
+      try { return await this._chatReq; } finally { this._chatReq = null; }
     },
 
     _recalcUnreadSum() {

@@ -1,4 +1,3 @@
-// static/js/core/toast.js
 window.app = window.app || {};
 
 (function bootstrapToasts(){

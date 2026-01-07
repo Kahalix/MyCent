@@ -100,15 +100,24 @@ document.body.addEventListener('htmx:historyRestore', () => {
 
   // --- hook: fetch (obejmie app.api i każde inne fetch) ---
   const _fetch = window.fetch;
+  const inflight = new Map();
+
   window.fetch = function(input, init){
-    // wykryj „cichy” request po nagłówku
+    let url = '';
+    let method = 'GET';
+
+    try {
+      if (typeof input === 'string') url = input;
+      else if (input && typeof input.url === 'string') url = input.url;
+      if (init && init.method) method = String(init.method).toUpperCase();
+      else if (input && input.method) method = String(input.method).toUpperCase();
+    } catch {}
+
     let skip = false;
     try {
       const H = init && init.headers;
       if (H instanceof Headers) {
         skip = H.has('X-No-Loading') || H.has('x-no-loading');
-        // jeśli chcesz nie wysyłać nagłówka na backend:
-        // if (skip) { H.delete('X-No-Loading'); H.delete('x-no-loading'); }
       } else if (Array.isArray(H)) {
         skip = H.some(([k]) => String(k).toLowerCase() === 'x-no-loading');
       } else if (H && typeof H === 'object') {
@@ -116,9 +125,33 @@ document.body.addEventListener('htmx:historyRestore', () => {
       }
     } catch {}
 
+    const dedupe = method === 'GET' || method === 'HEAD';
+    let key = null;
+
+    if (dedupe) {
+      const tok = localStorage.getItem('lown_access') || '';
+      try {
+        const abs = new URL(url, location.href).href;
+        key = method + ' ' + abs + ' ' + tok;
+      } catch {
+        key = method + ' ' + String(url) + ' ' + tok;
+      }
+
+      const ex = inflight.get(key);
+      if (ex) return ex.then(r => r.clone());
+    }
+
     if (!skip) app.loading.inc();
+
     const p = _fetch.apply(this, arguments);
-    return p.finally(() => { if (!skip) app.loading.dec(); });
+    const done = p.finally(() => {
+      if (!skip) app.loading.dec();
+      if (key && inflight.get(key) === done) inflight.delete(key);
+    });
+
+    if (key) inflight.set(key, done);
+
+    return done;
   };
 
   // --- hook: HTMX (globalny) ---
