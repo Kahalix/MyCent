@@ -20,7 +20,7 @@ from payments.serializers import (
 from payments.filters import PaymentFilter
 from payments.services.commands import (
     create_payment_for_transaction, confirm_payment, cancel_active_payment, _award_points_after_success,
-    mark_payment_failed_or_cancelled, mark_payment_succeeded
+    mark_payment_failed_or_cancelled, mark_payment_succeeded, mark_payment_requires_action, mark_payment_processing
 )
 
 # idempotencja
@@ -134,21 +134,34 @@ class PaymentWebhookView(APIView):
                 evt = client.parse_webhook(request)
             except Exception as e:
                 return Response({"detail": f"stripe webhook error: {e}"}, status=400)
+
             pid = evt.get("provider_payment_id")
             status = evt.get("status")
             if not pid:
                 return Response({"detail": "payment_intent id missing"}, status=400)
-            pay = (Payment.objects.filter(provider="STRIPE", provider_payment_id=pid).select_related("transaction").first())
+
+            pay = (
+                Payment.objects
+                .filter(provider="STRIPE", provider_payment_id=pid)
+                .select_related("transaction")
+                .first()
+            )
             if not pay:
                 return Response({"detail": "payment not found"}, status=404)
+
             if status == "succeeded":
                 mark_payment_succeeded(payment=pay, reason="Stripe webhook: succeeded")
-            elif status in ("failed","cancelled"):
-                mark_payment_failed_or_cancelled(payment=pay, status="FAILED" if status == "failed" else "CANCELLED", reason=f"Stripe webhook: {status}")
+            elif status in ("failed", "cancelled"):
+                mark_payment_failed_or_cancelled(
+                    payment=pay,
+                    status="FAILED" if status == "failed" else "CANCELLED",
+                    reason=f"Stripe webhook: {status}",
+                )
             elif status == "requires_action":
-                if pay.status != "REQUIRES_ACTION":
-                    pay.status = "REQUIRES_ACTION"
-                    pay.save(update_fields=["status","updated_at"])
+                mark_payment_requires_action(payment=pay, reason="Stripe webhook: requires_action")
+            elif status == "processing":
+                mark_payment_processing(payment=pay, reason="Stripe webhook: processing")
+
             return Response({"ok": True}, status=200)
 
         # --- SIM ---

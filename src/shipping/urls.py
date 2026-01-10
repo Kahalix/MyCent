@@ -13,7 +13,7 @@ router = DefaultRouter()
 router.register(r"api/public/shipping/package-types", PublicPackageTypeViewSet, basename="public-package-types")
 router.register(r"api/admin/shipping/package-types", AdminPackageTypeViewSet, basename="admin-package-types")
 
-# Self address (bez lookupu – pojedynczy zasób)
+# Self address
 my_addr = MyShippingAddressViewSet.as_view({
     "get": "retrieve",
     "post": "create",

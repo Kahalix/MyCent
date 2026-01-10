@@ -115,7 +115,7 @@ class Order(PublicIdModel):
         """
         if self.purchase_cost is not None:
             return self.purchase_cost
-        # jeśli brak pozycji – zwróć neutralne 0 PLN:
+        # jeśli brak - 0 PLN:
         return Money(0, "PLN")
 
 
@@ -152,13 +152,12 @@ class OrderLine(PublicIdModel):
 
 class OrderShipping(PublicIdModel):
     """
-    Wysyłka *dla pozycji* (split per metoda). Jedna wysyłka per linia (domyślnie).
+    Wysyłka dla pozycji (per metoda). Jedna wysyłka per linia (domyślnie).
     """
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="shippings")
     order_line = models.OneToOneField(OrderLine, on_delete=models.CASCADE, related_name="shipping")  # 1:1 per linia
     tracking_number = models.CharField(max_length=120, blank=True)
 
-    # opcjonalnie: jaka metoda (np. PackageType) i jej cena
     package_type = models.ForeignKey("shipping.PackageType", null=True, blank=True, on_delete=models.SET_NULL, related_name="order_shippings")
     price = MoneyField(max_digits=19, decimal_places=2, default_currency="PLN", null=True, blank=True)
 
@@ -172,7 +171,7 @@ class OrderShipping(PublicIdModel):
         ]
 
     def clean(self):
-        # spójność: linia należy do tego samego ordera
+        # linia należy do tego samego ordera
         if self.order_line and self.order_id and self.order_line.order_id != self.order_id:
             from django.core.exceptions import ValidationError
             raise ValidationError("order_line nie należy do tego ordera.")

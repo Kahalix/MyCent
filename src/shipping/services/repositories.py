@@ -20,7 +20,7 @@ def save_package_type(pkg: PackageType) -> PackageType:
 def delete_package_type(pkg: PackageType) -> None:
     pkg.delete()
 
-# ===== ShippingAddress (OneToOne do Usera) =====
+# ===== ShippingAddress =====
 
 def get_address_for_user(user: User) -> Optional[ShippingAddress]:
     return ShippingAddress.objects.filter(user=user).first()

@@ -12,7 +12,7 @@ from saved.models import SavedListing, SavedSearch, SavedSearchItem
 
 User = get_user_model()
 
-# === helpers ===
+# === helpers =
 def parse_query_string(qs: str) -> dict[str, list[str]]:
     try:
         return parse_qs(qs, keep_blank_values=False, strict_parsing=False)

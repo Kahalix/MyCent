@@ -51,7 +51,7 @@ class PawnAdminForm(CallModelCleanMixin, forms.ModelForm):
         forfeited_at = cleaned.get("forfeited_at")
         forfeited_item = cleaned.get("forfeited_item")
 
-        # status ↔ znaczniki czasu
+        # status <> znaczniki czasu
         if status == "REDEEMED":
             if not redeemed_at:
                 # ustaw automatycznie, jeżeli admin zmienia sam status
@@ -64,7 +64,7 @@ class PawnAdminForm(CallModelCleanMixin, forms.ModelForm):
             if not forfeited_at:
                 cleaned["forfeited_at"] = timezone.now()
             if forfeited_item is None:
-                # sam status bez itemu jest OK (listing może powstać później),
+                # sam status bez itemu jest ok (listing może powstać później),
                 # ale jeżeli item jest ustawiony, status MUSI być FORFEITED
                 pass
         else:
@@ -106,7 +106,7 @@ class PawnLineAdminForm(CallModelCleanMixin, forms.ModelForm):
 
 class PawnExtensionAdminForm(forms.ModelForm):
     """
-    Admin-inline do tworzenia przedłużeń:
+    Tworzenie przedłużeń:
       - automatycznie liczy fee, poprzedni i nowy termin (previous_due/new_due),
       - blokuje przedłużenie nieaktywnego lub przeterminowanego zastawu.
     Pola fee/previous_due/new_due są prezentowane jako tylko-do-odczytu (disabled),
@@ -118,7 +118,6 @@ class PawnExtensionAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # czytelność w adminie – użytkownik nie edytuje tych pól ręcznie
         for name in ("fee", "previous_due", "new_due"):
             if name in self.fields:
                 self.fields[name].disabled = True

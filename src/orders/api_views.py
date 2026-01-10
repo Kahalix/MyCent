@@ -100,7 +100,7 @@ class BuyerOrderViewSet(mixins.ListModelMixin,
         return Response(OrderPublicResponse(order).data, status=200)
 
 
-# ===== SELLER =====
+# ===== SELLER
 from identity.permissions import IsSellerMember, IsAnyActiveSellerMember, IsAnyActiveSellerManagerOrOwner
 
 class SellerOrderViewSet(mixins.ListModelMixin,

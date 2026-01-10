@@ -226,7 +226,7 @@ def create_extension_transaction(*, pawn: Pawn, days: int, operator) -> Transact
     )
 
 
-    # zapisz kontekst w tx.notes (lekki i bez nowej tabeli)
+    # zapisz kontekst w tx.notes
     tx.customer = pawn.customer
     tx.customer_snapshot = pawn.customer_snapshot
     tx.notes = f"PAWN_EXT:{pawn.public_id}:{int(days)}"
@@ -238,13 +238,13 @@ def create_extension_transaction(*, pawn: Pawn, days: int, operator) -> Transact
 @dbtx.atomic
 def finalize_extension_after_payment(*, tx: Transaction) -> Optional[Pawn]:
     """
-    Idempotentnie finalizuje przedłużenie po COMPLETED transakcji PAWN_EXTENSION.
+    Finalizuje przedłużenie po COMPLETED transakcji PAWN_EXTENSION.
     Tworzy PawnExtension i przesuwa due_date.
     """
     if tx.type != "PAWN_EXTENSION" or tx.status != "COMPLETED":
         return None
 
-    # idempotencja – jeśli Extension już istnieje dla tej TX, nic nie rób
+    # jeśli Extension już istnieje dla tej TX, nic nie rób
     existing = PawnExtension.objects.filter(transaction=tx).select_related("pawn").first()
     if existing:
         return existing.pawn
@@ -262,7 +262,6 @@ def finalize_extension_after_payment(*, tx: Transaction) -> Optional[Pawn]:
     if not pawn:
         return None
     if pawn.status != "ACTIVE" or pawn_is_expired(pawn):
-        # nic nie robimy – wedle polityki biznesowej można tu dodać zwrot/alert
         return None
 
     days = int(days_s)

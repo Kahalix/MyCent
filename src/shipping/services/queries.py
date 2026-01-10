@@ -12,7 +12,6 @@ def suggest_packages_for_dims(*, length_cm: int|None, width_cm: int|None,
     """
     Prosta sugestia paczek wyłącznie na podstawie wymiarów/wagi.
     Zwraca listę dictów: {"package_type": PackageType, "fits": bool}
-    (tu fits = True zawsze, bo filtrujemy; klucz zgodny z innymi wzorcami).
     """
     out = []
     for pkg in PackageType.objects.all():

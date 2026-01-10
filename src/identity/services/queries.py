@@ -15,7 +15,7 @@ def me_payload(user: User) -> dict[str, Any]:
     return PublicUserResponse(user).data
 
 
-# === helpery user/seller (cienkie wrapy dla widoków) ===
+# === helpery user/seller ===
 def get_user_by_public_id(public_id: str) -> Optional[User]:
     return User.objects.filter(public_id=public_id).first()
 
@@ -98,7 +98,7 @@ def get_seller_by_public_id(public_id: str) -> Optional[SellerProfile]:
     return SellerProfile.objects.select_related("owner").filter(public_id=public_id).first()
 
 
-# === uprawnienia (read-layer) ===
+# === uprawnienia ===
 def user_role_in_seller(user: User, seller: SellerProfile) -> Optional[str]:
     if not user or not seller:
         return None

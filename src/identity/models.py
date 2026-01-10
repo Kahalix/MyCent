@@ -196,12 +196,9 @@ class SellerBankAccount(PublicIdModel):
         return f"{self.seller_profile.company_name} / {self.iban}"
 
 
-# ========= UserToken (ephemeral + REFRESH_TOKEN w DB) =========
+# ========= UserToken =========
 
 class UserToken(PublicIdModel):
-    """
-    Hashowane tokeny jednorazowe i refresh JWT przechowywane w DB.
-    """
     TYPE_CHOICES = [
         ("EMAIL_CONFIRMATION", "EMAIL_CONFIRMATION"),
         ("PASSWORD_RESET", "PASSWORD_RESET"),

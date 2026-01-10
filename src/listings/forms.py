@@ -50,13 +50,13 @@ class ItemSetAdminForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # tylko liście + fallback (type nie wymagamy – może przyjść z catalog_item)
+        # tylko liście + fallback (type nie wymagamy, może przyjść z catalog_item)
         if "type" in self.fields:
             self.fields["type"].queryset = ItemType.objects.filter(children__isnull=True)
             self.fields["type"].required = False
 
-        # jeśli znamy typ już na starcie – ustaw schemat widgetu,
-        # żeby nie było "pustej" ramki przed pierwszym fetch-em
+        # jeśli znamy typ już na starcie - ustaw schemat widgetu,
+        # żeby nie było pustej ramki przed pierwszym fetchem
         it = self.initial.get("type") or getattr(self.instance, "type", None)
         cat = self.initial.get("catalog_item") or getattr(self.instance, "catalog_item", None)
         if isinstance(cat, (uuid.UUID, str, int)):
@@ -98,51 +98,6 @@ class ItemSetAdminForm(forms.ModelForm):
                 attrs, it.schema_json, where="attributes", require_same_fields=False
             )
         return cleaned
-
-    # def clean(self):
-    #     cleaned = super().clean()
-    #
-    #     # fallback: jeśli wybrano catalog_item, a type nie przyszło w POST
-    #     cat = cleaned.get("catalog_item")
-    #     if cat and not cleaned.get("type"):
-    #         cleaned["type"] = cat.type
-    #
-    #     # wymagane 'type' – ale z fallbackiem do instance na edycji
-    #     type_val = cleaned.get("type") or getattr(self.instance, "type", None)
-    #     if not type_val:
-    #         field_name = "type" if "type" in self.fields else None
-    #         self.add_error(field_name, "To pole jest wymagane.")
-    #
-    #     # # BLOKADA po 24h (USER): type + catalog_item
-    #     # inst: ItemSet = self.instance
-    #     # if inst and not inst._state.adding:
-    #     #     row = (ItemSet.objects
-    #     #            .filter(pk=inst.pk)
-    #     #            .values("type_id", "catalog_item_id", "created_at", "added_by")
-    #     #            ).first()
-    #     #     if row and row["added_by"] == "USER":
-    #     #         from django.utils import timezone
-    #     #         from datetime import timedelta
-    #     #         if row["created_at"] and timezone.now() - row["created_at"] >= timedelta(hours=24):
-    #     #             new_type = cleaned.get("type") or getattr(self.instance, "type", None)
-    #     #             if new_type and new_type.pk != row["type_id"]:
-    #     #                 self.add_error("type" if "type" in self.fields else None,
-    #     #                                "Zmiana kategorii (ItemType) jest zablokowana po 24 godzinach od utworzenia ogłoszenia.")
-    #     #             new_cat = cleaned.get("catalog_item", getattr(self.instance, "catalog_item", None))
-    #     #             new_cat_id = getattr(new_cat, "pk", None) if new_cat else None
-    #     #             if new_cat_id != (row["catalog_item_id"] or None):
-    #     #                 self.add_error("catalog_item" if "catalog_item" in self.fields else None,
-    #     #                                "Zmiana pozycji katalogowej jest zablokowana po 24 godzinach od utworzenia ogłoszenia.")
-    #
-    #     # normalizacja/validacja atrybutów
-    #     it = (cleaned.get("type") or getattr(self.instance, "type", None))
-    #     if it and it.schema_json:
-    #         attrs = cleaned.get("attributes") or getattr(self.instance, "attributes", {}) or {}
-    #         cleaned["attributes"] = _normalize_and_validate_attrs(
-    #             attrs, it.schema_json, where="attributes", require_same_fields=False
-    #         )
-    #     return cleaned
-
 
 class ItemSetImageAdminForm(forms.ModelForm):
     class Meta:

@@ -24,7 +24,7 @@ def add_saved_listing(*, user: User, item_public_id: str) -> SavedListing:
     item = get_object_or_404(ItemSet, public_id=item_public_id)
     obj = get_saved_listing(user, item)
     if obj:
-        # idempotentnie – nie traktujemy jako błąd, po prostu zwracamy istniejący
+        # nie traktujemy jako błąd, po prostu zwracamy istniejący
         return obj
     return create_saved_listing(user, item)
 
@@ -39,7 +39,6 @@ def list_saved_listings(*, user: User):
 # === Saved Search ===
 @transaction.atomic
 def create_saved_search_cmd(*, user: User, category_path: str, query_string: str, search_phrase: str="") -> SavedSearch:
-    # prosty sanity check: czy query_string nie jest pusty
     if not (query_string and query_string.strip()):
         raise InvalidQuery("query_string cannot be empty")
     return create_saved_search(user, category_path=category_path, query_string=query_string, search_phrase=search_phrase)

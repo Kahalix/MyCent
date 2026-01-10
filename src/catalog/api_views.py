@@ -177,7 +177,7 @@ class PublicCatalogItemViewSet(mixins.ListModelMixin,
         ser = CatalogItemPublicResponse(page or qs, many=True)
         return self.get_paginated_response(ser.data) if page is not None else Response(ser.data)
 
-    # ładny endpoint po public_id (przyda się dla UI usera)
+    # endpoint po public_id (przyda się dla UI usera)
     @action(detail=True, methods=["get"], url_path="attrs")
     def attrs(self, request, public_id=None):
         obj = get_object_or_404(CatalogItem, public_id=public_id)

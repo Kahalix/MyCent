@@ -15,7 +15,7 @@ from . import repositories as repo
 
 User = get_user_model()
 
-# ------------- helpers -------------
+# ------- helpers ---
 
 def _clean_and_save(obj: Any):
     try:
@@ -25,7 +25,7 @@ def _clean_and_save(obj: Any):
     obj.save()
     return obj
 
-# ------------- PURCHASE -------------
+# ----- PURCHASE --------
 
 @transaction.atomic
 def purchase_package(*, user: User, package: ListingPackage,
@@ -77,7 +77,7 @@ def purchase_package(*, user: User, package: ListingPackage,
             description=f"Zakup pakietu {package.public_id} za środki pieniężne"
         )
 
-    # Bezpłatny (np. przyznany przez admina / „0”)
+    # Bezpłatny (np. przyznany przez admina / 0)
     elif pay_with == "free":
         repo.create_purchase_history(
             user=user, package=package,
@@ -98,13 +98,13 @@ def purchase_package(*, user: User, package: ListingPackage,
 
     return up
 
-# ------------- SLOTS (consume/release) -------------
+# ----- SLOTS (consume/release) ------
 
 @transaction.atomic
 def consume_slot_for_itemset(*, user: User, itemset: ItemSet) -> ListingUsageHistory:
     """
     Zajmuje FREE (jeśli dostępny), w przeciwnym razie PAID.
-    Jeśli istnieje aktywny usage dla itemset -> idempotentnie zwraca go.
+    Jeśli istnieje aktywny usage dla itemset -> zwraca go.
     """
     existing = repo.get_active_usage_for_itemset(itemset)
     if existing:
@@ -144,7 +144,7 @@ def consume_slot_for_itemset(*, user: User, itemset: ItemSet) -> ListingUsageHis
 @transaction.atomic
 def release_slot_for_itemset(*, itemset: ItemSet) -> None:
     """
-    Zwalnia aktywny FREE/PAID dla ogłoszenia (ustawia released_at) – totals NIE zmieniamy.
+    Zwalnia aktywny FREE/PAID dla ogłoszenia (ustawia released_at) - totals NIE zmieniamy.
     """
     usage = repo.get_active_usage_for_itemset(itemset)
     if usage:
@@ -162,7 +162,7 @@ def ensure_slot_matches_state(*, user: User, itemset: ItemSet) -> None:
     if itemset.added_by != "USER":
         return
 
-    # bezpieczeństwo: tylko właściciel
+    # tylko właściciel
     if getattr(itemset, "owner_user_id", None) != getattr(user, "id", None):
         raise Forbidden("Możesz zarządzać slotami tylko dla własnych ogłoszeń.")
 
@@ -187,7 +187,7 @@ def grant_signup_freebies(user) -> None:
     if not public_ids:
         return
 
-    # idempotentnie – nie duplikuj grantów jeśli już były nadane
+    # nie duplikuj grantów jeśli już były nadane
     for pkg in ListingPackage.objects.select_for_update().filter(public_id__in=public_ids):
         up = (UserListingPackage.objects
               .select_for_update()
@@ -197,7 +197,7 @@ def grant_signup_freebies(user) -> None:
             up = UserListingPackage(user=user, listing_package=pkg, free_total=0, paid_total=0)
             up.save()
 
-        # jeśli chcesz grant „tylko raz”, sprawdź historię z opisem SIGNUP_FREE
+        # sprawdź historię z opisem SIGNUP_FREE
         already = ServicePurchaseHistory.objects.filter(
             user=user, listing_package=pkg, description="SIGNUP_FREE"
         ).exists()
@@ -216,7 +216,7 @@ def grant_signup_freebies(user) -> None:
             description="SIGNUP_FREE",
         )
 
-# ------------- REPORTS -------------
+# --- REPORTS ---
 
 def slot_summary_for_user(user: User) -> list[dict]:
     """

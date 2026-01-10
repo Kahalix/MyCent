@@ -219,7 +219,7 @@ app.chatThread = function (opts = {}) {
           const obj = this._normFromApi(m);
           this._pushIfNew(obj);
 
-          // od razu zgłoś read po swojej stronie (serwer i tak z-echo’uje)
+          // od razu zgłoś read po swojej stronie (serwer i tak z-echo'uje)
           try { app.wsHub.send(this.topic(), { type:'read.up_to', message_public_id: obj.public_id }); } catch {}
 
           this.input = '';

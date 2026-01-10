@@ -11,6 +11,8 @@ from moneyed import Money as M
 from django.db import transaction
 from django.db.models import F, Case, When, Value
 from django.utils import timezone
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
 
 from customers.models import Customer
 from orders.models import Order, OrderLine, OrderShipping, ItemReservation
@@ -221,47 +223,98 @@ def sync_orders_with_transaction(*, tx: Transaction) -> None:
     if not to_status:
         return
 
+    if to_status == "COMPLETED" and tx.type == "PURCHASE":
+        if ItemReservation.objects.filter(transaction=tx, released_at__isnull=True).exists():
+            now = timezone.now()
+
+            line_rows = list(
+                OrderLine.objects.select_for_update()
+                .filter(order__transaction=tx, item_set_id__isnull=False)
+                .values_list("item_set_id", "quantity")
+            )
+
+            need_by_item_id: dict[int, int] = defaultdict(int)
+            for item_id, qty in line_rows:
+                if item_id is not None and qty:
+                    need_by_item_id[int(item_id)] += int(qty)
+
+            if not need_by_item_id:
+                raise Conflict("Brak pozycji do finalizacji transakcji.")
+
+            item_ids = list(need_by_item_id.keys())
+
+            items = list(ItemSet.objects.select_for_update().filter(id__in=item_ids))
+            items_by_id = {int(it.id): it for it in items}
+
+            active_res_rows = list(
+                ItemReservation.objects.select_for_update()
+                .filter(
+                    item_set_id__in=item_ids,
+                    released_at__isnull=True,
+                    expires_at__gt=now,
+                )
+                .values_list("item_set_id", "transaction_id", "quantity")
+            )
+
+            reserved_other_by_item_id: dict[int, int] = defaultdict(int)
+            for item_id, tx_id, qty in active_res_rows:
+                if item_id is None or not qty:
+                    continue
+                if tx_id != tx.id:
+                    reserved_other_by_item_id[int(item_id)] += int(qty)
+
+            for item_id, need_qty in need_by_item_id.items():
+                if need_qty <= 0:
+                    continue
+
+                item = items_by_id.get(item_id)
+                if item is None:
+                    raise Conflict("Ogłoszenie nie istnieje.")
+
+                if item.status not in ("AVAILABLE", "RESERVED"):
+                    raise Conflict("Ogłoszenie nie jest dostępne.")
+                if item.listing_type != "BUY" or not item.allow_online_checkout:
+                    raise Forbidden("To ogłoszenie nie obsługuje zakupu online.")
+                if not item.seller_profile_id:
+                    raise Conflict("Oferta nie ma przypisanego sprzedawcy.")
+
+                if item.stock_quantity is None:
+                    raise Conflict("Brak stanu magazynowego dla oferty.")
+
+                stock = int(item.stock_quantity or 0)
+                reserved_other = int(reserved_other_by_item_id.get(item_id, 0))
+                available = stock - reserved_other
+                if available < need_qty:
+                    raise Conflict("Brak wystarczającego stanu magazynowego przy finalizacji transakcji.")
+
+            for item_id, dec_qty in need_by_item_id.items():
+                if dec_qty <= 0:
+                    continue
+
+                updated = ItemSet.objects.filter(
+                    id=item_id,
+                    stock_quantity__isnull=False,
+                    stock_quantity__gte=dec_qty,
+                ).update(
+                    stock_quantity=F("stock_quantity") - dec_qty,
+                    status=Case(
+                        When(
+                            stock_quantity=dec_qty,
+                            status__in=["AVAILABLE", "RESERVED"],
+                            then=Value("SOLD"),
+                        ),
+                        default=F("status"),
+                    ),
+                    updated_at=now,
+                )
+                if updated == 0:
+                    raise Conflict("Brak wystarczającego stanu magazynowego przy finalizacji transakcji.")
+
     for order in orders:
         set_order_status(order=order, to_status=to_status)
 
-    if to_status == "COMPLETED" and tx.type == "PURCHASE":
-        now = timezone.now()
-        qty_by_item_id: dict[int, int] = defaultdict(int)
-
-        for item_id, qty in (
-            ItemReservation.objects.select_for_update()
-            .filter(transaction=tx, released_at__isnull=True)
-            .values_list("item_set_id", "quantity")
-        ):
-            if item_id and qty:
-                qty_by_item_id[int(item_id)] += int(qty)
-
-        for item_id, dec_qty in qty_by_item_id.items():
-            if dec_qty <= 0:
-                continue
-
-            updated = ItemSet.objects.filter(
-                id=item_id,
-                stock_quantity__isnull=False,
-                stock_quantity__gte=dec_qty,
-            ).update(
-                stock_quantity=F("stock_quantity") - dec_qty,
-                status=Case(
-                    When(
-                        stock_quantity=dec_qty,
-                        status__in=["AVAILABLE", "RESERVED"],
-                        then=Value("SOLD"),
-                    ),
-                    default=F("status"),
-                ),
-                updated_at=now,
-            )
-            if updated == 0:
-                raise Conflict("Brak wystarczającego stanu magazynowego przy finalizacji transakcji.")
-
     repo.release_all_reservations_for_tx(tx)
     _update_tx_expected_total(tx)
-
 
 def _available_qty(item: ItemSet, *, exclude_tx_id: int | None = None) -> int:
     stock = int(item.stock_quantity or 0)

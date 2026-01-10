@@ -272,7 +272,8 @@ def preview_coupon_discount(
 @dbtx.atomic
 def cancel_stale_pending_transactions(*, minutes: int = 60) -> int:
     from django.utils import timezone
-    cutoff = timezone.now() - timezone.timedelta(minutes=minutes)
+    from datetime import timedelta
+    cutoff = timezone.now() - timedelta(minutes=minutes)
     qs = Transaction.objects.select_for_update().filter(status="PENDING", updated_at__lt=cutoff)
     count = 0
     for tx in qs:

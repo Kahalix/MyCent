@@ -9,7 +9,7 @@ from listings.models import ItemSet
 class ChatThread(PublicIdModel):
     """
     Wątek rozmowy (DM 1:1, powiązany opcjonalnie z ogłoszeniem).
-    dm_key = "<min_user_id>:<max_user_id>" zapewnia 1 DM na parę (globalnie lub w obrębie itemu).
+    dm_key = "<min_user_id>:<max_user_id>" zapewnia 1 DM na parę.
     """
     is_group = models.BooleanField(default=False)
     item_set = models.ForeignKey(ItemSet, null=True, blank=True, on_delete=models.PROTECT, related_name="chat_threads")

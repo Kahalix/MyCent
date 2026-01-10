@@ -12,13 +12,11 @@ class PointsError(Exception):
 
 def spend_points(user, amount: int, reason: str = "") -> None:
     """
-    Domyślny backend: korzysta z pola `user.points`.
     Zabezpieczony na wyścigi (select_for_update + F()).
     """
     if amount <= 0:
         return
 
-    # domyślnie: user.points
     if not hasattr(user, "points"):
         raise PointsError("Konto punktowe nie jest dostępne (brak pola 'points' lub niestandardowego backendu).")
 

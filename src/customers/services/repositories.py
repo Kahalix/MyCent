@@ -26,7 +26,6 @@ def seller_customers_qs(user: User):
     return Customer.objects.all().order_by("-created_at")
 
 def user_customers_qs(user: User):
-    # jeżeli kiedykolwiek zechcesz pokazać „moich klientów” użytkownika
     return Customer.objects.filter(user=user).order_by("-created_at")
 
 

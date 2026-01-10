@@ -51,11 +51,6 @@ class AdminListingPackageViewSet(viewsets.ModelViewSet):
 # ===== USER SELF: purchases & reports =====
 
 class MyServicesViewSet(viewsets.ViewSet):
-    """
-    /api/users/me/services/purchase-package [POST]
-    /api/users/me/services/slot-summary     [GET]
-    /api/users/me/services/packages         [GET]
-    """
     permission_classes = [permissions.IsAuthenticated]
 
     # @action(methods=["post"], detail=False, url_path="purchase-package")

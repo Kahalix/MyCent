@@ -64,7 +64,7 @@ def create_image(*, itemset: ItemSet, **fields) -> ItemSetImage:
     if siblings:
         ItemSetImage.objects.bulk_update(siblings, ["image_order"])
 
-    # utwórz nowy w „dziurze”
+    # utwórz nowy w dziurze
     img = ItemSetImage.objects.create(item_set=itemset, image_order=want_order, **fields)
     return img
 

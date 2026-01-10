@@ -3,7 +3,7 @@ from rest_framework import serializers
 from .models import SavedListing, SavedSearch, SavedSearchItem
 from listings.serializers import ItemSetPublicResponse
 
-# === Saved Listing ===
+# === Saved Listing =
 class SavedListingCreateRequest(serializers.Serializer):
     item_public_id = serializers.CharField(max_length=64)
 

@@ -5,6 +5,6 @@ User = get_user_model()
 
 def authenticate_user(email: str, password: str):
     """
-    Używa domyślnego ModelBackend. Działa, bo USERNAME_FIELD = 'email'.
+    Używa domyślnego ModelBackend.
     """
     return authenticate(email=email, password=password)

@@ -1,4 +1,3 @@
-# src/customers/admin.py
 from django.contrib import admin
 from customers.models import Customer
 from customers.forms import CustomerAdminForm

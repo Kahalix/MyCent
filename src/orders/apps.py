@@ -5,5 +5,4 @@ class OrdersConfig(AppConfig):
     name = 'orders'
 
     def ready(self):
-        # rejestr sygnałów
         from . import signals  # noqa: F401

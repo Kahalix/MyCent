@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 class DomainError(Exception):
-    """Bazowy wyjątek domenowy modułu shipping."""
+    """Wyjątek domeny"""
 
 class NotAllowed(DomainError):
-    """Brak uprawnień do wykonania akcji."""
+    """Brak uprawnień"""
 
 class NotFound(DomainError):
     """Encji nie znaleziono."""

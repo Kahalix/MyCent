@@ -28,3 +28,4 @@ whitenoise==6.9.0
 django-jsonform==2.23.2
 weasyprint==66.0
 stripe==13.0.1
+reportlab>=4.0

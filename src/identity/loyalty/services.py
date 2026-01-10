@@ -9,14 +9,14 @@ from djmoney.money import Money
 
 User = get_user_model()
 
-# Domyślne wartości – można nadpisać w settings.py
+# Domyślne wartości
 DEFAULT_RATE_BPS = getattr(settings, "LOYALTY_RATE_BPS", 200)               # 2% w punktach (1 PLN = 1 pkt przy 100%)
 DEFAULT_POINT_VALUE_PLN = Decimal(str(getattr(settings, "LOYALTY_POINT_VALUE_PLN", "0.01")))  # 1 pkt = 0.01 PLN
 
 def calc_points_for_amount(amount: Money) -> int:
     """
-    Liczba punktów za daną kwotę (waluta ignorowana – liczymy po nominale, bez FX).
-    Jeśli RATE_BPS=200 (2%), to za 123.45 PLN dostaniesz floor(123.45 * 0.02) = 2 pkt.
+    Liczba punktów za daną kwotę (waluta ignorowana - liczymy po nominale, bez FX).
+    Jeśli RATE_BPS=200 (2%), to za 123.45 PLN dostaniesz (123.45 * 0.02) = 2 pkt.
     """
     rate = Decimal(DEFAULT_RATE_BPS) / Decimal("10000")
     pts = int(Decimal(amount.amount) * rate)

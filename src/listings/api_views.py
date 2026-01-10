@@ -38,7 +38,7 @@ from listings.services.cache_utils import get_cache_key, invalidate_public_items
 User = get_user_model()
 
 
-# ===== PUBLIC =====
+# ==== PUBLIC ===
 class PublicItemSetViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     permission_classes = [permissions.AllowAny]
     serializer_class = ItemSetPublicResponse
@@ -47,11 +47,9 @@ class PublicItemSetViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
     filterset_class = ItemSetFilter
     ordering_fields = ("created_at", "price")
 
-    # ---------- queryset ----------
     def get_queryset(self):
         qs = queries.public_itemsets_qs()
         user = getattr(self.request, "user", None)
-        # Dla zalogowanych można annotate'ować (optymalizacja), ale i tak nie cache'ujemy user-specific
         if user and user.is_authenticated:
             qs = qs.annotate(is_saved=Exists(
                 SavedListing.objects.filter(user=user, item_set=OuterRef("pk"))
@@ -70,7 +68,7 @@ class PublicItemSetViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
 
     def _strip_user_fields_from_payload(self, data):
         """
-        Usuń pola user-specific (ostrzeżenie: defensywnie)
+        Usuń pola user-specific
         """
         # paginacja DRF zwykle zwraca dict z 'results'
         if isinstance(data, dict) and isinstance(data.get("results"), list):
@@ -82,13 +80,12 @@ class PublicItemSetViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
                 if isinstance(row, dict):
                     row.pop("is_saved", None)
         elif isinstance(data, dict):
-            # single object response
             data.pop("is_saved", None)
         return data
 
     def _inject_is_saved(self, data, user):
         """
-        Dograj per-user flagę is_saved. Wywołuje tylko jedno zapytanie do SavedListing (IN).
+        Dograj per-user flagę is_saved. Wywołuje tylko jedno zapytanie do SavedListing.
         Modyfikuje lokalną kopię.
         """
         if not (user and getattr(user, "is_authenticated", False)):
@@ -105,13 +102,11 @@ class PublicItemSetViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
                 data["is_saved"] = False
             return data
 
-        # collect ids
         if isinstance(data, dict) and isinstance(data.get("results"), list):
             rows = data["results"]
         elif isinstance(data, list):
             rows = data
         else:
-            # single object
             rows = [data] if isinstance(data, dict) else []
 
         ids = [r.get("public_id") for r in rows if isinstance(r, dict) and r.get("public_id")]
@@ -132,21 +127,16 @@ class PublicItemSetViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
                 continue
             r["is_saved"] = r.get("public_id") in saved_ids
 
-        # if single object and rows was list form, map back
         if isinstance(data, dict) and not isinstance(data.get("results"), list) and rows:
-            # data was single-object dict
-            # nothing else to do
             pass
 
         return data
 
-    # ---------- LIST ----------
     def list(self, request, *args, **kwargs):
         cache_key = self._cache_key("public_itemsets:list", request)
         cached = cache.get(cache_key)
 
         if cached is not None:
-            # deepcopy to avoid mutating cached object
             data = copy.deepcopy(cached)
         else:
             response = super().list(request, *args, **kwargs)
@@ -164,7 +154,6 @@ class PublicItemSetViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
         data = self._inject_is_saved(data, request.user)
         return Response(data)
 
-    # ---------- RETRIEVE ----------
     def retrieve(self, request, *args, **kwargs):
         user = getattr(request, "user", None)
         if user and user.is_authenticated:
@@ -184,7 +173,6 @@ class PublicItemSetViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
         cache.set(cache_key, safe, self._cache_ttl_detail())
         return Response(data)
 
-    # ---------- BY SLUG ----------
     @action(detail=False, methods=["get"], url_path=r"by-slug/(?P<slug>[^/]+)")
     def by_slug(self, request, slug=None):
         cache_key = self._cache_key("public_itemsets:detail_slug", request)
@@ -208,7 +196,6 @@ class PublicItemSetViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
         data = self._inject_is_saved(data, request.user)
         return Response(data, status=200)
 
-    # ---------- ITEMS IN CATEGORY ----------
     @action(detail=False, methods=["get"], url_path=r"categories/by-path/(?P<category_path>.+)/items")
     def items_in_category(self, request, category_path=None):
         cache_key = self._cache_key("public_itemsets:category", request)
@@ -240,18 +227,14 @@ class PublicItemSetViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
         data = self._inject_is_saved(safe_data, request.user)
         return Response(data)
 
-    # ---------- START CHAT ----------
     @action(detail=True, methods=["post"], url_path="start-chat", permission_classes=[permissions.IsAuthenticated])
     def start_chat(self, request, public_id=None):
         item = get_object_or_404(ItemSet, public_id=public_id, status="AVAILABLE")
         thread = chat_cmd.start_dm(initiator=request.user, other_user=None, item=item)
         return Response(ChatThreadResponse(thread).data, status=201)
 
-# ===== SELLER =====
+# ===== SELLER ====
 class SellerItemSetViewSet(viewsets.ModelViewSet):
-    """
-    /api/sellers/mine/item-sets/...
-    """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ItemSetOwnerResponse
     lookup_field = "public_id"
@@ -286,7 +269,6 @@ class SellerItemSetViewSet(viewsets.ModelViewSet):
         return Response(ItemSetOwnerResponse(it).data, status=201)
 
     def update(self, request, *args, **kwargs):
-        # obiekt i tak przejdzie przez get_queryset() => wymusza membership
         it = self.get_object()
         ser = self.get_serializer(data=request.data, partial=True);
         ser.is_valid(raise_exception=True)
@@ -393,9 +375,6 @@ class SellerItemSetViewSet(viewsets.ModelViewSet):
 
 # ===== USER (propozycje) =====
 class UserItemSetViewSet(viewsets.ModelViewSet):
-    """
-    /api/users/me/item-sets/...
-    """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ItemSetOwnerResponse
     lookup_field = "public_id"

@@ -1,5 +1,5 @@
 (function(){
-  // Schema Form (SSF)
+  // Schema Form
 
   function jsonParse(s){ try { return JSON.parse(s); } catch(e){ return null; } }
   function clone(o){ return o && typeof o === "object" ? JSON.parse(JSON.stringify(o)) : o; }
@@ -71,7 +71,7 @@
     if (v < min) v = min;
     if (v > max) v = max;
 
-    // dla integerów (step=1) – zrzuć do najbliższej liczby całkowitej
+    // dla integerów (step=1) zrzuć do najbliższej liczby całkowitej
     var st = el.getAttribute('step');
     if (st && st !== 'any') {
       var sn = Number(st);
@@ -85,7 +85,7 @@
   function _decimalsOf(nStr){
     if (!nStr || String(nStr) === 'any') return 0;
     var s = String(nStr);
-    if (s.indexOf('e') >= 0 || s.indexOf('E') >= 0) return 6; // naukowe – bezpieczny zapas
+    if (s.indexOf('e') >= 0 || s.indexOf('E') >= 0) return 6;
     var p = s.split('.')[1];
     return p ? p.length : 0;
   }
@@ -111,7 +111,7 @@
     var prec = Math.max(_decimalsOf(stepAttr), _decimalsOf(minAttr), _decimalsOf(input.value));
     var pow = Math.pow(10, prec);
 
-    // gdy pusto — zacznij od min (lub 0) i dopiero przesuń o step
+    // gdy pusto zacznij od min (lub 0) i dopiero przesuń o step
     if (cur===null){
       cur = (min!=null ? min : 0);
       if (dir>0){ cur = cur + step; }
@@ -151,7 +151,6 @@
       try { input.focus({ preventScroll:true }); } catch {}
     }
 
-    // hold-to-repeat
     function wire(btn, dir){
       let t1=null, t2=null;
       const start = (e)=>{
@@ -186,7 +185,7 @@
     var id = "ssf_" + name + "_" + Math.random().toString(36).slice(2,8);
     var wrap = makeEl("div", {class:"ssf-field"});
 
-    // etykieta – tekst wypełni później app._postFixSsfLabels (labels/units)
+    // etykieta
     var label = makeEl("label", {"for": id, "class":"ssf-label", text: name + (required ? " *" : "")});
     if (required) label.classList.add('is-required');
     wrap.appendChild(label);
@@ -254,7 +253,7 @@
 
       if (required) input.required = true;
 
-      // --- CLAMP: trzymaj wartość w [min,max] również dla strzałek i scrolla
+      // CLAMP - trzymaj wartość w [min,max] również dla strzałek i scrolla
       var _clampNow = function(){ clampNumberInput(input); };
       input.addEventListener('input', _clampNow);
       input.addEventListener('change', _clampNow);
@@ -267,7 +266,7 @@
         requestAnimationFrame(_clampNow);
       }, { passive: true });
 
-      // jeśli to liczba — opakuj w .numstep i dołóż przyciski
+      // jeśli to liczba opakuj w .numstep i dołóż przyciski
       if (type === "integer" || type === "number"){
         input.classList.add('numstep__input');
         var box = makeEl("div", {class:"numstep numstep--md"}, [

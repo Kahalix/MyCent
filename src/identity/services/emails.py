@@ -6,10 +6,6 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
 def send_templated_email(*, to: str, subject: str, template: str, context: Mapping):
-    """
-    template: ścieżka bazowa bez rozszerzenia, np. 'email/confirm_registration'
-    spodziewa się plików: <template>.html i <template>.txt
-    """
     html_body = render_to_string(f"{template}.html", context)
     try:
         text_body = render_to_string(f"{template}.txt", context)

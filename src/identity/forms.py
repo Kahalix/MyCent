@@ -6,8 +6,8 @@ from django.contrib.auth import get_user_model, password_validation
 from django.core.exceptions import ValidationError
 
 from .models import SellerProfile, SellerBankAccount, SellerMembership
-from .services.repositories import is_email_taken_ci  # lekkie sprawdzenie CI e-maila
-from .services.crud import authenticate_user  # wrapper na django.contrib.auth.authenticate
+from .services.repositories import is_email_taken_ci
+from .services.crud import authenticate_user
 
 User = get_user_model()
 
@@ -46,11 +46,6 @@ class RegisterForm(forms.Form):
 
 
 class LoginForm(forms.Form):
-    """
-    Jeśli chcesz od razu zweryfikować dane logowania:
-        form = LoginForm(request.POST, do_authenticate=True)
-        if form.is_valid(): user = form.user
-    """
     email = forms.EmailField()
     password = forms.CharField(widget=forms.PasswordInput)
 
@@ -97,10 +92,6 @@ class ResetPasswordForm(forms.Form):
 
 
 class ChangeEmailForm(forms.Form):
-    """
-    Użycie:
-        form = ChangeEmailForm(request.POST, user=request.user)
-    """
     new_email = forms.EmailField()
 
     def __init__(self, *args, user: Optional[User] = None, **kwargs):
@@ -226,11 +217,6 @@ class SellerBannerUploadForm(forms.Form):
 
 
 class AdminSellerProfileCreateForm(SellerProfileCreateForm):
-    """
-    Admin przy create musi wskazać właściciela.
-    API przyjmuje owner_id – w formie dopuszczam owner_id lub owner_public_id.
-    Przynajmniej jedno musi być podane.
-    """
     owner_id = forms.IntegerField(required=False)
     owner_public_id = forms.CharField(required=False)
 
@@ -257,7 +243,6 @@ class BaseBankAccountCreateForm(forms.Form):
     is_default = forms.BooleanField(required=False, initial=False)
 
     def clean_iban(self):
-        # normalizacja IBANu zgodna z serializerem
         return _strip(self.cleaned_data["iban"]).replace(" ", "").upper()
 
     def clean_bank_name(self): return _strip(self.cleaned_data.get("bank_name"))
@@ -265,7 +250,6 @@ class BaseBankAccountCreateForm(forms.Form):
 
 
 class MemberBankAccountCreateForm(BaseBankAccountCreateForm):
-    # wymagane do wskazania sklepu
     seller_public_id = forms.CharField()
 
 
@@ -279,7 +263,7 @@ class BankAccountUpdateForm(forms.Form):
 
 
 class AdminBankAccountCreateForm(BaseBankAccountCreateForm):
-    seller_public_id = forms.CharField()  # admin też wskazuje sklep po public_id
+    seller_public_id = forms.CharField()
 
 
 class AdminBankAccountUpdateForm(BankAccountUpdateForm):
@@ -291,11 +275,9 @@ class AdminBankAccountUpdateForm(BankAccountUpdateForm):
 # =========================
 
 def _membership_role_choices_without_owner():
-    # wykluczamy OWNER — zgodnie z polityką (OWNER tylko „z systemu”)
     return [(c, c) for (c, _label) in SellerMembership.ROLE_CHOICES if c != "OWNER"]
 
 class SellerMembershipCreateForm(forms.Form):
-    # można wskazać usera po public_id ALBO e-mailu
     user_public_id = forms.CharField(required=False)
     email = forms.EmailField(required=False)
     role = forms.ChoiceField(choices=_membership_role_choices_without_owner())
@@ -304,7 +286,6 @@ class SellerMembershipCreateForm(forms.Form):
         cleaned = super().clean()
         if not cleaned.get("user_public_id") and not cleaned.get("email"):
             raise ValidationError("Podaj user_public_id lub email.")
-        # normalizacja e-maila jeśli podany
         if cleaned.get("email"):
             cleaned["email"] = _lower(cleaned["email"])
         return cleaned

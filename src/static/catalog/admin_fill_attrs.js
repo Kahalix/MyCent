@@ -1,4 +1,3 @@
-// static/catalog/admin_fill_attrs.js
 (function () {
   var $ = (window.django && window.django.jQuery) || window.jQuery;
 
@@ -39,7 +38,7 @@
     return base;
   }
 
-  // lock/unlock TYPE overlay (jak wcześniej)
+  // lock/unlock TYPE overlay
   function ensureLockStyles(){
     if (document.getElementById("ssf-lock-style")) return;
     var css = ".ssf-lock-wrap{position:relative}"+

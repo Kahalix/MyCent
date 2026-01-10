@@ -109,12 +109,6 @@ class AdminPackageTypeViewSet(viewsets.ModelViewSet):
 # ===== USER SELF: shipping address =====
 
 class MyShippingAddressViewSet(viewsets.ViewSet):
-    """
-    /api/users/me/shipping-address  [GET, POST, PATCH, DELETE]
-    POST = create jeśli brak; jeśli istnieje, zwraca 400 (żeby nie „duplikować” przez przypadek).
-    PATCH = aktualizacja istniejącego; jeśli nie istnieje – stworzy („upsert”).
-    DELETE = usuń.
-    """
     permission_classes = [permissions.IsAuthenticated]
 
     def retrieve(self, request):
@@ -145,7 +139,6 @@ class MyShippingAddressViewSet(viewsets.ViewSet):
 
 
 # ===== ADMIN: shipping addresses =====
-
 class AdminShippingAddressViewSet(mixins.ListModelMixin,
                                   mixins.RetrieveModelMixin,
                                   mixins.UpdateModelMixin,

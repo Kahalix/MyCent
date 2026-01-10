@@ -5,7 +5,7 @@ app.cartPage = function () {
     loading: false,
     err: '', ok: '',
     items: [], // { public_id, quantity, item: ItemSetPublicResponse }
-    payment: 'ONLINE_PAYMENT', // zostawiamy dla zgodności z backendem (nie pokazujemy w UI)
+    payment: 'ONLINE_PAYMENT',
     checkingOut: false,
 
     async init(){ await this.reload(); },

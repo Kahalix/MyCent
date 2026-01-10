@@ -164,7 +164,7 @@ class ItemSetImage(PublicIdModel):
         # ]
         indexes = [models.Index(fields=["item_set", "image_order"], name="ix_itemset_images")]
 
-    def __str__(self):  # pragma: no cover
+    def __str__(self):
         return f"{self.item_set.set_name} [{self.image_order}]"
 
 
@@ -221,5 +221,5 @@ class ItemSetShipping(PublicIdModel):
         if not ok:
             raise ValidationError("Wymiary/masa nie mieszczą się w wybranym typie paczki.")
 
-    def __str__(self):  # pragma: no cover
+    def __str__(self):
         return f"{self.item_set.set_name} -> {self.package_type}"

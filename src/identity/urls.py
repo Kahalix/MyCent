@@ -34,7 +34,7 @@ router.register(r"api/auth/confirm-email-change", ConfirmEmailChangeView, basena
 # USERS
 router.register(r"api/public/users", PublicUserViewSet, basename="public-users")
 
-# /api/users/me [GET, PATCH, POST avatar, DELETE avatar] – niestandardowe as_view
+# /api/users/me [GET, PATCH, POST avatar, DELETE avatar]
 me_user = SelfUserViewSet.as_view({"get": "retrieve", "patch": "partial_update"})
 me_avatar = SelfUserViewSet.as_view({"post": "upload_avatar", "delete": "delete_avatar"})
 
@@ -50,13 +50,13 @@ my_seller_banner = MySellerProfileViewSet.as_view({"post": "upload_banner", "del
 # admin
 router.register(r"api/admin/sellers", AdminSellerProfileViewSet, basename="admin-sellers")
 
-# OWNER/MANAGER – bank accounts (membership, bez lookupu prefixu)
+# OWNER/MANAGER - bank accounts (membership, bez lookupu prefixu)
 router.register(r"api/sellers/mine/bank-accounts", MySellerBankAccountViewSet, basename="my-bank-accounts")
 
-# ADMIN – bank accounts
+# ADMIN - bank accounts
 router.register(r"api/admin/seller-bank-accounts", AdminSellerBankAccountViewSet, basename="admin-bank-accounts")
 
-# USER – moje membershipy (lista)
+# USER - moje membershipy (lista)
 router.register(r"api/sellers/mine/memberships", MySellerMembershipsViewSet, basename="my-memberships")
 
 urlpatterns = [
@@ -66,13 +66,12 @@ urlpatterns = [
     path("api/users/me/", me_user, name="users-me"),
     path("api/users/me/avatar/", me_avatar, name="users-me-avatar"),
 
-    # mój sklep (owner 1:1)
+    # mój sklep
     path("api/sellers/mine/", my_seller, name="sellers-mine"),
     path("api/sellers/mine/logo/", my_seller_logo, name="sellers-mine-logo"),
     path("api/sellers/mine/banner/", my_seller_banner, name="sellers-mine-banner"),
 ]
 
-# NIERESTROUTEROWANE endpointy do członków sklepu (dynamiczne seller_public_id)
 seller_members_list = SellerMembersViewSet.as_view({"get": "list", "post": "create"})
 seller_member_detail = SellerMembersViewSet.as_view({"patch": "partial_update", "delete": "destroy"})
 

@@ -1,4 +1,4 @@
-/* ==== Simple Schema Form (themed + responsive + right-aligned „Wymagane”) ==== */
+/* ==== Simple Schema Form == */
 .ssf-container{
   background: var(--frame-bg);
   border: 1px solid var(--frame-border);
@@ -31,7 +31,7 @@
   white-space: normal;
 }
 
-/* Pastylka „Wymagane” — czytelna w light/dark, zawsze po prawej */
+/* Pastylka Wymagane  czytelna w light/dark, zawsze po prawej */
 .ssf-label .req-badge{
   display: inline-flex;
   align-items: center;
@@ -62,7 +62,7 @@
   transform: translateY(.5px);
 }
 
-/* Jeśli gdzieś zostanie fallbackowa gwiazdka — chowamy */
+/* Jeśli gdzieś zostanie fallbackowa gwiazdka - chowamy */
 .ssf-label .ssf-required{ display: none !important; }
 
 /* Kontrolki */
@@ -82,7 +82,7 @@
   .ssf-help{ grid-column: 1 / -1; margin-left: 0; }
 }
 
-/* „DaisyUI look” dla surowych SSF inputów (fallback) */
+/* DaisyUI look dla surowych SSF inputów (fallback) */
 .ssf-field input[type="text"].ssf-input,
 .ssf-field input[type="number"].ssf-input{
   background-color: oklch(var(--b1));

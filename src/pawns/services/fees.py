@@ -18,6 +18,6 @@ def calc_extension_fee(*, principal: Money, days: int) -> Money:
     fee_amount = (Decimal(base.amount) * pct_30 * Decimal(days) / Decimal("30")).quantize(Decimal("0.01"))
     fee = Money(fee_amount, base.currency)
 
-    # min fee w tej samej walucie co principal (bez FX – 1:1 amount)
+    # min fee w tej samej walucie co principal
     min_fee = Money(Decimal(DEFAULT_MIN_FEE_AMOUNT), base.currency)
     return fee if fee >= min_fee else min_fee

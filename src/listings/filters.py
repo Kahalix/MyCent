@@ -83,7 +83,6 @@ class ItemSetFilter(django_filters.FilterSet):
         Zwraca oferty, które:
           - mieszczą się w gabarytach/wadze,
           - oraz (mają link do wskazanego PackageType) LUB (nie mają w ogóle żadnych shipping_options).
-        Implementacja używa Exists + annotate, zamiast ~Exists w wyrażeniu OR.
         """
         if not value:
             return qs

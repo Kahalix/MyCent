@@ -22,17 +22,13 @@ def _lower(v: Optional[str]) -> Optional[str]:
 
 
 # =========================
-# PACKAGE TYPES (ADMIN)
+# PACKAGE TYPES
 # =========================
 
 def _provider_choices():
     return PackageType.PROVIDER  # [(value, label), ...]
 
 class PackageTypeCreateUpdateForm(forms.Form):
-    """
-    Dane zgodne z commands.create_package_type / update_package_type.
-    price podajemy jako (price_amount, price_currency) -> pakowane do Money lub None.
-    """
     provider = forms.ChoiceField(choices=_provider_choices())
 
     dimensions = forms.CharField(max_length=120, required=False)
@@ -61,14 +57,11 @@ class PackageTypeCreateUpdateForm(forms.Form):
         if amount is not None and cleaned.get("price_currency") in (None, ""):
             cleaned["price_currency"] = "PLN"
 
-        # Walidacja spójności limitów: wszystkie dodatnie (wymusza to już min_value),
-        # ale dopuszczamy None (brak limitu). Tu nic więcej nie trzeba.
-
         return cleaned
 
     def to_data(self) -> dict:
         """
-        Zwraca dict zgodny z oczekiwaniami warstwy commands:
+        Zwraca dict zgodny z oczekiwaniami warstwy:
         {
           provider, dimensions, max_length_cm, ..., price(Money|None), points
         }
@@ -89,7 +82,6 @@ class PackageTypeCreateUpdateForm(forms.Form):
         }
 
 
-# Przydatne w prostych widokach HTML (np. panel admina z filtrem/sugestią)
 class PackageSuggestForm(forms.Form):
     length_cm = forms.IntegerField(required=False, min_value=1)
     width_cm  = forms.IntegerField(required=False, min_value=1)
@@ -126,9 +118,6 @@ class BaseShippingAddressForm(forms.Form):
     def clean_country(self): return _strip(self.cleaned_data.get("country"))
 
     def to_data(self) -> dict:
-        """
-        Sformatowany dict przekazywany do commands.[create|upsert|admin_update]_address
-        """
         cd = self.cleaned_data
         return {
             "first_name": cd.get("first_name") or "",
@@ -144,21 +133,10 @@ class BaseShippingAddressForm(forms.Form):
         }
 
 class ShippingAddressCreateForm(BaseShippingAddressForm):
-    """
-    Tworzy adres dla bieżącego użytkownika (POST w UI).
-    commands.create_address_for_user(user=request.user, data=form.to_data())
-    """
     pass
 
 class ShippingAddressUpsertForm(BaseShippingAddressForm):
-    """
-    PATCH/PUT w UI: commands.upsert_address_for_user(user=request.user, data=form.to_data())
-    """
     pass
 
 class AdminShippingAddressUpdateForm(BaseShippingAddressForm):
-    """
-    Admin modyfikuje dowolny adres:
-      commands.admin_update_address(address=addr, data=form.to_data())
-    """
     pass

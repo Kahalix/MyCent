@@ -37,7 +37,6 @@ class PackageTypeCreateUpdateRequest(serializers.ModelSerializer):
         )
 
     def validate(self, data):
-        # prosta walidacja – jeżeli podany jest któryś z wymiarów, to niech będzie >0
         for k in ("max_length_cm","max_width_cm","max_height_cm"):
             if data.get(k) is not None and data[k] == 0:
                 raise serializers.ValidationError({k: "Musi być > 0 lub null"})

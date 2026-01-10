@@ -33,7 +33,8 @@ from .services.exceptions import (
     TokenInvalid, RefreshMissing, RefreshInvalid, RefreshNotRecognized
 )
 from .permissions import (
-    IsAdmin, IsSelf, IsUserRoleOwner, IsSellerOwnerOrAdmin, IsBankAccountOwnerOrAdmin, IsSellerManagerOrOwner  # noqa: F401 (część może być użyta później)
+    IsAdmin, IsSelf, IsUserRoleOwner, IsSellerOwnerOrAdmin, IsBankAccountOwnerOrAdmin, IsSellerManagerOrOwner,
+    IsMySellerOwnerOrAdmin  # noqa: F401 (część może być użyta później)
 )
 from .filters import UserFilter, UserCandidateFilter, SellerProfileFilter, SellerBankAccountFilter, SellerMembershipFilter
 from .models import SellerProfile, SellerBankAccount
@@ -225,7 +226,6 @@ class SelfUserViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def retrieve(self, request):
-        # DTO z services.queries (zamiast bezpośredniego serializera na request.user)
         return Response(queries.me_payload(request.user), status=200)
 
     def partial_update(self, request):
@@ -313,29 +313,23 @@ class PublicSellerProfileViewSet(mixins.ListModelMixin,
     serializer_class = SellerProfilePublicResponse
 
 
-# ===== SELLER PROFILE – OWNER (create/own/detail/update + images) =====
-# to API dotyczy TYLKO profilu, którego "owner" == request.user
-# Operacje na wielu sklepach przez membership masz w innych endpointach (np. bank accounts).
-
+# ===== SELLER PROFILE - OWNER (create/own/detail/update + images) =====
 class MySellerProfileViewSet(viewsets.ViewSet):
-    """
-    GET:   każdy zalogowany, jeśli jest właścicielem LUB ma aktywne membership (zwracamy "jego" sklep)
-    POST/PATCH: tylko użytkownik z rolą OWNER (globalną) – jak było.
-    """
     def get_permissions(self):
-        if getattr(self, "action", None) in ("retrieve",):
+        if getattr(self, "action", None) == "retrieve":
             return [permissions.IsAuthenticated()]
-        # create / partial_update – tylko globalny OWNER
-        return [permissions.IsAuthenticated(), IsUserRoleOwner()]
+        if getattr(self, "action", None) == "create":
+            return [IsAdmin()]
+        return [permissions.IsAuthenticated(), IsMySellerOwnerOrAdmin()]
 
     def retrieve(self, request):
-        # 1) jeśli user jest właścicielem sklepu -> jego profil
-        sp = (SellerProfile.objects
-              .select_related("owner")
-              .filter(owner=request.user)
-              .first())
+        sp = (
+            SellerProfile.objects
+            .select_related("owner")
+            .filter(owner=request.user)
+            .first()
+        )
 
-        # 2) w innym przypadku – najlepsze aktywne członkostwo usera
         if not sp:
             mem = queries.best_membership_for_user(request.user)
             if mem:
@@ -357,7 +351,7 @@ class MySellerProfileViewSet(viewsets.ViewSet):
     def partial_update(self, request):
         sp = SellerProfile.objects.filter(owner=request.user).first()
         if not sp:
-            return Response({"detail": "Not found"}, status=404)
+            return Response({"detail": "Forbidden"}, status=403)
         ser = SellerProfileUpdateRequest(data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
         sp = commands.update_seller_owned(seller=sp, data=ser.validated_data)
@@ -367,7 +361,7 @@ class MySellerProfileViewSet(viewsets.ViewSet):
     def upload_logo(self, request):
         sp = SellerProfile.objects.filter(owner=request.user).first()
         if not sp:
-            return Response({"detail": "Not found"}, status=404)
+            return Response({"detail": "Forbidden"}, status=403)
         ser = SellerLogoUploadRequest(data=request.data)
         ser.is_valid(raise_exception=True)
         url = commands.upload_seller_logo(seller=sp, logo=ser.validated_data["logo"])
@@ -377,7 +371,7 @@ class MySellerProfileViewSet(viewsets.ViewSet):
     def delete_logo(self, request):
         sp = SellerProfile.objects.filter(owner=request.user).first()
         if not sp:
-            return Response({"detail": "Not found"}, status=404)
+            return Response({"detail": "Forbidden"}, status=403)
         commands.delete_seller_logo(seller=sp)
         return Response(status=204)
 
@@ -385,7 +379,7 @@ class MySellerProfileViewSet(viewsets.ViewSet):
     def upload_banner(self, request):
         sp = SellerProfile.objects.filter(owner=request.user).first()
         if not sp:
-            return Response({"detail": "Not found"}, status=404)
+            return Response({"detail": "Forbidden"}, status=403)
         ser = SellerBannerUploadRequest(data=request.data)
         ser.is_valid(raise_exception=True)
         url = commands.upload_seller_banner(seller=sp, banner=ser.validated_data["banner"])
@@ -395,7 +389,7 @@ class MySellerProfileViewSet(viewsets.ViewSet):
     def delete_banner(self, request):
         sp = SellerProfile.objects.filter(owner=request.user).first()
         if not sp:
-            return Response({"detail": "Not found"}, status=404)
+            return Response({"detail": "Forbidden"}, status=403)
         commands.delete_seller_banner(seller=sp)
         return Response(status=204)
 
@@ -443,7 +437,7 @@ class AdminSellerProfileViewSet(viewsets.ModelViewSet):
         return self.update(request, *args, **kwargs)
 
 
-# ===== BANK ACCOUNTS – OWNER/MANAGER (membership) =====
+# ===== BANK ACCOUNTS =====
 class MySellerBankAccountViewSet(viewsets.GenericViewSet,
                                  mixins.ListModelMixin,
                                  mixins.RetrieveModelMixin,
@@ -451,12 +445,12 @@ class MySellerBankAccountViewSet(viewsets.GenericViewSet,
                                  mixins.UpdateModelMixin,
                                  mixins.DestroyModelMixin):
     """
-    /api/sellers/mine/bank-accounts/...
-    - LIST/RETRIEVE: wszystkie konta bankowe w sklepach, gdzie user ma AKTYWNE membership.
-    - CREATE/UPDATE/DELETE: dozwolone dla ról OWNER/MANAGER (waliduje services.commands.*).
-    - CREATE wymaga w body: seller_public_id (wskazuje sklep).
-    """
-    permission_classes = [permissions.IsAuthenticated, IsUserRoleOwner]
+     /api/sellers/mine/bank-accounts/...
+     - LIST/RETRIEVE: konta bankowe sklepów, których właścicielem jest zalogowany użytkownik.
+     - CREATE: tworzy konto bankowe dla wskazanego sklepu pod warunkiem, że sklep należy do zalogowanego użytkownika.
+     - UPDATE/DELETE/SET-DEFAULT: operacje na kontach bankowych należących do sklepu, którego właścicielem jest zalogowany użytkownik.
+     """
+    permission_classes = [permissions.IsAuthenticated, IsMySellerOwnerOrAdmin]
     lookup_field = "public_id"
     serializer_class = SellerBankAccountOwnerResponse
     filter_backends = (DjangoFilterBackend, OrderingFilter, SearchFilter)
@@ -464,7 +458,6 @@ class MySellerBankAccountViewSet(viewsets.GenericViewSet,
     ordering_fields = ("created_at", "is_default", "iban")
     search_fields = ("iban", "bank_name", "account_holder")
 
-    # może dodać w queries a nie tu
     def get_queryset(self):
         # tylko konta dla sklepu, którego właścicielem jest user
         return SellerBankAccount.objects.select_related("seller_profile").filter(
@@ -533,7 +526,7 @@ class MySellerBankAccountViewSet(viewsets.GenericViewSet,
 class AdminSellerBankAccountViewSet(viewsets.ModelViewSet):
     """
     /api/sellers/mine/bank-accounts/...
-    - LIST/RETRIEVE/CREATE/UPDATE/DELETE: tylko właściciel (globalna rola OWNER).
+    - LIST/RETRIEVE/CREATE/UPDATE/DELETE: tylko administrator (superuser).
     - CREATE wymaga w body: seller_public_id (ID własnego sklepu).
     """
     permission_classes = [IsAdmin]

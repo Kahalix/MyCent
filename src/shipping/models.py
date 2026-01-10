@@ -8,7 +8,7 @@ from django.db.models import Q
 class PackageType(PublicIdModel):
     """
     Definicja typu paczki u przewoźnika oraz jego limitów.
-    None w limitach oznacza „brak limitu”.
+    None w limitach oznacza brak limitu.
     """
     PROVIDER = [
         ("INPOST","InPost"),("DPD","DPD"),("POCZTAPOLSKA","Poczta Polska"),
@@ -16,7 +16,7 @@ class PackageType(PublicIdModel):
     ]
     provider = models.CharField(max_length=20, choices=PROVIDER, default="OTHER")
 
-    # Marketingowa etykieta (np. „Gabaryt A”, „Paczkomat M”)
+    # Marketingowa etykieta (np. Gabaryt A, Paczkomat M)
     dimensions = models.CharField(max_length=120, blank=True)
 
     # Limity techniczne (cm / kg)
@@ -25,7 +25,7 @@ class PackageType(PublicIdModel):
     max_height_cm = models.PositiveIntegerField(null=True, blank=True)
     max_weight_kg = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True)
 
-    # Cena katalogowa + punkty (opcjonalnie)
+    # Cena katalogowa + punkty
     price  = MoneyField(max_digits=19, decimal_places=2, default_currency="PLN", null=True, blank=True)
     points = models.PositiveIntegerField(default=0)
 
@@ -48,7 +48,6 @@ class PackageType(PublicIdModel):
 class ShippingAddress(PublicIdModel):
     """
     Jeden adres wysyłkowy przypięty do użytkownika (OneToOne).
-    Możesz rozbudować to potem do wielu adresów – wtedy zmienisz na ForeignKey i dodasz „is_default”.
     """
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="shipping_address")
     first_name = models.CharField(max_length=120, blank=True)

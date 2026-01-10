@@ -12,7 +12,7 @@ from listings.models import ItemSet
 
 User = get_user_model()
 
-# --------- LOOKUPS ---------
+# ----- LOOKUPS -----
 
 def get_package_by_public_id(public_id: str) -> Optional[ListingPackage]:
     return ListingPackage.objects.select_related("item_type").filter(public_id=public_id).first()
@@ -41,7 +41,7 @@ def get_any_paid_usage_for_itemset(itemset: ItemSet) -> Optional[ListingUsageHis
         .first()
     )
 
-# --------- LOCKING ---------
+# --------- LOCKING ---
 
 @transaction.atomic
 def lock_user_packages_for_type(user: User, item_type: ItemType) -> None:
@@ -59,11 +59,11 @@ def lock_active_usages_for_type(user: User, item_type: ItemType) -> None:
 def lock_user_row(user: User) -> User:
     return User.objects.select_for_update().get(pk=user.pk)
 
-# --------- TOTALS / COUNTS ---------
+# ----- TOTALS / COUNTS ----
 
 def totals_for_user_and_type(user: User, item_type: ItemType) -> tuple[int, int]:
     """
-    Zwraca (free_total, paid_total) – SUMA z pakietów użytkownika dla danej kategorii.
+    Zwraca (free_total, paid_total) - SUMA z pakietów użytkownika dla danej kategorii.
     """
     agg = (UserListingPackage.objects
            .filter(user=user, listing_package__item_type=item_type)
@@ -72,7 +72,7 @@ def totals_for_user_and_type(user: User, item_type: ItemType) -> tuple[int, int]
 
 def active_free_used_count(user: User, item_type: ItemType) -> int:
     """
-    Ile AKTYWNYCH (released_at is null) usage’ów FREE (is_bought=False) ma user w tej kategorii.
+    Ile AKTYWNYCH (released_at is null) usageów FREE (is_bought=False) ma user w tej kategorii.
     """
     return (ListingUsageHistory.objects
             .filter(user=user, item_type=item_type, released_at__isnull=True, is_bought=False)
@@ -80,7 +80,7 @@ def active_free_used_count(user: User, item_type: ItemType) -> int:
 
 def paid_consumed_count(user: User, item_type: ItemType) -> int:
     """
-    Ile PAID zużył lifetime (is_bought=True) – nie zwracamy.
+    Ile PAID zużył lifetime (is_bought=True)
     """
     return (ListingUsageHistory.objects
             .filter(user=user, item_type=item_type, is_bought=True)
@@ -94,7 +94,7 @@ def active_itemsets_count(user: User, item_type: ItemType) -> int:
             .filter(owner_user=user, added_by="USER", status="AVAILABLE", type=item_type)
             .count())
 
-# --------- MUTATIONS ---------
+# ------ MUTATIONS ---
 
 def add_free_capacity(up: UserListingPackage, count: int) -> UserListingPackage:
     up.free_total = (up.free_total or 0) + int(count)
@@ -138,7 +138,7 @@ def create_purchase_history(*, user: User, package: ListingPackage,
         description=description,
     )
 
-# --------- REPORTS ---------
+# ----- REPORTS ---
 
 def item_types_with_activity_for_user(user: User) -> Iterable[ItemType]:
     # wszystkie typy, w których user ma pakiety LUB aktywne/zużyte usage

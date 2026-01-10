@@ -23,7 +23,7 @@ class Customer(PublicIdModel):
     city          = models.CharField(max_length=120, blank=True)
     country       = models.CharField(max_length=2, blank=True)  # ISO 3166-1 alpha-2
 
-    # dokument (opcjonalnie)
+    # dokument
     document_type   = models.CharField(max_length=32, blank=True)  # np. "ID", "PASSPORT"
     document_number = models.CharField(max_length=64, blank=True)
     birth_date      = models.DateField(null=True, blank=True)
@@ -38,7 +38,7 @@ class Customer(PublicIdModel):
             models.Index(fields=["city"], name="ix_customer_city"),
         ]
         constraints = [
-            # brak „twardych” wymaganych pól, ale jeśli jest email – to niepusty
+            # brak twardych wymaganych pól, ale jeśli jest email to niepusty
             models.CheckConstraint(
                 name="ck_customer_email_not_blank",
                 check=Q(email__isnull=True) | ~Q(email=""),

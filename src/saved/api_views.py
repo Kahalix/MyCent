@@ -26,12 +26,8 @@ class DefaultPagination(PageNumberPagination):
     page_size_query_param = "page_size"
     max_page_size = 200
 
-# ===== USER SELF: Saved Listings =====
+# ===== USER: Saved Listings =====
 class MySavedListingsViewSet(viewsets.GenericViewSet):
-    """
-    /api/users/me/saved/listings  [GET, POST]
-    /api/users/me/saved/listings/<item_public_id>  [DELETE]
-    """
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = DefaultPagination
     lookup_url_kwarg = "item_public_id"
@@ -54,15 +50,8 @@ class MySavedListingsViewSet(viewsets.GenericViewSet):
         return Response(status=204)
 
 
-# ===== USER SELF: Saved Searches =====
+# ===== USER: Saved Searches =====
 class MySavedSearchesViewSet(viewsets.GenericViewSet):
-    """
-    /api/users/me/saved/searches [GET, POST]
-    /api/users/me/saved/searches/<public_id> [PATCH, DELETE]
-    /api/users/me/saved/searches/<public_id>/items [GET]
-    /api/users/me/saved/searches/<public_id>/refresh [POST]
-    /api/users/me/saved/searches/<public_id>/results [GET]  # on-the-fly run
-    """
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = DefaultPagination
     lookup_field = "public_id"
@@ -134,7 +123,7 @@ class MySavedSearchesViewSet(viewsets.GenericViewSet):
     @action(detail=True, methods=["get"], url_path="results")
     def results(self, request, public_id=None):
         """
-        On-the-fly podgląd „NOWYCH” wyników (bez modyfikacji stanu).
+        Podgląd NOWYCH wyników (bez modyfikacji stanu).
         """
         ss = get_saved_search_by_public_id(request.user, public_id)
         if not ss:

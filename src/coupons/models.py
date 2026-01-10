@@ -21,16 +21,16 @@ class Coupon(PublicIdModel):
     DISCOUNT_TYPE = [("PERCENTAGE", "Percentage"), ("AMOUNT", "Amount")]
     discount_type = models.CharField(max_length=10, choices=DISCOUNT_TYPE)
 
-    # Uwaga: dla PERCENTAGE używamy discount_value.amount jako % (np. 10 => 10%)
+    # dla PERCENTAGE używamy discount_value.amount jako % (np. 10 => 10%)
     discount_value = MoneyField(max_digits=19, decimal_places=2, default_currency="PLN", null=True, blank=True)
     max_discount_value = MoneyField(max_digits=19, decimal_places=2, default_currency="PLN", null=True, blank=True)
     min_purchase_value = MoneyField(max_digits=19, decimal_places=2, default_currency="PLN", null=True, blank=True)
 
-    # Dla „sklepiku punktowego”: stok kuponów i koszt punktowy
+    # Dla sklepu punktowego: stok kuponów i koszt punktowy
     quantity = models.PositiveIntegerField(null=True, blank=True)       # None = bez limitu
     points_cost = models.PositiveIntegerField(null=True, blank=True)    # None = nie do kupienia za punkty
 
-    # Limity użyć (dla GLOBAL – przez code) i per user (dla GLOBAL i USER)
+    # Limity użyć (dla GLOBAL - przez code) i per user (dla GLOBAL i USER)
     max_redemptions = models.PositiveIntegerField(null=True, blank=True)   # None = bez limitu
     max_per_user = models.PositiveIntegerField(null=True, blank=True)      # None = bez limitu
 

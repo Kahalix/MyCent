@@ -14,7 +14,7 @@ class ListingPackageForm(forms.ModelForm):
       - listings_free >= 0
       - points >= 0
       - dopuszczamy dowolną kombinację price/points (oba, jedno, żadne -> FREE grant)
-      - listings_free == 0 oznacza „kredyt płatny” (paid credit) przy zakupie.
+      - listings_free == 0 oznacza kredyt płatny (paid credit) przy zakupie.
     """
     class Meta:
         model = ListingPackage
@@ -30,15 +30,11 @@ class ListingPackageForm(forms.ModelForm):
         if pts < 0:
             self.add_error("points", "Wartość musi być ≥ 0.")
 
-        # Nie wymuszamy price/points – pakiet może być darmowy (admin przyznaje).
+        # Nie wymuszamy price/points - pakiet może być darmowy (admin przyznaje).
         return data
 
 
 class PurchasePackageForm(forms.Form):
-    """
-    Jeżeli budujesz stronę HTML (poza API), to tym formularzem
-    użytkownik może wybrać pakiet i metodę płatności.
-    """
     PAY_WITH = (
         ("auto", "Automatycznie"),
         ("points", "Punkty"),
@@ -53,6 +49,4 @@ class PurchasePackageForm(forms.Form):
 
     def clean(self):
         data = super().clean()
-        # Dodatkowe walidacje typu: czy user ma punkty – robisz na etapie view/command,
-        # bo tu nie mamy jeszcze użytkownika.
         return data

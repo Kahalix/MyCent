@@ -1,4 +1,3 @@
-# src/common/attrs_display.py  (POLSKA WERSJA)
 from __future__ import annotations
 import re
 from typing import Dict, Any

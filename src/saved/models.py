@@ -8,14 +8,12 @@ class SavedListing(PublicIdModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="saved_listings")
     item_set = models.ForeignKey(ItemSet, on_delete=models.CASCADE, related_name="saved_by")
 
-    # snapshot ceny w momencie zapisu (uzupełniany sygnałem i/lub cronem)
+    # snapshot ceny w momencie zapisu
     saved_price_amount   = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     saved_price_currency = models.CharField(max_length=3, default="PLN", blank=True)
 
-    # flaga jednorazowego powiadomienia o spadku
     price_drop_notification_sent = models.BooleanField(default=False)
 
-    # housekeeping
     last_price_checked_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:

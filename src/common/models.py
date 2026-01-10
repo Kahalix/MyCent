@@ -95,7 +95,7 @@ class PublicIdModel(TimeStampedModel):
 
 class IdempotencyKey(models.Model):
     """
-    Prosty magazyn idempotentnych wywołań.
+    magazyn idempotentnych wywołań.
     Unikalność: (user, scope, key).
     target_ids: JSON – np. ["pay_public_id"] albo lista public_id zamówień.
     """

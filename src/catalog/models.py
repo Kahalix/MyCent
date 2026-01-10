@@ -346,7 +346,7 @@ def _validate_against_schema(attrs: dict, schema_or_itemtype, *, where: str = "a
               (schema_or_itemtype or {}))
     return _normalize_and_validate_attrs(attrs or {}, schema, where=where, require_same_fields=require_same_fields)
 
-# alias „czytelny”
+# alias czytelny
 validate_against_schema = _validate_against_schema
 
 

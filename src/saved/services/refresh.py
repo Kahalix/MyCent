@@ -7,7 +7,7 @@ from catalog.models import ItemType
 from listings.models import ItemSet
 from saved.models import SavedSearch, SavedSearchItem, SavedListing
 from saved.services.notifications import notify_price_drop
-from saved.services.queries import run_saved_query  # <<- używamy filtra opartego o query_string
+from saved.services.queries import run_saved_query
 
 
 def _descendants_types(category_path: str):
@@ -16,13 +16,12 @@ def _descendants_types(category_path: str):
     return ItemType.objects.filter(path__startswith=category_path)
 
 def _since(ss: SavedSearch):
-    # skąd zaczynamy liczenie „nowych” - domyślnie data utworzenia
     return ss.since_at or ss.created_at
 
 def _query_for_search(ss: SavedSearch):
     """
-    Zwraca queryset NOWYCH ofert (created_at > since) - lekki, bez select_related/prefetch.
-    Używany wyłącznie do budowania snapshota (wystarczy PK).
+    Zwraca queryset NOWYCH ofert (created_at > since)
+    Używany wyłącznie do budowania snapshota.
     """
     qstr = (ss.query_string or "").strip()
     if qstr:
@@ -38,7 +37,6 @@ def _query_for_search(ss: SavedSearch):
             qs = qs.filter(Q(set_name__icontains=phrase) | Q(description__icontains=phrase))
         base = qs
 
-    # Zbij wszystkie wcześniejsze select_related/prefetch z public_itemsets_qs()
     base = base.select_related(None).prefetch_related(None)
 
     # Tylko nowe
@@ -49,8 +47,8 @@ def _query_for_search(ss: SavedSearch):
 @transaction.atomic
 def refresh_saved_searches(*, limit: int | None = None, prune: bool = False) -> dict:
     """
-    Buduje snapshot „nieprzeczytanych” wyników (SavedSearchItem) tylko dla NOWYCH ogłoszeń.
-    Nie czyści niczego – czyszczenie następuje dopiero po obejrzeniu wyników (mark-seen).
+    Buduje snapshot nieprzeczytanych wyników (SavedSearchItem) tylko dla NOWYCH ogłoszeń.
+    Czyszczenie następuje dopiero po obejrzeniu wyników.
     """
     qs = SavedSearch.objects.all().order_by("id")
     if limit:
@@ -72,9 +70,7 @@ def refresh_saved_searches(*, limit: int | None = None, prune: bool = False) -> 
             )
         added += len(new_ids)
 
-        # „prune” nie ma już znaczenia (trzymamy tylko nowe), ale zostawiamy zgodność:
         if prune:
-            # nic do prunowania – snapshot to tylko nieprzeczytane
             pass
 
     return {"scanned": scanned, "added": added, "removed": removed}
@@ -128,7 +124,7 @@ def check_price_drops(*, limit: int | None = None, notify: bool = True) -> dict:
             ])
             notified += 1
         else:
-            # jeśli cena wzrosła – znów pozwól powiadomić przy kolejnym spadku
+            # jeśli cena wzrosła znów pozwól powiadomić przy kolejnym spadku
             if sl.price_drop_notification_sent and cur_amount > sl.saved_price_amount:
                 sl.price_drop_notification_sent = False
             sl.last_price_checked_at = now

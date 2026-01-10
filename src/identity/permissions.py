@@ -1,10 +1,10 @@
 from __future__ import annotations
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
-from identity.models import SellerMembership
+from identity.models import SellerMembership, SellerProfile
 
 ADMIN_ROLES = {"OWNER", "MANAGER"}
-MOD_ROLES   = {"MODERATOR", "MANAGER", "OWNER"}
+MOD_ROLES = {"MODERATOR", "MANAGER", "OWNER"}
 SHOP_MOD_ROLES = {"MANAGER", "MODERATOR", "OWNER"}
 
 def _has_membership(user, seller_public_id: str, roles: set[str] | None = None) -> bool:
@@ -24,6 +24,15 @@ class IsAdmin(BasePermission):
         u = request.user
         return bool(u and u.is_authenticated and u.is_superuser)
 
+class IsMySellerOwnerOrAdmin(BasePermission):
+    def has_permission(self, request, view):
+        u = request.user
+        if not u or not u.is_authenticated:
+            return False
+        if u.is_superuser:
+            return True
+        return SellerProfile.objects.filter(owner=u).exists()
+
 class IsAnyActiveSellerMember(BasePermission):
     def has_permission(self, request, view):
         u = request.user
@@ -34,7 +43,6 @@ class IsAnyActiveSellerMember(BasePermission):
         )
 
 class IsSellerMember(BasePermission):
-    """Sprawdza członkostwo w profilu sprzedawcy przypiętym do obiektu."""
     def has_object_permission(self, request, view, obj):
         spid = getattr(getattr(obj, "seller_profile", None), "public_id", None)
         return _has_membership(request.user, spid)
@@ -55,9 +63,6 @@ class IsShopModeratorMember(BasePermission):
         return SellerMembership.objects.filter(user=u, is_active=True, role__in=list(SHOP_MOD_ROLES)).exists()
 
 class IsModerator(BasePermission):
-    """
-    Moderator: Django is_staff OR rola w MOD_ROLES (MODERATOR/MANAGER/OWNER).
-    """
     def has_permission(self, request, view):
         u = request.user
         return bool(u and u.is_authenticated and (u.is_staff or getattr(u, "role", None) in MOD_ROLES))
@@ -71,9 +76,6 @@ class IsSelf(BasePermission):
         return request.user.is_authenticated and obj.pk == request.user.pk
 
 class IsSellerOwnerOrAdmin(BasePermission):
-    """
-    Dla obiektów SellerProfile – właściciel (owner) lub admin.
-    """
     def has_object_permission(self, request, view, obj):
         u = request.user
         if not u or not u.is_authenticated:
@@ -83,7 +85,6 @@ class IsSellerOwnerOrAdmin(BasePermission):
         return getattr(obj, "owner_id", None) == u.id
 
     def has_permission(self, request, view):
-        # przy tworzeniu pozwól zalogowanym; walidacja szczegółowa w command
         return request.user.is_authenticated
 
 class IsBankAccountOwnerOrAdmin(BasePermission):
@@ -93,7 +94,6 @@ class IsBankAccountOwnerOrAdmin(BasePermission):
             return False
         if u.is_superuser:
             return True
-        # własność konta = właściciel SellerProfile
         try:
             return obj.seller_profile.owner_id == u.id
         except Exception:
@@ -103,11 +103,9 @@ class IsBankAccountOwnerOrAdmin(BasePermission):
         return request.user.is_authenticated
 
 class IsUserRoleOwner(BasePermission):
-    """Wymaga, by request.user.role == OWNER (nie mylić z membership OWNER)."""
     def has_permission(self, request, view):
         u = request.user
         return bool(u and u.is_authenticated and getattr(u, "role", None) == "OWNER")
-
 
 class IsAnyActiveSellerManagerOrOwner(BasePermission):
     def has_permission(self, request, view):

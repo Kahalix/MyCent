@@ -4,21 +4,21 @@ from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.core.exceptions import PermissionDenied
 from django.utils.html import format_html
+from django.db.models import F
 
 from .models import User, SellerProfile, SellerBankAccount, UserToken, SellerMembership
 
 # ========= helpers / stałe =========
 
 STATUS_THAT_DISABLE_LOGIN = {"SUSPENDED", "DELETED"}
-SPECIAL_PERM = "identity.can_set_user_status"  # niestandardowe uprawnienie „zmiana statusu”
+SPECIAL_PERM = "identity.can_set_user_status"  # niestandardowe uprawnienie zmiana statusu
 
 ALLOWED_ROLES_FOR_NON_SUPERUSER_EDIT = {"CLIENT", "EMPLOYEE"}
-ROLES_EDIT_DELETE_OWNER_ONLY = {"MANAGER", "MODERATOR"}  # tylko OWNER (lub superuser) może ich ruszać
+ROLES_EDIT_DELETE_OWNER_ONLY = {"MANAGER", "MODERATOR"}
 
 def _safe_file_url(field) -> str:
     """
     Zwraca URL pliku jeśli istnieje, w przeciwnym razie pusty string.
-    Unika ValueError: The 'X' attribute has no file associated with it.
     """
     try:
         if not field or not getattr(field, "name", None):
@@ -30,11 +30,11 @@ def _safe_file_url(field) -> str:
 
 def _is_protected_target(target: User, acting_user: User) -> bool:
     """
-    Czy konto jest „chronione” przed edycją/usunięciem przez działającego użytkownika?
+    Czy konto jest chronione przed edycją/usunięciem przez działającego użytkownika?
     - superuser: może wszystko
     - staff / superuser / OWNER – zawsze chronione dla nie-superusera
-    - MANAGER/MODERATOR – chronione, chyba że acting_user ma globalną rolę OWNER
-    - własne konto – chronione
+    - MANAGER/MODERATOR - chronione
+    - własne konto - chronione
     """
     if not target:
         return False
@@ -44,7 +44,7 @@ def _is_protected_target(target: User, acting_user: User) -> bool:
     if target.is_superuser or target.is_staff or getattr(target, "role", None) == "OWNER":
         return True
 
-    if target.role in ROLES_EDIT_DELETE_OWNER_ONLY and getattr(acting_user, "role", None) != "OWNER":
+    if target.role in ROLES_EDIT_DELETE_OWNER_ONLY:
         return True
 
     if target.pk == acting_user.pk:
@@ -95,7 +95,7 @@ class UserAdmin(DjangoUserAdmin):
         ("Important dates", {"fields": ("last_login", "date_joined")}),
     )
 
-    # --- ograniczenie wyboru ról w UI dla nie-superusera ---
+    # --- ograniczenie wyboru ról w UI dla nie superusera ---
     def formfield_for_choice_field(self, db_field, request, **kwargs):
         if db_field.name == "role" and not request.user.is_superuser:
             full = dict(User._meta.get_field("role").choices)
@@ -109,7 +109,7 @@ class UserAdmin(DjangoUserAdmin):
             return True if obj is None else base
         if obj is not None and _is_protected_target(obj, request.user):
             return False
-        # osoby z samym SPECIAL_PERM mogą wejść (status-only) – resztę zablokujemy polami read-only
+        # osoby z samym SPECIAL_PERM mogą wejść (status-only) - resztę zablokujemy polami readonly
         if request.user.has_perm(SPECIAL_PERM):
             return True
         return base
@@ -136,11 +136,9 @@ class UserAdmin(DjangoUserAdmin):
             .exclude(is_superuser=True)
             .exclude(is_staff=True)
             .exclude(role="OWNER")
+            .exclude(role__in=list(ROLES_EDIT_DELETE_OWNER_ONLY))
             .exclude(pk=request.user.pk)
         )
-        # MANAGER/MODERATOR tylko dla OWNERa
-        if getattr(request.user, "role", None) != "OWNER":
-            qs = qs.exclude(role__in=list(ROLES_EDIT_DELETE_OWNER_ONLY))
         skipped = queryset.count() - qs.count()
         super().delete_queryset(request, qs)
         if skipped:
@@ -152,7 +150,7 @@ class UserAdmin(DjangoUserAdmin):
 
     # ---------- widok listy ----------
     def changelist_view(self, request, extra_context=None):
-        # schowaj inline-edycję statusu/aktywności jeśli brak SPECIAL_PERM
+        # schowaj inline edycję statusu/aktywności jeśli brak SPECIAL_PERM
         if not (request.user.is_superuser or request.user.has_perm(SPECIAL_PERM)):
             original = self.list_editable
             self.list_editable = ()
@@ -164,7 +162,7 @@ class UserAdmin(DjangoUserAdmin):
 
     def get_actions(self, request):
         actions = super().get_actions(request)
-        # usuń delete_selected dla nie-superuserów
+        # usuń delete_selected dla nie superuserów
         if not request.user.is_superuser:
             actions.pop("delete_selected", None)
         # usuń akcje statusowe, jeśli brak SPECIAL_PERM
@@ -173,11 +171,11 @@ class UserAdmin(DjangoUserAdmin):
                 actions.pop(k, None)
         return actions
 
-    # ---------- pola read-only dynamicznie ----------
+    # ---------- pola readonly dynamicznie ----------
     def get_readonly_fields(self, request, obj=None):
         ro = list(super().get_readonly_fields(request, obj))
 
-        # Zawsze zablokowane dla nie-superusera
+        # Zawsze zablokowane dla nie superusera
         ALWAYS_RO = {"is_staff", "is_superuser", "groups", "user_permissions"}
 
         if not request.user.is_superuser:
@@ -188,7 +186,7 @@ class UserAdmin(DjangoUserAdmin):
                 if _is_protected_target(obj, request.user):
                     ro = sorted(set(ro) | {"role", "user_status", "is_active"})
                 else:
-                    # Osoba z samym SPECIAL_PERM (bez standardowego change) – pozwól tylko na status/aktywność
+                    # Osoba z samym SPECIAL_PERM (bez standardowego change) - pozwól tylko na status/aktywność
                     has_std_change = super().has_change_permission(request, obj)
                     has_special = request.user.has_perm(SPECIAL_PERM)
                     if has_special and not has_std_change:
@@ -214,22 +212,22 @@ class UserAdmin(DjangoUserAdmin):
 
     # ---------- zapis z egzekwowaniem zasad ----------
     def save_model(self, request, obj, form, change):
-        # twarda blokada edycji kont chronionych dla nie-superusera
+        # twarda blokada edycji kont chronionych dla nie superusera
         if not request.user.is_superuser and obj and _is_protected_target(obj, request.user):
             raise PermissionDenied("Nie możesz modyfikować tego konta.")
 
-        # nie-superuser nie dotyka pól uprawnień
+        # nie superuser nie dotyka pól uprawnień
         perm_fields = {"is_staff", "is_superuser", "groups", "user_permissions"}
         if not request.user.is_superuser and (set(form.changed_data) & perm_fields):
             raise PermissionDenied("Brak uprawnień do zmiany uprawnień użytkownika.")
 
-        # ograniczenie zmiany roli dla nie-superusera -> dozwolone tylko CLIENT/EMPLOYEE
+        # ograniczenie zmiany roli dla nie superusera -> dozwolone tylko CLIENT/EMPLOYEE
         if not request.user.is_superuser and "role" in form.changed_data:
             new_role = form.cleaned_data.get("role")
             if new_role not in ALLOWED_ROLES_FOR_NON_SUPERUSER_EDIT:
                 raise PermissionDenied("Nie możesz ustawiać tej roli (dozwolone: CLIENT lub EMPLOYEE).")
 
-        # zmiana statusu/aktywności wymaga SPECIAL_PERM (dla nie-superuserów)
+        # zmiana statusu/aktywności wymaga SPECIAL_PERM (dla nie superuserów)
         changed_status_fields = any(f in form.changed_data for f in ("user_status", "is_active"))
         if changed_status_fields and not request.user.is_superuser and not request.user.has_perm(SPECIAL_PERM):
             raise PermissionDenied("Brak uprawnienia do zmiany statusu użytkownika.")
@@ -252,14 +250,14 @@ class UserAdmin(DjangoUserAdmin):
             if changed_status_fields and (obj.user_status in STATUS_THAT_DISABLE_LOGIN or obj.is_active is False):
                 self._revoke_tokens(obj)
 
-    # nie pozwól nadawać grup/perms przy save_related (osoby nie-superuser)
+    # nie pozwól nadawać grup/perms przy save_related (osoby nie superuser)
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
         obj = form.instance
         if not request.user.is_superuser:
             obj.groups.clear()
             obj.user_permissions.clear()
-            # przy tworzeniu – dopnij jeszcze raz bezpieczeństwo roli
+            # przy tworzeniu dopnij jeszcze raz bezpieczeństwo roli
             if not change and obj.role not in ALLOWED_ROLES_FOR_NON_SUPERUSER_EDIT:
                 obj.role = "CLIENT"
                 obj.save(update_fields=["role"])
@@ -405,7 +403,7 @@ class UserTokenAdmin(admin.ModelAdmin):
 # ========= SellerMembershipAdmin (sklep – członkowie) =========
 # Ograniczenia:
 # - Nikt poza superuserem nie może edytować/usuwać członkostwa OWNERA.
-# - Nie można dodać/ustawić roli OWNER (z wyjątkiem superusera – ale i tak zwykle nie robimy tego w adminie).
+# - Nie można dodać/ustawić roli OWNER (z wyjątkiem superusera ale i tak zwykle nie robimy tego w adminie).
 # - (Pozostałe reguły biznesowe wymuszasz też w API, tutaj to twarde zabezpieczenie na panelu)
 
 @admin.register(SellerMembership)
@@ -415,7 +413,7 @@ class SellerMembershipAdmin(admin.ModelAdmin):
     search_fields = ("seller_profile__slug", "user__email")
     autocomplete_fields = ("seller_profile", "user")
 
-    # wytnij OWNER z wyboru ról dla nie-superuserów
+    # wytnij OWNER z wyboru ról dla nie superuserów
     def formfield_for_choice_field(self, db_field, request, **kwargs):
         if db_field.name == "role" and not request.user.is_superuser:
             full = dict(SellerMembership.ROLE_CHOICES)
@@ -457,7 +455,7 @@ class SellerMembershipAdmin(admin.ModelAdmin):
     def delete_queryset(self, request, queryset):
         if request.user.is_superuser:
             return super().delete_queryset(request, queryset)
-        qs = queryset.exclude(user_id=models.F("seller_profile__owner_id"))
+        qs = queryset.exclude(user_id=F("seller_profile__owner_id"))
         skipped = queryset.count() - qs.count()
         super().delete_queryset(request, qs)
         if skipped:

@@ -7,7 +7,7 @@ from .base import ProviderClient
 
 class DummyClient(ProviderClient):
     """
-    Minimalny „provider” do lokalnej symulacji – bez zewnętrznego API.
+    Provider do lokalnej symulacji bez zewnętrznego API.
     """
     provider_code: str = "SIM"
 
@@ -17,8 +17,8 @@ class DummyClient(ProviderClient):
         return provider_payment_id, client_secret
 
     def confirm(self, *, provider_payment_id: str) -> str:
-        # w dummy nie dzwonimy do zewnętrza – status zwróci webhook/endpoint testowy
-        # ale dla zgodności oddamy 'processing'
+        # w dummy nie dzwonimy do zewnętrza. Status zwróci webhook/endpoint testowy
+        # ale dla zgodności oddamy processing
         return "processing"
 
     def cancel(self, *, provider_payment_id: str) -> str:

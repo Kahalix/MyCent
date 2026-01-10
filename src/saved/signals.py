@@ -10,7 +10,7 @@ def init_saved_listing_price(sender, instance: SavedListing, created: bool, **kw
         return
     it = instance.item_set
     if getattr(it, "price", None):
-        # ustaw snapshot tylko jeśli nie był ustawiony ręcznie
+        # ustaw snapshot jeśli nie był ustawiony ręcznie
         if instance.saved_price_amount is None:
             instance.saved_price_amount = it.price.amount
             instance.saved_price_currency = str(it.price.currency)

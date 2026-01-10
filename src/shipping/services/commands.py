@@ -11,7 +11,7 @@ from ..services.exceptions import (
 
 User = get_user_model()
 
-# ===== ShippingAddress – self/admin =====
+# ===== ShippingAddress - self/admin =====
 
 @transaction.atomic
 def create_address_for_user(*, user: User, data: dict) -> ShippingAddress:
@@ -45,7 +45,7 @@ def admin_update_address(*, address: ShippingAddress, data: dict) -> ShippingAdd
 def admin_delete_address(*, address: ShippingAddress) -> None:
     repo.delete_address(address)
 
-# ===== PackageType – admin =====
+# ===== PackageType - admin =====
 
 @transaction.atomic
 def create_package_type(*, data: dict) -> PackageType:

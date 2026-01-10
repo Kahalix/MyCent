@@ -35,7 +35,7 @@ class CouponFilter(django_filters.FilterSet):
                  .filter(Q(expiration_date__isnull=True) | Q(expiration_date__gt=now))
         if value:
             return base.filter(Q(quantity__isnull=True) | Q(quantity__gt=0))
-        # „niekupowalne” – odwrotność powyższego
+        # niekupowalne - odwrotność powyższego
         return qs.exclude(pk__in=base.filter(Q(quantity__isnull=True) | Q(quantity__gt=0)).values("pk"))
 
 class UserCouponFilter(django_filters.FilterSet):

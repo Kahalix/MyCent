@@ -16,9 +16,7 @@ from .exceptions import (
     TokenInvalid, RefreshMissing, RefreshInvalid, RefreshNotRecognized
 )
 
-# Kto ma pełne prawa do kont bankowych – tylko właściciel sklepu
 BANK_ADMIN_ROLES = {"OWNER"}
-# Kto ma prawo do sekcji „Członkowie”: OWNER i MANAGER
 MEMBER_ADMIN_ROLES = {"OWNER", "MANAGER"}
 
 from .repositories import (
@@ -285,7 +283,7 @@ def admin_set_user_status(*, public_id: str, user_status: str, is_active: bool |
     u.is_active = _map_is_active_for_status(user_status) if is_active is None else bool(is_active)
     u.save(update_fields=["user_status", "is_active"])
 
-    # jeśli konto zostało zdezaktywowane lub zawieszone – wyloguj wszędzie
+    # jeśli konto zostało zdezaktywowane lub zawieszone - wyloguj wszędzie
     if not u.is_active or user_status in ("SUSPENDED", "DELETED"):
         _revoke_all_tokens(u)
 
@@ -462,14 +460,10 @@ def member_set_default_bank_account(*, user, public_id: str) -> SellerBankAccoun
     set_default_for_seller(acc.seller_profile, acc)
     return acc
 
-# --- helper: zapewnij OWNER-membership dla właściciela sklepu ---
+# --- helper: zapewnij OWNER membership dla właściciela sklepu ---
 def ensure_owner_membership(seller: SellerProfile):
     if not SellerMembership.objects.filter(seller_profile=seller, user_id=seller.owner_id).exists():
         SellerMembership.objects.create(seller_profile=seller, user_id=seller.owner_id, role="OWNER", is_active=True)
-
-# wywołaj ensure_owner_membership w miejscach tworzenia sklepu:
-# - po commands.create_seller_for_owner(...)
-# - po AdminSellerProfileViewSet.create(...)
 
 # ==== MEMBERSHIP COMMANDS ====
 
@@ -478,7 +472,7 @@ def add_member(*, actor: User, seller: SellerProfile, target_user: User, role: s
     if not queries.can_manage_members(actor, seller):
         raise PermissionError("Not allowed")
 
-    # Nie dodajemy użytkowników-klientów
+    # Nie dodajemy użytkowników klientów
     if target_user.role == "CLIENT":
         raise TokenInvalid("Użytkownik z rolą CLIENT nie może zostać członkiem sklepu")
 
@@ -491,13 +485,12 @@ def add_member(*, actor: User, seller: SellerProfile, target_user: User, role: s
     if actor_role == "MANAGER" and role != "EMPLOYEE":
         raise PermissionError("Manager może dodawać wyłącznie pracowników (EMPLOYEE)")
 
-    # nie dubluj
     m, created = SellerMembership.objects.get_or_create(
         seller_profile=seller, user=target_user,
         defaults={"role": role, "is_active": True}
     )
     if not created:
-        # jeśli istnieje nieaktywny – reaktywuj i ustaw rolę
+        # jeśli istnieje nieaktywny - reaktywuj i ustaw rolę
         if not m.is_active:
             m.is_active = True
         m.role = role

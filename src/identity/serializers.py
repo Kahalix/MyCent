@@ -5,7 +5,7 @@ from .models import SellerProfile, SellerBankAccount, SellerMembership
 
 User = get_user_model()
 
-# ======= USER – Responses =======
+# ======= USER - Responses =======
 
 class PublicUserResponse(serializers.ModelSerializer):
     class Meta:
@@ -28,7 +28,7 @@ class UserAdminListResponse(UserAdminResponse):
     """lista może mieć te same pola; oddzielone pod ew. zmianę w przyszłości"""
     pass
 
-# ======= USER – Requests =======
+# ======= USER - Requests =======
 
 class RegisterRequest(serializers.Serializer):
     email = serializers.EmailField()
@@ -108,7 +108,7 @@ class AdminUserStatusUpdateRequest(serializers.Serializer):
     user_status = serializers.ChoiceField(
         choices=[c[0] for c in User._meta.get_field("user_status").choices]
     )
-    # domyślne mapowanie -> is_active
+    # domyślne mapowanie is_active
     is_active = serializers.BooleanField(required=False)
 
 class AvatarUploadRequest(serializers.Serializer):
@@ -192,7 +192,7 @@ class SellerBankAccountCreateRequest(serializers.ModelSerializer):
 class SellerBankAccountUpdateRequest(serializers.ModelSerializer):
     class Meta:
         model = SellerBankAccount
-        fields = ("bank_name", "account_holder", "is_active")  # IBAN niezmienny tu
+        fields = ("bank_name", "account_holder", "is_active")
 
 # ===== MEMBERSHIPS =====
 from .models import SellerMembership
@@ -210,7 +210,7 @@ class SellerMembershipResponse(serializers.ModelSerializer):
         )
 
 class SellerMembershipCreateRequest(serializers.Serializer):
-    # Możesz wskazać użytkownika po public_id lub email (wymagane: jedno z nich)
+    # Możesz wskazać użytkownika po public_id lub email (wymagane jedno z nich)
     user_public_id = serializers.CharField(required=False, allow_blank=True)
     email = serializers.EmailField(required=False)
     role = serializers.ChoiceField(choices=[c[0] for c in SellerMembership.ROLE_CHOICES if c[0] != "OWNER"])
@@ -235,7 +235,7 @@ class SellerContextResponse(serializers.Serializer):
     seller_public_id = serializers.CharField(allow_null=True)
     seller_slug = serializers.CharField(allow_null=True)
 
-    # Jakie zakładki wolno – do prostego sterowania UI
+    # Jakie zakładki wolno - do prostego sterowania UI
     allowed_tabs = serializers.SerializerMethodField()
 
     def get_allowed_tabs(self, obj):

@@ -22,10 +22,9 @@ def get_public_itemsets_cache_version() -> int:
 
     if v is None:
         try:
-            # spróbuj ustawić domyślną wersję (add jest bezpieczne jeśli backend to obsługuje)
+            # spróbuj ustawić domyślną wersję
             cache.add(_CACHE_VERSION_KEY, _DEFAULT_VERSION)
         except Exception:
-            # nie krytyczne — backend może nie wspierać add/incr w test environment
             pass
         return _DEFAULT_VERSION
 
@@ -44,7 +43,7 @@ def get_cache_key(prefix: str, request_path: str) -> str:
 
 def invalidate_public_itemsets_cache() -> None:
     """
-    Bumpuje wersję cache — tania invalidacja wszystkich wpisów.
+    Bumpuje wersję cache - tania invalidacja wszystkich wpisów.
     Stosuje INCR jeśli dostępne, fallback -> losowa wartość.
     """
     try:

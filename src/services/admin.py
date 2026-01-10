@@ -14,7 +14,7 @@ from .services.exceptions import PurchaseError
 User = get_user_model()
 
 
-# ---------- Admin action form: grant package to user (FREE) ----------
+# --- Admin action form ---
 
 class GrantPackageActionForm(ActionForm):
     user = forms.ModelChoiceField(
@@ -25,7 +25,7 @@ class GrantPackageActionForm(ActionForm):
     quantity = forms.IntegerField(min_value=1, initial=1, required=True, label="Ile razy dodać")
 
 
-# ---------- ListingPackage ----------
+# --- ListingPackage ----
 
 @admin.register(ListingPackage)
 class ListingPackageAdmin(admin.ModelAdmin):
@@ -62,7 +62,7 @@ class ListingPackageAdmin(admin.ModelAdmin):
     grant_to_user_free.short_description = "Przyznaj wybrany pakiet użytkownikowi (FREE)"
 
 
-# ---------- UserListingPackage ----------
+# ------- UserListingPackage -----
 
 @admin.register(UserListingPackage)
 class UserListingPackageAdmin(admin.ModelAdmin):
@@ -78,7 +78,7 @@ class UserListingPackageAdmin(admin.ModelAdmin):
     item_type.short_description = "Item type"
 
 
-# ---------- ListingUsageHistory ----------
+# ------ ListingUsageHistory ------
 
 @admin.register(ListingUsageHistory)
 class ListingUsageHistoryAdmin(admin.ModelAdmin):
@@ -97,7 +97,7 @@ class ListingUsageHistoryAdmin(admin.ModelAdmin):
     release_selected.short_description = "Zwolnij sloty dla zaznaczonych (ustaw released_at)"
 
 
-# ---------- ServicePurchaseHistory ----------
+# ----- ServicePurchaseHistory -----
 
 @admin.register(ServicePurchaseHistory)
 class ServicePurchaseHistoryAdmin(admin.ModelAdmin):

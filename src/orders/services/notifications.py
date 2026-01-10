@@ -7,7 +7,7 @@ from django.urls import reverse
 from identity.services import emails
 
 
-# ===== helpers: URL =====
+# ===== helpers: URL ====
 def _abs_base() -> str:
     base = getattr(settings, "SITE_URL", "").rstrip("/")
     return base or "https://localhost"
@@ -19,20 +19,14 @@ def _abs_url(path: str) -> str:
 
 def _order_url(public_id: str) -> str:
     """
-    core: path("orders/<str:order_public_id>", ..., name="buyer_order_detail")
+    path("orders/<str:order_public_id>", ..., name="buyer_order_detail")
     """
     path = reverse("core:buyer_order_detail", kwargs={"order_public_id": public_id})
     return _abs_url(path)
 
 
-# ===== notifications =====
+# ===== notifications ==
 def notify_order_confirmed(*, user, orders: Iterable) -> None:
-    """
-    Jeden mail do kupującego z listą zamówień w ramach transakcji.
-    Szablony:
-      - templates/email/order_confirmed.html  (extends email/_base.html)
-      - templates/email/order_confirmed.txt
-    """
     site = getattr(settings, "SITE_NAME", "MyCent")
     subject = f"[{site}] Potwierdzenie zamówienia"
 
@@ -40,7 +34,7 @@ def notify_order_confirmed(*, user, orders: Iterable) -> None:
     ctx = {
         "first_name": (getattr(user, "first_name", "") or user.email),
         "site_name": site,
-        "subject": subject,          # <- dla nagłówka w _base.html
+        "subject": subject,
         "orders": items,
     }
 
@@ -53,19 +47,13 @@ def notify_order_confirmed(*, user, orders: Iterable) -> None:
 
 
 def notify_order_shipped(*, user, order) -> None:
-    """
-    Mail o wysyłce konkretnego zamówienia.
-    Szablony:
-      - templates/email/order_shipped.html   (extends email/_base.html)
-      - templates/email/order_shipped.txt
-    """
     site = getattr(settings, "SITE_NAME", "MyCent")
     subject = f"[{site}] Twoje zamówienie zostało wysłane"
 
     ctx = {
         "first_name": (getattr(user, "first_name", "") or user.email),
         "site_name": site,
-        "subject": subject,          # <- dla nagłówka w _base.html
+        "subject": subject,
         "order": order,
         "order_url": _order_url(order.public_id),
     }

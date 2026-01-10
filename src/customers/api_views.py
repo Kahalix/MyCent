@@ -19,7 +19,6 @@ def _ensure_staff_membership(request) -> bool:
 class SellerCustomerViewSet(viewsets.ModelViewSet):
     """
     /api/sellers/mine/customers/...
-    Globalna baza klientów – dostęp tylko dla użytkowników z aktywną rolą w jakimkolwiek sklepie.
     """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = CustomerResponse
