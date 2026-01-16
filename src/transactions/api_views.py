@@ -17,9 +17,6 @@ from transactions.services.commands import attach_coupon_and_recalculate, set_tr
 
 # ====== USER ======
 class UserTransactionViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    /api/users/me/transactions/...
-    """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = TransactionResponse
     lookup_field = "public_id"
@@ -62,8 +59,7 @@ class UserTransactionViewSet(viewsets.ReadOnlyModelViewSet):
 # ====== SELLER ======
 class SellerTransactionViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    /api/sellers/mine/transactions/...
-    Pokazuje transakcje, w których są zamówienia sprzedawcy (dowolnego jego profilu).
+    Pokazuje transakcje, w których są zamówienia sprzedawcy
     Pozwala zmienić status (symulacja płatności/offline rozliczenie).
     """
     permission_classes = [permissions.IsAuthenticated]
@@ -92,9 +88,6 @@ class SellerTransactionViewSet(viewsets.ReadOnlyModelViewSet):
 
 # ====== ADMIN ======
 class AdminTransactionViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    /api/admin/transactions/...
-    """
     permission_classes = [IsAdmin]
     serializer_class = TransactionResponse
     lookup_field = "public_id"

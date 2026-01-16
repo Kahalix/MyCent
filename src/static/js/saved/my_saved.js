@@ -1,4 +1,3 @@
-// static/js/saved/my_saved.js
 window.app = window.app || {};
 
 app.savedCenterPage = function () {
@@ -149,7 +148,7 @@ app.savedCenterPage = function () {
     const ord = p.get('ordering') || '';
     if (ORDER[ord]) out.push(`Sort: ${ORDER[ord]}`);
 
-    // wszystko, czego nie rozpoznaliśmy – dorzućmy jako param=value
+    // wszystko, czego nie rozpoznaliśmy - dorzućmy jako param=value
     const known = new Set([
       'search','type_path','listing_type','added_by','condition','allow_online_checkout',
       'price_min','price_max','seller_slug','owner_public_id','ordering'

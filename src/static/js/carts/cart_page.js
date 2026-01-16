@@ -104,7 +104,7 @@ app.cartPage = function () {
       try{
         const key = 'cart-' + Date.now() + '-' + Math.random().toString(36).slice(2,8);
         const payload = {};
-        if (this.payment) payload.payment_method = this.payment; // zgodność z API
+        if (this.payment) payload.payment_method = this.payment;
 
         const r = await app.api('/api/users/me/cart/checkout/', {
           method:'POST',

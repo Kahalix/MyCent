@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -60,6 +61,15 @@ class AwardPointsAfterSuccessTests(TestCase):
 
 
 class CreatePaymentForTransactionTests(TestCase):
+    def setUp(self):
+        super().setUp()
+        self._ensure_patch = patch("payments.services.commands._ensure_purchase_tx_stock_available_and_reserve")
+        self._ensure_patch.start()
+
+    def tearDown(self):
+        self._ensure_patch.stop()
+        super().tearDown()
+
     @override_settings(STRIPE_SECRET_KEY="", STRIPE_PUBLISHABLE_KEY="")
     @patch("payments.services.commands.attach_coupon_and_recalculate")
     def test_create_payment_for_non_purchase_ignores_coupons(self, attach_mock):
@@ -96,7 +106,6 @@ class CreatePaymentForTransactionTests(TestCase):
         tx = create_transaction(type="PURCHASE", amount=Decimal("100.00"))
         order = create_order(tx=tx)
         line = create_order_line(order=order)
-        # Tworzymy shipping ręcznie z price=None, żeby zadziałał warunek ship.price is None
         OrderShipping.objects.create(order=order, order_line=line, price=None)
         with self.assertRaises(DomainError):
             commands.create_payment_for_transaction(tx=tx)
@@ -173,7 +182,7 @@ class CreatePaymentForTransactionTests(TestCase):
             if new_amount <= 0:
                 new_amount = Decimal("1.00")
 
-            expected_discount["val"] = original - new_amount  # faktyczny rabat
+            expected_discount["val"] = original - new_amount
 
             transaction.expected_total_amount = new_amount
             transaction.expected_total_currency = "PLN"
@@ -466,7 +475,7 @@ class ExpireStalePaymentsTests(TestCase):
         new = create_payment(tx=tx3, status="REQUIRES_CONFIRMATION")
         done = create_payment(tx=tx4, status="SUCCEEDED")
 
-        long_ago = timezone.now() - timezone.timedelta(minutes=120)
+        long_ago = timezone.now() - timedelta(minutes=120)
         Payment.objects.filter(pk__in=[old1.pk, old2.pk]).update(updated_at=long_ago)
 
         count = commands.expire_stale_payments(minutes=30)
@@ -516,16 +525,17 @@ class CancelActivePaymentsForTxTests(TestCase):
         self.assertTrue(p_active.metadata.get("auto_cancelled_due_to_change"))
         self.assertNotIn("auto_cancel_reason", p_active.metadata)
 
-    def test_cancel_active_payments_for_tx_on_requires_action_is_noop(self):
+    def test_cancel_active_payments_for_tx_cancels_requires_action_and_sets_metadata(self):
         tx = create_transaction()
         p = create_payment(tx=tx, status="REQUIRES_ACTION", metadata={})
 
         result = commands.cancel_active_payments_for_tx(tx=tx, reason="Changed order")
-        self.assertFalse(result)
+        self.assertTrue(result)
 
         p.refresh_from_db()
-        self.assertEqual(p.status, "REQUIRES_ACTION")
-        self.assertFalse(p.metadata.get("auto_cancelled_due_to_change"))
+        self.assertEqual(p.status, "CANCELLED")
+        self.assertTrue(p.metadata.get("auto_cancelled_due_to_change"))
+        self.assertEqual(p.metadata.get("auto_cancel_reason"), "Changed order")
 
     def test_cancel_active_payments_for_tx_returns_false_when_nothing_to_cancel(self):
         tx = create_transaction()

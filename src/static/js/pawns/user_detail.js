@@ -1,4 +1,3 @@
-// static/js/pawns/user_detail.js
 window.app = window.app || {};
 // fallback, gdyby nie było globalnie
 app.getSchemaCached = app.getSchemaCached || (async () => ({ schema:{}, ui_schema:{} }));

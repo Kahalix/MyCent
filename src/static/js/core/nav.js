@@ -2,7 +2,7 @@ window.app = window.app || {};
 
 app.navState = function () {
   return {
-    authed: !!localStorage.getItem('lown_access'),
+    authed: window.app?.authed === true,
     theme: (app.getTheme && app.getTheme()) || 'lownLight',
     user: null,
     hasSeller: false,
@@ -22,13 +22,13 @@ app.navState = function () {
       window.addEventListener('theme:changed', (e) => { this.theme = e.detail.theme; });
 
       window.addEventListener('cart:changed', () => { if (this.authed) this.fetchCartCount(); });
-      if (this.authed) this.fetchCartCount();
 
       window.addEventListener('auth:changed', async (e) => {
         const now = !!e.detail?.authed;
         if (now === this.authed) return;
 
         this.authed = now;
+
         if (now) {
           await this.fetchUser();
           this.fetchCartCount();
@@ -39,30 +39,37 @@ app.navState = function () {
           this.user = null;
           this.hasSeller = false;
           this.canAdminPanel = false;
+          this.isSellerOwner = false;
+          this.isModerator = false;
+          this.sellerCtx = null;
           this.cartCount = 0;
           this.chatUnread = 0;
           this._threadUnread.clear();
         }
       });
 
-      document.addEventListener('htmx:afterSettle', async () => {
-        const now = !!localStorage.getItem('lown_access');
-        if (now !== this.authed) {
-          this.authed = now;
-          if (now) {
-            await this.fetchUser();
+      document.addEventListener('htmx:afterSettle', () => {
+        const now = window.app?.authed === true;
+        if (now === this.authed) return;
+        this.authed = now;
+
+        if (now) {
+          this.fetchUser().then(async () => {
             this.fetchCartCount();
             await this.fetchChatUnread();
             this._subscribeInbox();
-          } else {
-            this._unsubscribeInbox();
-            this.user = null;
-            this.hasSeller = false;
-            this.canAdminPanel = false;
-            this.cartCount = 0;
-            this.chatUnread = 0;
-            this._threadUnread.clear();
-          }
+          });
+        } else {
+          this._unsubscribeInbox();
+          this.user = null;
+          this.hasSeller = false;
+          this.canAdminPanel = false;
+          this.isSellerOwner = false;
+          this.isModerator = false;
+          this.sellerCtx = null;
+          this.cartCount = 0;
+          this.chatUnread = 0;
+          this._threadUnread.clear();
         }
       });
 
@@ -76,12 +83,22 @@ app.navState = function () {
         }
       });
 
-      if (this.authed) {
-        this.fetchUser().then(async () => {
+      (async () => {
+        try {
+          if (typeof app.ensureAuthed === 'function') {
+            await app.ensureAuthed();
+          }
+        } catch {}
+
+        this.authed = window.app?.authed === true;
+
+        if (this.authed) {
+          await this.fetchUser();
+          this.fetchCartCount();
           await this.fetchChatUnread();
           this._subscribeInbox();
-        });
-      }
+        }
+      })();
     },
 
     _subscribeInbox() {
@@ -97,6 +114,7 @@ app.navState = function () {
         } catch {}
       });
     },
+
     _unsubscribeInbox() {
       try { this._unsubInbox && this._unsubInbox(); } catch {}
       this._unsubInbox = null;
@@ -105,7 +123,9 @@ app.navState = function () {
     toggleTheme() { app.toggleTheme && app.toggleTheme(); },
 
     async fetchCartCount() {
+      if (!this.authed) { this.cartCount = 0; return; }
       if (this._cartReq) return this._cartReq;
+
       this._cartReq = (async () => {
         try {
           const r = await app.api('/api/users/me/cart/', { method: 'GET' });
@@ -115,21 +135,35 @@ app.navState = function () {
           this.cartCount = items.reduce((s, it) => s + (parseInt(it.quantity, 10) || 0), 0);
         } catch {}
       })();
+
       try { return await this._cartReq; } finally { this._cartReq = null; }
     },
 
     async fetchUser() {
+      if (!this.authed) { this.user = null; return; }
       if (this._userReq) return this._userReq;
+
       this._userReq = (async () => {
         try {
-          const r = await app.api('/api/users/me/');
-          if (!r.ok) return;
-          this.user = await r.json();
-          app.me = this.user;
+          if (typeof app.ensureAuthed === 'function') {
+            await app.ensureAuthed();
+          }
+          if (window.app?.authed !== true) return;
+
+          if (window.app?.me) {
+            this.user = window.app.me;
+          } else {
+            const r = await app.api('/api/users/me/');
+            if (!r.ok) return;
+            this.user = await r.json().catch(() => null);
+            window.app.me = this.user;
+          }
+
           this.canAdminPanel = !!(this.user?.is_staff || this.user?.is_superuser);
           await this.fetchSellerContext();
         } catch {}
       })();
+
       try { return await this._userReq; } finally { this._userReq = null; }
     },
 
@@ -167,6 +201,7 @@ app.navState = function () {
         this._threadUnread.clear();
         let url = '/api/users/me/chats/threads/?page_size=10';
         let pages = 0;
+
         try {
           while (url && pages < 10) {
             pages++;
@@ -174,7 +209,7 @@ app.navState = function () {
             if (!r.ok) break;
             const j = await r.json().catch(() => ({}));
             const results = Array.isArray(j) ? j : (j.results || []);
-            const mePid = this.user?.public_id || app.me?.public_id || null;
+            const mePid = this.user?.public_id || window.app?.me?.public_id || null;
 
             for (const th of results) {
               const myPart = (th.participants || []).find(p => p.user?.public_id === mePid);
@@ -185,6 +220,7 @@ app.navState = function () {
             url = Array.isArray(j) ? null : (j.next || null);
           }
         } catch {}
+
         this._recalcUnreadSum();
       })();
 

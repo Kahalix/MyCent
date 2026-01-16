@@ -15,7 +15,7 @@
   padding: .5rem 0;
 }
 
-/* Etykieta: [tekst | badge] — tekst zawija się i nie znika */
+/* Etykieta: [tekst | badge] - tekst zawija się i nie znika */
 .ssf-label{
   display: grid;
   grid-template-columns: minmax(0,1fr) auto;
@@ -31,7 +31,7 @@
   white-space: normal;
 }
 
-/* Pastylka Wymagane  czytelna w light/dark, zawsze po prawej */
+/* Pastylka Wymagane - zawsze po prawej */
 .ssf-label .req-badge{
   display: inline-flex;
   align-items: center;

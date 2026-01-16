@@ -9,29 +9,50 @@ from chat.services import commands as cmd
 from chat.services import repositories as repo
 
 
+def _choose_subprotocol(scope) -> str | None:
+    subs = scope.get("subprotocols") or []
+    return next((p for p in subs if isinstance(p, str) and not p.startswith("rt.")), None)
+
+
 class ThreadConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.thread_pid = self.scope["url_route"]["kwargs"]["public_id"]
         self.group = f"chat.thread.{self.thread_pid}"
 
         user = self.scope.get("user")
+        chosen = _choose_subprotocol(self.scope)
+
         if not getattr(user, "is_authenticated", False):
+            if chosen:
+                await self.accept(subprotocol=chosen)
+            else:
+                await self.accept()
             await self.close(code=4401)
             return
 
         ok = await self._user_has_access(user.id, self.thread_pid)
         if not ok:
+            if chosen:
+                await self.accept(subprotocol=chosen)
+            else:
+                await self.accept()
             await self.close(code=4403)
             return
 
         await self._ensure_participant(user.id, self.thread_pid)
-
         await self.channel_layer.group_add(self.group, self.channel_name)
-        await self.accept()
+
+        if chosen:
+            await self.accept(subprotocol=chosen)
+        else:
+            await self.accept()
 
     async def disconnect(self, code):
         if hasattr(self, "group"):
-            await self.channel_layer.group_discard(self.group, self.channel_name)
+            try:
+                await self.channel_layer.group_discard(self.group, self.channel_name)
+            except Exception:
+                pass
 
     async def receive(self, text_data=None, bytes_data=None):
         try:
@@ -45,12 +66,16 @@ class ThreadConsumer(AsyncWebsocketConsumer):
 
         typ = data.get("type") or "message"
 
+        if typ == "ping":
+            await self.send(text_data=json.dumps({"type": "pong"}))
+            return
+
         if typ == "typing":
             await self.channel_layer.group_send(
                 self.group,
                 {
                     "type": "chat.typing",
-                    "user_id": user.id,
+                    "user_id": str(getattr(user, "public_id", user.id)),
                     "state": bool(data.get("state", True)),
                 },
             )
@@ -58,9 +83,7 @@ class ThreadConsumer(AsyncWebsocketConsumer):
 
         if typ == "message":
             content = (data.get("content") or "").strip()
-            if not content:
-                return
-            if len(content) > 5000:
+            if not content or len(content) > 5000:
                 return
 
             msg = await self._send(user.id, self.thread_pid, content)
@@ -70,7 +93,11 @@ class ThreadConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({"type": "message", **event["payload"]}))
 
     async def chat_typing(self, event):
-        await self.send(text_data=json.dumps({"type": "typing", "user_id": event["user_id"], "state": event["state"]}))
+        await self.send(
+            text_data=json.dumps(
+                {"type": "typing", "user_id": str(event["user_id"]), "state": event["state"]}
+            )
+        )
 
     @database_sync_to_async
     def _user_has_access(self, user_id: int, thread_pid: str) -> bool:
@@ -126,17 +153,46 @@ class ThreadConsumer(AsyncWebsocketConsumer):
 class InboxConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         user = self.scope.get("user")
+        chosen = _choose_subprotocol(self.scope)
+
         if not getattr(user, "is_authenticated", False):
+            if chosen:
+                await self.accept(subprotocol=chosen)
+            else:
+                await self.accept()
             await self.close(code=4401)
             return
 
         self.group = f"chat.inbox.{user.public_id}"
         await self.channel_layer.group_add(self.group, self.channel_name)
-        await self.accept()
+
+        if chosen:
+            await self.accept(subprotocol=chosen)
+        else:
+            await self.accept()
 
     async def disconnect(self, code):
         if hasattr(self, "group"):
-            await self.channel_layer.group_discard(self.group, self.channel_name)
+            try:
+                await self.channel_layer.group_discard(self.group, self.channel_name)
+            except Exception:
+                pass
+
+    async def receive(self, text_data=None, bytes_data=None):
+        try:
+            data = json.loads(text_data or "{}")
+        except Exception:
+            return
+
+        user = self.scope.get("user")
+        if not getattr(user, "is_authenticated", False):
+            return
+
+        typ = data.get("type") or ""
+
+        if typ == "ping":
+            await self.send(text_data=json.dumps({"type": "pong"}))
+            return
 
     async def inbox_thread_updated(self, event):
         await self.send(text_data=json.dumps({"type": "inbox.thread_updated", **event["payload"]}))

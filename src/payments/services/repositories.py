@@ -10,10 +10,12 @@ def get_by_public_id(public_id: str) -> Optional[Payment]:
     return Payment.objects.select_related("transaction").filter(public_id=public_id).first()
 
 def list_for_user(user) -> QuerySet[Payment]:
-    return (Payment.objects
-            .select_related("transaction")
-            .filter(transaction__user=user)
-            .order_by("-created_at"))
+    return (
+        Payment.objects
+        .select_related("transaction")
+        .filter(transaction__user=user)
+        .order_by("-created_at", "-pk")
+    )
 
 def list_for_seller(user) -> QuerySet[Payment]:
     # płatności transakcji, które mają zamówienia sprzedawcy (podobnie jak SellerTransactionViewSet)

@@ -12,10 +12,25 @@ env = environ.Env(
     DJANGO_ALLOWED_HOSTS=(str, "localhost,web,web-http,caddy,0.0.0.0"),
     DATABASE_URL=(str, ""),
     REDIS_URL=(str, "redis://localhost:6379/1"),
+
+    JWT_ALLOW_AUTH_HEADER_BEARER=(bool, False),
+    JWT_ACCESS_IN_COOKIE=(bool, True),
     JWT_REFRESH_IN_COOKIE=(bool, True),
+
+    ACCESS_COOKIE_NAME=(str, "access_token"),
+    ACCESS_COOKIE_PATH=(str, "/api/"),
+    ACCESS_COOKIE_HTTPONLY=(bool, True),
+    ACCESS_COOKIE_SECURE=(bool, True),
+    ACCESS_COOKIE_SAMESITE=(str, "Lax"),
+    ACCESS_COOKIE_DOMAIN=(str, ""),
+
     AUTH_COOKIE_NAME=(str, "refresh_token"),
     AUTH_COOKIE_PATH=(str, "/api/auth/"),
     AUTH_COOKIE_HTTPONLY=(bool, True),
+    AUTH_COOKIE_SECURE=(bool, True),
+    AUTH_COOKIE_SAMESITE=(str, "Lax"),
+    AUTH_COOKIE_DOMAIN=(str, ""),
+
     CHAT_NEW_MESSAGE_WEBHOOK_URL=(str, ""),
     CHAT_NEW_MESSAGE_WEBHOOK_SECRET=(str, ""),
 )
@@ -106,10 +121,19 @@ DATABASES = {
     )
 }
 DATABASES["default"]["CONN_MAX_AGE"] = env.int("DB_CONN_MAX_AGE", default=30)
+WS_REFERENCE_TOKEN_SINGLE_USE = env.bool("WS_REFERENCE_TOKEN_SINGLE_USE", default=False)
+WS_REFERENCE_TOKEN_MAX_USES = env.int("WS_REFERENCE_TOKEN_MAX_USES", default=50)
+WS_REFERENCE_TOKEN_ENFORCE_IP = env.bool("WS_REFERENCE_TOKEN_ENFORCE_IP", default=False)
+WS_REFERENCE_TOKEN_ENFORCE_UA = env.bool("WS_REFERENCE_TOKEN_ENFORCE_UA", default=True)
+
+
+REFRESH_ENFORCE_IP = env.bool("REFRESH_ENFORCE_IP", default=not DEBUG)
+REFRESH_ENFORCE_UA = env.bool("REFRESH_ENFORCE_UA", default=True)
 
 REST_FRAMEWORK = {
+    "NUM_PROXIES": env.int("DRF_NUM_PROXIES", default=1),
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "identity.authentication.CookieJWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
@@ -125,6 +149,21 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": (
         "rest_framework.renderers.JSONRenderer",
     ),
+    "DEFAULT_THROTTLE_CLASSES": (
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ),
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": env.str("DRF_THROTTLE_ANON", default="120/min"),
+        "user": env.str("DRF_THROTTLE_USER", default="600/min"),
+        "login": env.str("DRF_THROTTLE_LOGIN", default="12/min"),
+        "refresh": env.str("DRF_THROTTLE_REFRESH", default="60/min"),
+        "register": env.str("DRF_THROTTLE_REGISTER", default="6/min"),
+        "forgot_password": env.str("DRF_THROTTLE_FORGOT_PASSWORD", default="6/min"),
+        "reset_password": env.str("DRF_THROTTLE_RESET_PASSWORD", default="10/min"),
+        "ws_token": env.str("DRF_THROTTLE_WS_TOKEN", default="60/min"),
+    },
 }
 
 SPECTACULAR_SETTINGS = {
@@ -142,12 +181,23 @@ SIMPLE_JWT = {
     "ALGORITHM": "HS256",
 }
 
+JWT_ALLOW_AUTH_HEADER_BEARER = env.bool("JWT_ALLOW_AUTH_HEADER_BEARER", default=False)
+JWT_ACCESS_IN_COOKIE = env.bool("JWT_ACCESS_IN_COOKIE", default=True)
 JWT_REFRESH_IN_COOKIE = env.bool("JWT_REFRESH_IN_COOKIE", default=True)
+
+ACCESS_COOKIE_NAME = env.str("ACCESS_COOKIE_NAME", default="access_token")
+ACCESS_COOKIE_PATH = env.str("ACCESS_COOKIE_PATH", default="/api/")
+ACCESS_COOKIE_SECURE = env.bool("ACCESS_COOKIE_SECURE", default=not DEBUG)
+ACCESS_COOKIE_DOMAIN = env.str("ACCESS_COOKIE_DOMAIN", default="") or None
+ACCESS_COOKIE_HTTPONLY = env.bool("ACCESS_COOKIE_HTTPONLY", default=True)
+ACCESS_COOKIE_SAMESITE = env.str("ACCESS_COOKIE_SAMESITE", default="Lax")
+
 AUTH_COOKIE_NAME = env.str("AUTH_COOKIE_NAME", default="refresh_token")
 AUTH_COOKIE_PATH = env.str("AUTH_COOKIE_PATH", default="/api/auth/")
 AUTH_COOKIE_SECURE = env.bool("AUTH_COOKIE_SECURE", default=not DEBUG)
 AUTH_COOKIE_DOMAIN = env.str("AUTH_COOKIE_DOMAIN", default="") or None
 AUTH_COOKIE_HTTPONLY = env.bool("AUTH_COOKIE_HTTPONLY", default=True)
+AUTH_COOKIE_SAMESITE = env.str("AUTH_COOKIE_SAMESITE", default="Lax")
 
 if not DEBUG:
     SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=31536000)
@@ -163,9 +213,6 @@ CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=not DEBUG)
 
 SESSION_COOKIE_SAMESITE = env.str("SESSION_COOKIE_SAMESITE", default="Lax")
 CSRF_COOKIE_SAMESITE = env.str("CSRF_COOKIE_SAMESITE", default="Lax")
-
-AUTH_COOKIE_HTTPONLY = env.bool("AUTH_COOKIE_HTTPONLY", default=True)
-AUTH_COOKIE_SAMESITE = env.str("AUTH_COOKIE_SAMESITE", default="Lax")
 
 EMAIL_BACKEND = env.str("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = env.str("EMAIL_HOST", "mailpit")
@@ -194,7 +241,15 @@ REDIS_URL = env.str("REDIS_URL", "redis://redis:6379/1")
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {"hosts": [REDIS_URL]},
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+            "capacity": 2000,
+            "group_expiry": 86400,
+            "channel_capacity": {
+                "chat.thread.*": 200,
+                "chat.inbox.*": 200,
+            },
+        },
     },
 }
 
@@ -313,6 +368,8 @@ CHAT_NEW_MESSAGE_WEBHOOK_SECRET = env.str("CHAT_NEW_MESSAGE_WEBHOOK_SECRET", def
 STRIPE_PUBLISHABLE_KEY = env.str("STRIPE_PUBLISHABLE_KEY", default="")
 STRIPE_SECRET_KEY = env.str("STRIPE_SECRET_KEY", default="")
 STRIPE_WEBHOOK_SECRET = env.str("STRIPE_WEBHOOK_SECRET", default="")
+
+WS_REFERENCE_TOKEN_TTL = env.int("WS_REFERENCE_TOKEN_TTL", default=30)
 
 TEMPLATES[0]["OPTIONS"]["context_processors"].append(
     "payments.payments_integrations.stripe_ctx.stripe_public_key"

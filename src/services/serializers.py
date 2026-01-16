@@ -1,6 +1,7 @@
 from __future__ import annotations
 from rest_framework import serializers
 from djmoney.contrib.django_rest_framework import MoneyField as DRFMoneyField
+from django.conf import settings
 
 from catalog.models import ItemType
 from services.models import ListingPackage, UserListingPackage, ServicePurchaseHistory
@@ -10,14 +11,23 @@ from services.models import ListingPackage, UserListingPackage, ServicePurchaseH
 class ItemTypeShort(serializers.ModelSerializer):
     class Meta:
         model = ItemType
-        fields = ("public_id","name")
+        fields = ("public_id", "name")
+
 
 class ListingPackagePublicResponse(serializers.ModelSerializer):
     item_type = ItemTypeShort()
     price = DRFMoneyField(max_digits=19, decimal_places=2, required=False, allow_null=True)
+
     class Meta:
         model = ListingPackage
         fields = ("public_id", "listings_free", "price", "points", "item_type")
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        money_enabled = bool(getattr(settings, "SERVICES_ENABLE_MONEY_PURCHASES", False))
+        if not money_enabled:
+            data["price"] = None
+        return data
 
 class ListingPackageAdminResponse(ListingPackagePublicResponse):
     class Meta(ListingPackagePublicResponse.Meta):

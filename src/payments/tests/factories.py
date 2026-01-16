@@ -34,12 +34,16 @@ def create_seller_membership(
     role: str = "EMPLOYEE",
     is_active: bool = True,
 ) -> SellerMembership:
-    return SellerMembership.objects.create(
+    obj, created = SellerMembership.objects.get_or_create(
         seller_profile=seller_profile,
         user=user,
-        role=role,
-        is_active=is_active,
+        defaults={"role": role, "is_active": is_active},
     )
+    if not created:
+        obj.role = role
+        obj.is_active = is_active
+        obj.save(update_fields=["role", "is_active", "updated_at"])
+    return obj
 
 
 def create_transaction(

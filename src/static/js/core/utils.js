@@ -1,6 +1,117 @@
 window.app = window.app || {};
+var app = window.app;
 
-/* ================== MONEY ================== */
+app.accessStorage = 'none';
+app._accessMem = '';
+app.useBearer = false;
+
+app.setAccessStorage = function (mode) {
+  const m = String(mode || '').toLowerCase();
+  if (m === 'local') app.accessStorage = 'local';
+  else if (m === 'memory') app.accessStorage = 'memory';
+  else app.accessStorage = 'none';
+
+  if (app.accessStorage !== 'local') {
+    try { localStorage.removeItem('lown_access'); } catch {}
+  }
+};
+
+app.getAccessToken = function () {
+  if (!app.useBearer) return '';
+  return String(app._accessMem || '');
+};
+
+app.setAccessToken = function (tok) {
+  const t = String(tok || '');
+  app._accessMem = t;
+
+  if (!app.useBearer) {
+    try { localStorage.removeItem('lown_access'); } catch {}
+    return;
+  }
+
+  if (app.accessStorage === 'local') {
+    try { localStorage.setItem('lown_access', t); } catch {}
+  } else {
+    try { localStorage.removeItem('lown_access'); } catch {}
+  }
+};
+
+app.clearAccessToken = function () {
+  app._accessMem = '';
+  try { localStorage.removeItem('lown_access'); } catch {}
+};
+
+try { localStorage.removeItem('lown_access'); } catch {}
+
+app.authed = null;
+app.me = null;
+
+app._setAuthState = function (authed, me) {
+  const next = !!authed;
+  const prev = app.authed;
+  app.authed = next;
+  app.me = me || null;
+  if (prev !== next) {
+    try { window.dispatchEvent(new CustomEvent('auth:changed', { detail: { authed: next } })); } catch {}
+  }
+};
+
+app._mePromise = null;
+
+app.ensureAuthed = async function () {
+  if (app._mePromise) return app._mePromise;
+
+  app._mePromise = (async () => {
+    const fetchMe = async () => {
+      try {
+        return await fetch('/api/users/me/', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Accept': 'application/json' }
+        });
+      } catch {
+        return null;
+      }
+    };
+
+    let resp = await fetchMe();
+    if (!resp) return app.authed === true;
+
+    if (resp.ok) {
+      const d = await resp.json().catch(() => null);
+      app._setAuthState(true, d);
+      return true;
+    }
+
+    if (resp.status === 401 || resp.status === 403) {
+      try {
+        await app._refreshAccess();
+        resp = await fetchMe();
+      } catch {
+        resp = null;
+      }
+
+      if (resp && resp.ok) {
+        const d2 = await resp.json().catch(() => null);
+        app._setAuthState(true, d2);
+        return true;
+      }
+
+      app._setAuthState(false, null);
+      return false;
+    }
+
+    return app.authed === true;
+  })();
+
+  try {
+    return await app._mePromise;
+  } finally {
+    app._mePromise = null;
+  }
+};
+
 app.moneyNormalize = function (val, defCur='PLN') {
   if (val == null) return null;
   if (typeof val === 'number') return { amount: String(val), currency: defCur };
@@ -35,9 +146,9 @@ app.moneyText = function (val, dash='—') {
   if (!Number.isFinite(n)) return dash;
   return n.toFixed(2) + ' ' + (m.currency || 'PLN');
 };
+
 app.money = app.moneyText;
 
-/* ================== HELPERS ================== */
 app.qs = (sel) => document.querySelector(sel);
 
 app.readJson = async (resp) => {
@@ -64,15 +175,20 @@ app.errText = (obj) => {
   return parts.join('\n');
 };
 
-app.imgUrl = (p) => p || 'https://placehold.co/600x600?text=%20';
+app.imgUrl = function (p) {
+  if (!p) return 'https://placehold.co/600x600?text=%20';
+  if (/^https?:\/\//i.test(p)) return p;
+  let s = String(p).replace(/^\/+/, '');
+  s = s.replace(/^(?:media\/)+/, 'media/');
+  if (s.startsWith('media/')) return '/' + s;
+  return '/media/' + s;
+};
 
-/* ================== TOAST ALIASES ================== */
 app.ok    = (text, ms) => { try { app.toast.ok(String(text||''),   { timeout: Number.isFinite(ms)?ms:undefined }); } catch { console.log('[ok]', text); } };
 app.error = (text, ms) => { try { app.toast.err(String(text||''),  { timeout: Number.isFinite(ms)?ms:undefined }); } catch { console.error('[err]', text); } };
 app.info  = (text, ms) => { try { app.toast.info(String(text||''), { timeout: Number.isFinite(ms)?ms:undefined }); } catch { console.info('[info]', text); } };
 app.warn  = (text, ms) => { try { app.toast.warn(String(text||''), { timeout: Number.isFinite(ms)?ms:undefined }); } catch { console.warn('[warn]', text); } };
 
-/* ================== COOKIES / CSRF ================== */
 app.getCookie = function (name) {
   const pairs = document.cookie ? document.cookie.split('; ') : [];
   for (const p of pairs) {
@@ -84,11 +200,18 @@ app.getCookie = function (name) {
   return null;
 };
 
-/* ===== Signed-out helper ===== */
+app.ensureCsrfCookie = async function () {
+  if (app.getCookie('csrftoken')) return true;
+  try {
+    await fetch('/api/auth/csrf/', { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
+  } catch {}
+  return !!app.getCookie('csrftoken');
+};
+
 app._onSignedOut = function (opts) {
-  try { localStorage.removeItem('lown_access'); } catch {}
+  try { app.clearAccessToken(); } catch {}
   try { sessionStorage.removeItem('post_login_redirect'); } catch {}
-  window.dispatchEvent(new CustomEvent('auth:changed', { detail: { authed: false } }));
+  app._setAuthState(false, null);
   const shouldRedirect = !opts || opts.redirect !== false;
   if (shouldRedirect) {
     const next = (opts && typeof opts.next === 'string') ? opts.next : (location.pathname + location.search);
@@ -96,46 +219,87 @@ app._onSignedOut = function (opts) {
   }
 };
 
-/* ===== Refresh access (singleton) ===== */
 app._refreshPromise = null;
+app._refreshNeedMe = false;
 
-app._refreshAccess = async function () {
+app._hasMe = function () {
+  const m = app.me || (window.app && window.app.me);
+  return !!(m && typeof m === 'object' && m.public_id);
+};
+
+app._fetchMeOnce = async function () {
+  try {
+    const r = await fetch('/api/users/me/', {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!r.ok) return null;
+    const me = await r.json().catch(() => null);
+    if (me) {
+      app.me = me;
+      window.app = window.app || {};
+      window.app.me = me;
+    }
+    return me;
+  } catch {
+    return null;
+  }
+};
+
+app._refreshAccess = async function (opts) {
+  const o = (opts && typeof opts === 'object') ? opts : {};
+  const forceMe = o.forceMe === true;
+
+  app._refreshNeedMe = app._refreshNeedMe || forceMe;
+
   if (app._refreshPromise) return app._refreshPromise;
 
   app._refreshPromise = (async () => {
-    const headers = new Headers({ 'Accept': 'application/json', 'Content-Type': 'application/json' });
-    const csrftoken = app.getCookie('csrftoken');
-    if (csrftoken) headers.set('X-CSRFToken', csrftoken);
+    await app.ensureCsrfCookie();
 
-    let resp;
-    try {
-      resp = await fetch('/api/auth/refresh/', {
+    const mkHeaders = () => {
+      const headers = new Headers({ 'Accept': 'application/json', 'Content-Type': 'application/json' });
+      const csrftoken = app.getCookie('csrftoken');
+      if (csrftoken) headers.set('X-CSRFToken', csrftoken);
+      return headers;
+    };
+
+    const doRefresh = async () => {
+      return await fetch('/api/auth/refresh/', {
         method: 'POST',
-        headers,
+        headers: mkHeaders(),
         credentials: 'include',
         body: '{}'
       });
-    } catch {
-      throw new Error('Network error');
+    };
+
+    let resp;
+    try { resp = await doRefresh(); } catch { throw new Error('Network error'); }
+
+    if (resp.status === 403) {
+      await app.ensureCsrfCookie();
+      try { resp = await doRefresh(); } catch { throw new Error('Network error'); }
     }
+
     if (!resp.ok) throw new Error('Refresh failed');
 
-    const data = await resp.json().catch(() => ({}));
-    if (!data?.access) throw new Error('No access in refresh response');
+    if (app._refreshNeedMe && !app._hasMe()) {
+      await app._fetchMeOnce();
+    }
 
-    try { localStorage.setItem('lown_access', data.access); } catch {}
-    window.dispatchEvent(new CustomEvent('auth:changed', { detail: { authed: true } }));
-    return data.access;
+    app._setAuthState(true, app.me || window.app?.me || null);
+    return true;
   })();
 
   try {
     return await app._refreshPromise;
   } finally {
     app._refreshPromise = null;
+    app._refreshNeedMe = false;
   }
 };
 
-/* ================== API ================== */
 app.api = async (url, opts = {}) => {
   const silent = opts.silent === true || opts.background === true || opts.noBusy === true;
 
@@ -155,17 +319,16 @@ app.api = async (url, opts = {}) => {
     headers.set('Content-Type', 'application/json');
   }
 
-  const token = localStorage.getItem('lown_access');
-  if (token) headers.set('Authorization', `Bearer ${token}`);
-
   const method = (opts.method || 'GET').toUpperCase();
   if (!['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method)) {
+    if (!app.getCookie('csrftoken') && typeof app.ensureCsrfCookie === 'function') {
+      try { await app.ensureCsrfCookie(); } catch {}
+    }
     const csrftoken = app.getCookie('csrftoken');
     if (csrftoken) headers.set('X-CSRFToken', csrftoken);
   }
 
   const reqInit = { ...opts, headers, credentials: 'include' };
-
   const doFetch = () => fetch(url, reqInit);
 
   let resp;
@@ -179,9 +342,9 @@ app.api = async (url, opts = {}) => {
 
   if (resp.status === 401) {
     try {
-      const newAccess = await app._refreshAccess();
-      reqInit.headers.set('Authorization', `Bearer ${newAccess}`);
+      await app._refreshAccess({ forceMe: opts.forceMe === true });
       resp = await doFetch();
+      if (resp.ok) app._setAuthState(true, app.me || window.app?.me || null);
     } catch {
       app._onSignedOut({ redirect: false });
       return resp;
@@ -198,7 +361,6 @@ app.api = async (url, opts = {}) => {
   return resp;
 };
 
-/* ================== SPA / HTMX ================== */
 app.goto = function (url) {
   const root = document.getElementById('app-root');
   if (window.htmx && root) {
@@ -216,11 +378,24 @@ app.goto = function (url) {
 
 app.urlParams = (href) => new URL(href || location.href, location.origin).searchParams;
 
-app.requireAuth = function (destPath) {
-  if (localStorage.getItem('lown_access')) {
-    app.goto(destPath);
-    return;
-  }
+app.requireAuth = async function (destPath) {
+  try {
+    const ok = await app.ensureAuthed();
+    if (ok) {
+      app.goto(destPath);
+      return;
+    }
+  } catch {}
+
+  try {
+    await app._refreshAccess();
+    const ok2 = await app.ensureAuthed();
+    if (ok2) {
+      app.goto(destPath);
+      return;
+    }
+  } catch {}
+
   try { sessionStorage.setItem('post_login_redirect', destPath); } catch {}
   app.goto('/login?next=' + encodeURIComponent(destPath));
 };
@@ -228,10 +403,7 @@ app.requireAuth = function (destPath) {
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a[data-requires-auth]');
   if (!a) return;
-  const authed = !!localStorage.getItem('lown_access');
-  if (authed) {
-    return;
-  }
+  if (app.authed === true) return;
   e.preventDefault();
   const href = a.getAttribute('href') || a.dataset.href || '/';
   app.requireAuth(href);
@@ -257,16 +429,22 @@ document.addEventListener('click', (e) => {
   app.goto(u.pathname + u.search + u.hash);
 });
 
-document.body.addEventListener('htmx:configRequest', (evt) => {
-  const token = localStorage.getItem('lown_access');
-  if (token) evt.detail.headers['Authorization'] = `Bearer ${token}`;
-});
+app._htmx401InFlight = false;
 
-document.body.addEventListener('htmx:afterOnLoad', (evt) => {
+document.body.addEventListener('htmx:afterOnLoad', async (evt) => {
   const xhr = evt.detail?.xhr;
   if (!xhr) return;
-  if (xhr.status === 401 || xhr.status === 403) {
+  if (xhr.status !== 401) return;
+  if (app._htmx401InFlight) return;
+
+  app._htmx401InFlight = true;
+  try {
+    await app._refreshAccess();
+    window.location.reload();
+  } catch {
     app._onSignedOut({ redirect: true });
+  } finally {
+    app._htmx401InFlight = false;
   }
 });
 
@@ -305,12 +483,16 @@ function _clearOverlays() {
   const o = document.getElementById('overlays');
   if (o) o.innerHTML = '';
 }
+
 document.body.addEventListener('htmx:afterSwap', (evt) => {
   if (evt.target.id === 'app-root') _clearOverlays();
 });
+
 window.addEventListener('popstate', _clearOverlays);
 
 document.addEventListener('DOMContentLoaded', () => {
+  try { app.ensureAuthed(); } catch {}
+
   if (window.htmx) {
     const root = document.getElementById('app-root');
     if (root) {
@@ -321,15 +503,17 @@ document.addEventListener('DOMContentLoaded', () => {
       root.setAttribute('hx-boost', 'true');
     }
   }
+
   const root = document.getElementById('app-root');
   if (!root) return;
   const isProtected = root.querySelector('[data-protected]');
-  if (isProtected && !localStorage.getItem('lown_access')) {
+  if (isProtected && app.authed !== true) {
     app.requireAuth(location.pathname + location.search);
   }
 });
 
 app._busyCount = 0;
+
 app._busyOn = function(){
   app._busyCount++;
   const root = document.getElementById('app-root');
@@ -337,6 +521,7 @@ app._busyOn = function(){
   if (root) root.classList.add('is-route-loading');
   if (bar)  bar.classList.add('app-request');
 };
+
 app._busyOff = function(){
   app._busyCount = Math.max(0, app._busyCount - 1);
   if (app._busyCount > 0) return;

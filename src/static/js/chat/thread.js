@@ -1,4 +1,3 @@
-// static/js/chat/thread.js
 window.app = window.app || {};
 
 app.chatThread = function (opts = {}) {
@@ -27,45 +26,46 @@ app.chatThread = function (opts = {}) {
     /* ========= lifecycle ========= */
     async init(){
       this._alive = true;
-      await this._loadThreadMeta();   // <-- naprawione
+      await this._loadThreadMeta();
       await this._loadLatest();
       await this.$nextTick(() => this.scrollBottom()); // tylko na start
 
       // subskrypcja kanału wątku przez globalny WS Hub
       this._unsub = app.wsHub.subscribe(this.topic(), (raw) => {
-        try{
-          if (raw.type === 'message'){
-            const obj = this._normFromWs(raw);
+      try{
+        if (!this._alive) return;
 
-            // policz „blisko dna” zanim dołożymy wiadomość
-            const near = this._computeIsNearBottom();
+        if (raw.type === 'message'){
+          if (!this._isOnThreadRoute()) return;
 
-            this._pushIfNew(obj);
+          const obj = this._normFromWs(raw);
+          const near = this._computeIsNearBottom();
 
-            // oznacz przeczytane: WS (read.up_to) + cichy REST
-            try { app.wsHub.send(this.topic(), { type:'read.up_to', message_public_id: obj.public_id }); } catch {}
-            app.api(`/api/users/me/chats/threads/${encodeURIComponent(this.threadId)}/read/`, {
-              method:'POST',
-              silent:true,
-            }).catch(()=>{});
+          this._pushIfNew(obj);
 
-            if (near || obj.mine) {
-              this.$nextTick(() => this.scrollBottom());
-              this.newCount = 0;
-            } else {
-              this.newCount = (this.newCount || 0) + 1;
-            }
+          try { app.wsHub.send(this.topic(), { type:'read.up_to', message_public_id: obj.public_id }); } catch {}
+          app.api(`/api/users/me/chats/threads/${encodeURIComponent(this.threadId)}/read/`, {
+            method:'POST',
+            silent:true,
+          }).catch(()=>{});
+
+          if (near || obj.mine) {
+            this.$nextTick(() => this.scrollBottom());
+            this.newCount = 0;
+          } else {
+            this.newCount = (this.newCount || 0) + 1;
           }
+        }
 
-          if (raw.type === 'typing') {
-            const myId = String(app.me?.id || app.auth?.user?.id || '');
-            if (String(raw.user_id) !== myId) {
-              if (raw.state) this.typingOthers.add(String(raw.user_id));
-              else this.typingOthers.delete(String(raw.user_id));
-            }
+        if (raw.type === 'typing') {
+          const myPid = String(app.me?.public_id || app.auth?.user?.public_id || '');
+          if (String(raw.user_id) !== myPid) {
+            if (raw.state) this.typingOthers.add(String(raw.user_id));
+            else this.typingOthers.delete(String(raw.user_id));
           }
-        } catch {}
-      });
+        }
+      } catch {}
+    });
     },
 
     destroy(){
@@ -76,6 +76,16 @@ app.chatThread = function (opts = {}) {
 
     /* ========= helpers ========= */
     topic(){ return 'thread:' + this.threadId; },
+
+    _isOnThreadRoute(){
+      try{
+        const p = location.pathname.replace(/\/+$/, '');
+        const expected = (`/chat/t/${encodeURIComponent(this.threadId)}`).replace(/\/+$/, '');
+        return p === expected;
+      }catch{
+        return false;
+      }
+    },
 
     /* ========= header ========= */
     partyName(){

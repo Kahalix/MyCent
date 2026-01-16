@@ -66,36 +66,43 @@ class PaymentsUnitTests(SimpleTestCase):
         )
         return p
 
+    @patch("payments.services.commands.Transaction")
     @patch("payments.services.commands.attach_coupon_and_recalculate")
-    def test_create_payment_rejects_non_pending(self, attach_mock):
+    def test_create_payment_rejects_non_pending(self, attach_mock, TxModel):
         tx = self._mk_tx(status="COMPLETED", type="PURCHASE")
+        TxModel.objects.select_for_update.return_value.get.return_value = tx
+
         with self.assertRaises(Forbidden):
             commands.create_payment_for_transaction.__wrapped__(tx=tx)
+
         attach_mock.assert_not_called()
 
     @override_settings(STRIPE_SECRET_KEY="", STRIPE_PUBLISHABLE_KEY="")
     @patch("payments.services.commands.Transaction")
     @patch("payments.services.commands.Payment")
     @patch("payments.services.commands.repo")
+    @patch("payments.services.commands._ensure_purchase_tx_stock_available_and_reserve")
     @patch("orders.services.commands._addr_ok", return_value=True)
     def test_create_payment_returns_existing_active_payment(
         self,
         addr_ok_mock,
+        ensure_reserve_mock,
         repo_mock,
         PaymentModel,
         TxModel,
     ):
         tx = self._mk_tx(status="PENDING", type="PURCHASE", expected_total_amount=Decimal("100.00"))
-        lock_qs = MagicMock()
-        lock_qs.filter.return_value.exists.return_value = True
-        TxModel.objects.select_for_update.return_value = lock_qs
+        TxModel.objects.select_for_update.return_value.get.return_value = tx
 
         existing = SimpleNamespace(id=999)
-        qs = MagicMock()
-        qs.order_by.return_value.first.return_value = existing
-        PaymentModel.objects.filter.return_value = qs
+        PaymentModel.objects.select_for_update.return_value.filter.return_value.order_by.return_value.first.return_value = existing
 
-        out = commands.create_payment_for_transaction.__wrapped__(tx=tx, provider="SIM", coupon_code=None, user_coupon_public_id=None)
+        out = commands.create_payment_for_transaction.__wrapped__(
+            tx=tx,
+            provider="SIM",
+            coupon_code=None,
+            user_coupon_public_id=None,
+        )
         self.assertIs(out, existing)
         repo_mock.create_payment.assert_not_called()
 
@@ -103,18 +110,21 @@ class PaymentsUnitTests(SimpleTestCase):
     @patch("payments.services.commands.Transaction")
     @patch("payments.services.commands.Payment")
     @patch("payments.services.commands.repo")
+    @patch("payments.services.commands._ensure_purchase_tx_stock_available_and_reserve")
     @patch("orders.services.commands._addr_ok", return_value=True)
-    def test_create_payment_amount_must_be_positive(self, addr_ok_mock, repo_mock, PaymentModel, TxModel):
+    def test_create_payment_amount_must_be_positive(self, addr_ok_mock, ensure_reserve_mock, repo_mock, PaymentModel, TxModel):
         tx = self._mk_tx(status="PENDING", type="PURCHASE", expected_total_amount=Decimal("0.00"))
-        lock_qs = MagicMock()
-        lock_qs.filter.return_value.exists.return_value = True
-        TxModel.objects.select_for_update.return_value = lock_qs
-        qs = MagicMock()
-        qs.order_by.return_value.first.return_value = None
-        PaymentModel.objects.filter.return_value = qs
+        TxModel.objects.select_for_update.return_value.get.return_value = tx
+
+        PaymentModel.objects.select_for_update.return_value.filter.return_value.order_by.return_value.first.return_value = None
 
         with self.assertRaises(DomainError):
-            commands.create_payment_for_transaction.__wrapped__(tx=tx, provider="SIM", coupon_code=None, user_coupon_public_id=None)
+            commands.create_payment_for_transaction.__wrapped__(
+                tx=tx,
+                provider="SIM",
+                coupon_code=None,
+                user_coupon_public_id=None,
+            )
 
         repo_mock.create_payment.assert_not_called()
 
@@ -122,22 +132,26 @@ class PaymentsUnitTests(SimpleTestCase):
     @patch("payments.services.commands.Transaction")
     @patch("payments.services.commands.Payment")
     @patch("payments.services.commands.repo")
+    @patch("payments.services.commands._ensure_purchase_tx_stock_available_and_reserve")
     @patch("orders.services.commands._addr_ok", return_value=True)
-    def test_create_payment_sets_discount_metadata_for_coupon(self, addr_ok_mock, repo_mock, PaymentModel, TxModel):
+    def test_create_payment_sets_discount_metadata_for_coupon(
+        self,
+        addr_ok_mock,
+        ensure_reserve_mock,
+        repo_mock,
+        PaymentModel,
+        TxModel,
+    ):
         coupon = SimpleNamespace(id=1, public_id="C1", code="SAVE10")
         tx = self._mk_tx(status="PENDING", type="PURCHASE", expected_total_amount=Decimal("90.00"), coupon=coupon)
         tx.coupon_id = 1
         tx.orders = self._mk_orders_for_payment(gross=Money(100, "PLN"))
+        TxModel.objects.select_for_update.return_value.get.return_value = tx
 
-        lock_qs = MagicMock()
-        lock_qs.filter.return_value.exists.return_value = True
-        TxModel.objects.select_for_update.return_value = lock_qs
-
-        qs = MagicMock()
-        qs.order_by.return_value.first.return_value = None
-        PaymentModel.objects.filter.return_value = qs
+        PaymentModel.objects.select_for_update.return_value.filter.return_value.order_by.return_value.first.return_value = None
 
         created = SimpleNamespace(provider="SIM", amount=Money(90, "PLN"), metadata={})
+
         def _create_payment(**kwargs):
             created.provider = kwargs.get("provider")
             created.amount = kwargs.get("amount")
@@ -146,7 +160,12 @@ class PaymentsUnitTests(SimpleTestCase):
 
         repo_mock.create_payment.side_effect = _create_payment
 
-        out = commands.create_payment_for_transaction.__wrapped__(tx=tx, provider="SIM", coupon_code=None, user_coupon_public_id=None)
+        out = commands.create_payment_for_transaction.__wrapped__(
+            tx=tx,
+            provider="SIM",
+            coupon_code=None,
+            user_coupon_public_id=None,
+        )
         self.assertIs(out, created)
         self.assertEqual(Decimal(created.metadata.get("discount_applied")), Decimal("10"))
         cm = created.metadata.get("coupon") or {}
@@ -160,29 +179,33 @@ class PaymentsUnitTests(SimpleTestCase):
     @patch("payments.services.commands.Payment")
     @patch("payments.services.commands.StripeClient")
     @patch("payments.services.commands.repo")
+    @patch("payments.services.commands._ensure_purchase_tx_stock_available_and_reserve")
     @patch("orders.services.commands._addr_ok", return_value=True)
     def test_create_payment_uses_stripe_when_available(
         self,
         addr_ok_mock,
+        ensure_reserve_mock,
         repo_mock,
         StripeClientCls,
         PaymentModel,
         TxModel,
     ):
         tx = self._mk_tx(status="PENDING", type="PURCHASE", expected_total_amount=Decimal("100.00"))
-        lock_qs = MagicMock()
-        lock_qs.filter.return_value.exists.return_value = True
-        TxModel.objects.select_for_update.return_value = lock_qs
-        qs = MagicMock()
-        qs.order_by.return_value.first.return_value = None
-        PaymentModel.objects.filter.return_value = qs
+        TxModel.objects.select_for_update.return_value.get.return_value = tx
+
+        PaymentModel.objects.select_for_update.return_value.filter.return_value.order_by.return_value.first.return_value = None
 
         StripeClientCls.return_value.create_intent.return_value = ("pi_1", "cs_1")
 
         created = SimpleNamespace(provider="STRIPE", provider_payment_id="pi_1", client_secret="cs_1")
         repo_mock.create_payment.return_value = created
 
-        out = commands.create_payment_for_transaction.__wrapped__(tx=tx, provider="STRIPE", coupon_code=None, user_coupon_public_id=None)
+        out = commands.create_payment_for_transaction.__wrapped__(
+            tx=tx,
+            provider="STRIPE",
+            coupon_code=None,
+            user_coupon_public_id=None,
+        )
         self.assertIs(out, created)
         StripeClientCls.return_value.create_intent.assert_called_once()
         self.assertEqual(out.provider, "STRIPE")
@@ -191,45 +214,65 @@ class PaymentsUnitTests(SimpleTestCase):
     @patch("payments.services.commands.Transaction")
     @patch("payments.services.commands.Payment")
     @patch("payments.services.commands.repo")
+    @patch("payments.services.commands._ensure_purchase_tx_stock_available_and_reserve")
     @patch("orders.services.commands._addr_ok", return_value=True)
-    def test_create_payment_integrity_error_returns_revived(self, addr_ok_mock, repo_mock, PaymentModel, TxModel):
+    def test_create_payment_integrity_error_returns_revived(
+        self,
+        addr_ok_mock,
+        ensure_reserve_mock,
+        repo_mock,
+        PaymentModel,
+        TxModel,
+    ):
         tx = self._mk_tx(status="PENDING", type="PURCHASE", expected_total_amount=Decimal("100.00"))
+        TxModel.objects.select_for_update.return_value.get.return_value = tx
 
-        lock_qs = MagicMock()
-        lock_qs.filter.return_value.exists.return_value = True
-        TxModel.objects.select_for_update.return_value = lock_qs
+        PaymentModel.objects.select_for_update.return_value.filter.return_value.order_by.return_value.first.return_value = None
 
-        qs = MagicMock()
-        qs.order_by.return_value.first.side_effect = [None, SimpleNamespace(id=777)]
-        PaymentModel.objects.filter.return_value = qs
+        revived = SimpleNamespace(id=777)
+        PaymentModel.objects.filter.return_value.order_by.return_value.first.return_value = revived
 
         from django.db import IntegrityError
         repo_mock.create_payment.side_effect = IntegrityError("uq")
 
-        out = commands.create_payment_for_transaction.__wrapped__(tx=tx, provider="SIM", coupon_code=None, user_coupon_public_id=None)
+        out = commands.create_payment_for_transaction.__wrapped__(
+            tx=tx,
+            provider="SIM",
+            coupon_code=None,
+            user_coupon_public_id=None,
+        )
         self.assertEqual(out.id, 777)
 
     @override_settings(STRIPE_SECRET_KEY="", STRIPE_PUBLISHABLE_KEY="")
     @patch("payments.services.commands.Transaction")
     @patch("payments.services.commands.Payment")
     @patch("payments.services.commands.repo")
+    @patch("payments.services.commands._ensure_purchase_tx_stock_available_and_reserve")
     @patch("orders.services.commands._addr_ok", return_value=True)
-    def test_create_payment_integrity_error_no_revived_raises_conflict(self, addr_ok_mock, repo_mock, PaymentModel, TxModel):
+    def test_create_payment_integrity_error_no_revived_raises_conflict(
+        self,
+        addr_ok_mock,
+        ensure_reserve_mock,
+        repo_mock,
+        PaymentModel,
+        TxModel,
+    ):
         tx = self._mk_tx(status="PENDING", type="PURCHASE", expected_total_amount=Decimal("100.00"))
+        TxModel.objects.select_for_update.return_value.get.return_value = tx
 
-        lock_qs = MagicMock()
-        lock_qs.filter.return_value.exists.return_value = True
-        TxModel.objects.select_for_update.return_value = lock_qs
-
-        qs = MagicMock()
-        qs.order_by.return_value.first.return_value = None
-        PaymentModel.objects.filter.return_value = qs
+        PaymentModel.objects.select_for_update.return_value.filter.return_value.order_by.return_value.first.return_value = None
+        PaymentModel.objects.filter.return_value.order_by.return_value.first.return_value = None
 
         from django.db import IntegrityError
         repo_mock.create_payment.side_effect = IntegrityError("uq")
 
         with self.assertRaises(Conflict) as cm:
-            commands.create_payment_for_transaction.__wrapped__(tx=tx, provider="SIM", coupon_code=None, user_coupon_public_id=None)
+            commands.create_payment_for_transaction.__wrapped__(
+                tx=tx,
+                provider="SIM",
+                coupon_code=None,
+                user_coupon_public_id=None,
+            )
         self.assertEqual(str(cm.exception.detail), "Istnieje już aktywna płatność dla tej transakcji.")
 
     @patch("payments.services.commands.Payment")
@@ -264,19 +307,21 @@ class PaymentsUnitTests(SimpleTestCase):
         notify_mock.assert_called_once()
 
     @patch("payments.services.commands.Payment")
-    def test_cancel_active_payments_for_tx_cancels_only_confirmation_and_processing(self, PaymentModel):
+    def test_cancel_active_payments_for_tx_cancels_all_active_statuses(self, PaymentModel):
         tx = self._mk_tx(status="PENDING", type="PURCHASE", expected_total_amount=Decimal("100.00"))
         p1 = self._mk_payment(tx=tx, status="REQUIRES_CONFIRMATION", metadata={})
         p2 = self._mk_payment(tx=tx, status="PROCESSING", metadata={})
+        p3 = self._mk_payment(tx=tx, status="REQUIRES_ACTION", metadata={})
 
         qs = MagicMock()
-        qs.filter.return_value = [p1, p2]
+        qs.filter.return_value = [p1, p2, p3]
         PaymentModel.objects.select_for_update.return_value = qs
 
         out = commands.cancel_active_payments_for_tx.__wrapped__(tx=tx, reason="Changed")
         self.assertTrue(out)
         self.assertEqual(p1.status, "CANCELLED")
         self.assertEqual(p2.status, "CANCELLED")
+        self.assertEqual(p3.status, "CANCELLED")
         self.assertTrue(p1.metadata.get("auto_cancelled_due_to_change"))
         self.assertEqual(p1.metadata.get("auto_cancel_reason"), "Changed")
 

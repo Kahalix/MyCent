@@ -6,14 +6,14 @@ DEFAULT_EMPTY_SCHEMA = {"type": "object", "properties": {}}
 
 class SimpleJSONSchemaWidget(forms.Textarea):
     """
-    Ukryty <textarea> + atrybuty data-*, a UI buduje JS (static/catalog/simple_schema_form.js).
+    Ukryty <textarea> + atrybuty data-*, a UI buduje JS (simple_schema_form.js).
     """
     def __init__(self, schema: dict | None = None, attrs=None):
         schema = schema or DEFAULT_EMPTY_SCHEMA
         attrs = attrs or {}
         attrs.setdefault("data-ssf", "1")  # znacznik dla naszego JS
         attrs.setdefault("data-ssf-schema", json.dumps(schema))
-        # textarea chowamy – UI jest w osobnym kontenerze
+        # textarea chowamy - UI jest w osobnym kontenerze
         style = attrs.get("style", "")
         if "display:" not in style:
             style = (style + ";display:none;").lstrip(";")

@@ -13,7 +13,7 @@
       <template x-if="err"><div class="alert alert-error whitespace-pre-line" x-text="err"></div></template>
       <template x-if="ok"><div class="alert alert-success" x-text="ok"></div></template>
 
-      <!-- KLIENT (powiązanie + odłączenie jak w offline) -->
+      <!-- KLIENT (powiązanie + odłączenie) -->
       <div class="p-3 rounded border border-base-300 bg-base-100">
         <div class="flex items-center gap-2">
           <div class="font-medium">Klient (opcjonalnie)</div>
@@ -58,7 +58,7 @@
         </div>
       </div>
 
-      <!-- PARAMETRY ZASTAWU (bez zmian poza klasami) -->
+      <!-- PARAMETRY ZASTAWU -->
       <div class="grid sm:grid-cols-3 gap-3">
         <div id="f_principal_amount">
           <label class="label"><span class="label-text">Kapitał (kwota)</span></label>
@@ -145,7 +145,7 @@
                 </template>
               </div>
 
-              <!-- CAT (bez zmian funkcjonalnych, tylko klasy) -->
+              <!-- CAT -->
               <div class="mt-3" x-show="row.mode==='CAT'">
                 <div class="grid md:grid-cols-2 gap-3 items-stretch">
                   <div class="p-3 rounded border border-base-300 bg-base-100 h-full flex flex-col">

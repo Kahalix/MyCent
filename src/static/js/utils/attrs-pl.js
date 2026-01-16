@@ -1,4 +1,3 @@
-// static/js/utils/attrs-pl.js
 window.app = window.app || {};
 
 (function(){

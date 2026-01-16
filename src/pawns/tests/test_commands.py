@@ -210,7 +210,7 @@ class PawnForfeitTests(TestCase):
         self.assertEqual(item.listing_type, "BUY")
         self.assertFalse(item.allow_online_checkout)
         self.assertEqual(item.price, pawn.appraisal_total)
-        self.assertEqual(item.status, "AVAILABLE")
+        self.assertEqual(item.status, "RESERVED")
         self.assertEqual(item.stock_quantity, 1)
         self.assertEqual(item.type, self.item_type)
 

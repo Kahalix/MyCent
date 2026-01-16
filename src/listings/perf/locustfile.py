@@ -1,13 +1,19 @@
 from __future__ import annotations
 
+import os
 import random
 import string
 from datetime import date, timedelta
 
+import gevent
 from locust import HttpUser, task, between
 from locust.exception import StopUser
 
 NUM_PERF_USERS = 500
+
+ACCESS_COOKIE_NAME = os.getenv("ACCESS_COOKIE_NAME", "access_token")
+AUTH_COOKIE_NAME = os.getenv("AUTH_COOKIE_NAME", "refresh_token")
+CSRF_COOKIE_NAME = os.getenv("CSRF_COOKIE_NAME", "csrftoken")
 
 
 def _pick_results(payload):
@@ -41,6 +47,7 @@ class TestUser(HttpUser):
     def on_start(self):
         self.pawn_ids: list[str] = []
         self.pick_credentials()
+        gevent.sleep(random.uniform(0.0, 3.0))
         self.login()
 
     def pick_credentials(self):
@@ -48,16 +55,53 @@ class TestUser(HttpUser):
         self.email = f"perfuser{idx:04d}@example.com"
         self.password = "PerfPass123!"
 
+    def _origin(self) -> str:
+        return (self.host or "").rstrip("/")
+
+    def _sync_csrf_headers(self):
+        token = self.client.cookies.get(CSRF_COOKIE_NAME)
+        origin = self._origin()
+        hdrs = {}
+        if token:
+            hdrs["X-CSRFToken"] = token
+        if origin:
+            hdrs["Origin"] = origin
+            hdrs["Referer"] = f"{origin}/"
+        if hdrs:
+            self.client.headers.update(hdrs)
+
+    def ensure_csrf_cookie(self):
+        resp = self.client.get("/api/auth/csrf/", name="/api/auth/csrf/")
+        if resp.status_code not in (200, 204):
+            raise StopUser(f"csrf bootstrap failed {resp.status_code}")
+        self._sync_csrf_headers()
+        if not self.client.cookies.get(CSRF_COOKIE_NAME):
+            raise StopUser("no csrftoken cookie after /api/auth/csrf/")
+
     def login(self):
         payload = {"email": self.email, "password": self.password}
-        resp = self.client.post("/api/auth/login/", json=payload, name="/api/auth/login")
+
+        for _ in range(6):
+            resp = self.client.post("/api/auth/login/", json=payload, name="/api/auth/login/")
+            if resp.status_code == 200:
+                break
+            if resp.status_code == 429:
+                gevent.sleep(random.uniform(0.5, 2.0))
+                continue
+            raise StopUser(f"login failed {resp.status_code}")
+
         if resp.status_code != 200:
             raise StopUser(f"login failed {resp.status_code}")
-        data = resp.json()
-        token = data.get("access")
-        if not token:
-            raise StopUser("no access token")
-        self.client.headers.update({"Authorization": f"Bearer {token}"})
+
+        if not self.client.cookies.get(ACCESS_COOKIE_NAME):
+            raise StopUser(f"no {ACCESS_COOKIE_NAME} cookie after login")
+        if not self.client.cookies.get(AUTH_COOKIE_NAME):
+            raise StopUser(f"no {AUTH_COOKIE_NAME} cookie after login")
+
+        if not self.client.cookies.get(CSRF_COOKIE_NAME):
+            self.ensure_csrf_cookie()
+        else:
+            self._sync_csrf_headers()
 
     def random_filters(self) -> dict:
         scenarios = [
@@ -142,13 +186,17 @@ class TestUser(HttpUser):
         slug = self.random_id(type(self).slug_ids)
         if not slug:
             return
-        self.client.get(f"/api/public/item-sets/by-slug/{slug}/", name="/api/public/item-sets/by-slug/{slug} [detail]")
+        self.client.get(
+            f"/api/public/item-sets/by-slug/{slug}/",
+            name="/api/public/item-sets/by-slug/{slug}/ [detail]",
+        )
 
     @task(3)
     def add_item_to_cart(self):
         pid = self.random_id(type(self).buyable_ids)
         if not pid:
             return
+        self._sync_csrf_headers()
         payload = {"item_public_id": pid, "quantity": 1}
         with self.client.post(
             "/api/users/me/cart/items/",
@@ -170,6 +218,8 @@ class TestUser(HttpUser):
         items = data.get("items") or []
         if not items:
             return
+
+        self._sync_csrf_headers()
         payload = {"payment_method": "ONLINE_PAYMENT"}
         key = "".join(random.choices(string.ascii_lowercase + string.digits, k=16))
         headers = {"Idempotency-Key": key}
@@ -205,4 +255,7 @@ class TestUser(HttpUser):
         pid = self.random_my_pawn_id()
         if not pid:
             return
-        self.client.get(f"/api/users/me/pawns/{pid}/", name="/api/users/me/pawns/{id}/ [detail]")
+        self.client.get(
+            f"/api/users/me/pawns/{pid}/",
+            name="/api/users/me/pawns/{public_id}/ [detail]",
+        )

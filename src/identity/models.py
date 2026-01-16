@@ -12,6 +12,7 @@ from django.db import models
 from django.db.models import Q
 from django.db.models.functions import Lower
 from django.utils import timezone
+from django.db import transaction
 
 from common.models import PublicIdModel
 
@@ -286,3 +287,32 @@ class UserToken(PublicIdModel):
     @classmethod
     def delete_all_refreshes(cls, user: User) -> int:
         return cls.objects.filter(user=user, type="REFRESH_TOKEN").delete()[0]
+
+    @classmethod
+    def consume_refresh_atomic(cls, *, user: User, raw_refresh_jwt: str, ua_hash: str, ip: str | None) -> bool:
+        now = timezone.now()
+        h = cls._sha256(raw_refresh_jwt)
+
+        enforce_ua = getattr(settings, "REFRESH_ENFORCE_UA", True)
+        enforce_ip = getattr(settings, "REFRESH_ENFORCE_IP", False)
+
+        with transaction.atomic():
+            tok = (
+                cls.objects.select_for_update()
+                .filter(user=user, type="REFRESH_TOKEN", hash=h, expiry__gt=now)
+                .first()
+            )
+            if not tok:
+                return False
+
+            data = tok.data or {}
+            stored_ua = data.get("ua_hash")
+            stored_ip = data.get("ip")
+
+            if enforce_ua and stored_ua and stored_ua != ua_hash:
+                return False
+            if enforce_ip and stored_ip and ip and stored_ip != ip:
+                return False
+
+            tok.delete()
+            return True

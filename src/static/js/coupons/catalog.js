@@ -1,4 +1,3 @@
-// static/js/coupons/catalog.js
 window.app = window.app || {};
 
 app.userCouponCatalog = function(){

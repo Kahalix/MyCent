@@ -6,11 +6,10 @@ from django.utils import timezone
 from djmoney.money import Money
 
 from customers.models import Customer
-from orders.models import Order, OrderShipping, ItemReservation
+from orders.models import Order, OrderShipping
 from orders.services import commands
 from orders.services.exceptions import Forbidden, Conflict, DomainError
 from orders.services.repositories import active_reserved_qty
-from transactions.models import Transaction
 from listings.models import ItemSetShipping
 from .factories import (
     create_user,
@@ -138,7 +137,9 @@ class ShippingCommandsTests(TestCase):
     def test_buyer_set_line_shipping_pickup_and_package(self):
         pkg = create_package_type(provider="INPOST", dimensions="C", price=Money(12, "PLN"))
         with patch("orders.services.commands.cancel_active_payments_for_tx", return_value=True) as cancel_mock:
-            ship, cancelled = commands.buyer_set_line_shipping(order=self.order, line=self.line, mode="PICKUP", package_type=None)
+            ship, cancelled = commands.buyer_set_line_shipping(
+                order=self.order, line=self.line, mode="PICKUP", package_type=None
+            )
         self.assertTrue(cancelled)
         self.assertEqual(ship.package_label, "PICKUP")
         self.assertIsNone(ship.package_type)
@@ -146,13 +147,16 @@ class ShippingCommandsTests(TestCase):
         self.order.refresh_from_db()
         self.assertEqual(self.order.shipping_total, Money(0, "PLN"))
         cancel_mock.assert_called_once()
+
         ItemSetShipping.objects.create(
             item_set=self.item,
             package_type=pkg,
             price_override=Money(9, "PLN"),
         )
         with patch("orders.services.commands.cancel_active_payments_for_tx", return_value=False):
-            ship2, cancelled2 = commands.buyer_set_line_shipping(order=self.order, line=self.line, mode="PACKAGE", package_type=pkg)
+            ship2, cancelled2 = commands.buyer_set_line_shipping(
+                order=self.order, line=self.line, mode="PACKAGE", package_type=pkg
+            )
         self.assertFalse(cancelled2)
         self.assertEqual(ship2.package_type, pkg)
         self.assertEqual(ship2.price, Money(9, "PLN"))
@@ -191,6 +195,16 @@ class StatusAndSyncCommandsTests(TestCase):
         self.line = create_order_line(self.order, self.item, quantity=3, unit_price=self.item.price)
         self.order.recalc_totals(save=True)
 
+        create_item_reservation(
+            item=self.item,
+            tx=self.tx,
+            line=self.line,
+            user=self.buyer,
+            quantity=3,
+            expires_at=timezone.now() + timezone.timedelta(hours=1),
+            released_at=None,
+        )
+
     def test_set_order_status_valid_transition(self):
         commands.set_order_status(order=self.order, to_status="COMPLETED")
         self.order.refresh_from_db()
@@ -212,6 +226,7 @@ class StatusAndSyncCommandsTests(TestCase):
         self.tx.status = "COMPLETED"
         self.tx.save(update_fields=["status"])
 
+        commands.sync_orders_with_transaction(tx=self.tx)
         self.order.refresh_from_db()
         self.item.refresh_from_db()
         self.assertEqual(self.order.order_status, "COMPLETED")
@@ -222,6 +237,17 @@ class StatusAndSyncCommandsTests(TestCase):
         order2 = create_order(self.tx2, self.seller, buyer=self.buyer, status="PENDING")
         line2 = create_order_line(order2, self.item, quantity=2, unit_price=self.item.price)
         order2.recalc_totals(save=True)
+
+        create_item_reservation(
+            item=self.item,
+            tx=self.tx2,
+            line=line2,
+            user=self.buyer,
+            quantity=2,
+            expires_at=timezone.now() + timezone.timedelta(hours=1),
+            released_at=None,
+        )
+
         commands.sync_orders_with_transaction(tx=self.tx2)
 
         self.item.refresh_from_db()
@@ -267,8 +293,8 @@ class CustomerCommandsTests(TestCase):
         self.assertEqual(self.order.customer.email, "new@example.com")
 
     def test_ensure_customer_conflict_returns_candidates(self):
-        c1 = Customer.objects.create(first_name="Jan", last_name="A", email="conf@example.com")
-        c2 = Customer.objects.create(first_name="Jan", last_name="B", phone="999888777", email="jan.b@example.com")
+        Customer.objects.create(first_name="Jan", last_name="A", email="conf@example.com")
+        Customer.objects.create(first_name="Jan", last_name="B", phone="999888777", email="jan.b@example.com")
         res = commands.ensure_customer_for_order(
             order=self.order,
             first_name="X",
@@ -286,7 +312,9 @@ class OfflineCheckoutCommandsTests(TestCase):
         self.owner = create_user(email="owner-offline@example.com")
         self.seller = create_seller_profile(owner=self.owner, slug="shop-offline")
         self.item_type = create_item_type()
-        self.item = create_itemset(self.seller, self.item_type, price=Money(40, "PLN"), stock_quantity=4, status="AVAILABLE")
+        self.item = create_itemset(
+            self.seller, self.item_type, price=Money(40, "PLN"), stock_quantity=4, status="AVAILABLE"
+        )
         self.customer = create_customer(email="offline@example.com")
 
     def test_seller_offline_checkout_reduces_stock_and_completes(self):
@@ -366,8 +394,8 @@ class PawnPurchaseCommandsTests(TestCase):
         self.assertEqual(order.order_status, "COMPLETED")
         self.assertEqual(order.transaction.type, "PAWN_PURCHASE")
         self.assertEqual(order.order_lines.count(), 1)
-        line = order.order_lines.first()
-        self.assertIsNone(line.item_set)
+        line = order.order_lines.select_related("item_set").first()
+        self.assertIsNotNone(line.item_set)
         self.assertEqual(line.item_snapshot.get("title"), "Telefon")
         self.assertIsNotNone(order.purchase_cost)
         self.assertEqual(order.transaction.expected_total_amount, order.purchase_cost.amount)

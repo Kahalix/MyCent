@@ -5,11 +5,10 @@ from unittest.mock import patch
 from django.test import TestCase, override_settings
 from rest_framework.test import APIRequestFactory
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 
 from identity.models import User, SellerBankAccount, SellerMembership, UserToken
 from identity.services import commands
-from identity.services import repositories as repo
 from identity.services import queries
 from identity.services.exceptions import (
     EmailAlreadyUsed,
@@ -23,7 +22,6 @@ from identity.services.exceptions import (
 from .factories import (
     create_user,
     create_seller_profile,
-    create_seller_bank_account,
     create_seller_membership,
     issue_ephemeral_token,
 )
@@ -73,7 +71,7 @@ class AuthCommandsTests(TestCase):
         with self.assertRaises(TokenInvalid):
             commands.confirm_registration(token="invalid-token")
 
-    def test_login_user_success_returns_tokens_and_saves_refresh(self):
+    def test_login_user_success_returns_payload_and_saves_refresh(self):
         user = create_user(email="login@example.com")
         request = self.factory.post(
             "/api/auth/login/",
@@ -81,17 +79,15 @@ class AuthCommandsTests(TestCase):
             HTTP_USER_AGENT="ua",
             REMOTE_ADDR="127.0.0.1",
         )
-        payload = commands.login_user(
+        payload, refresh_jwt = commands.login_user(
             request,
             email="login@example.com",
             password="pass1234",
         )
         self.assertIn("access", payload)
-        self.assertIn("refresh", payload)
+        self.assertIn("user", payload)
         self.assertEqual(payload["user"]["email"], "login@example.com")
-        self.assertTrue(
-            UserToken.exists_refresh(user, payload["refresh"])
-        )
+        self.assertTrue(UserToken.exists_refresh(user, refresh_jwt))
 
     def test_login_user_invalid_credentials_raises(self):
         create_user(email="bad@example.com")
@@ -104,7 +100,7 @@ class AuthCommandsTests(TestCase):
             )
 
     def test_login_inactive_status_active_raises_account_not_active(self):
-        user = create_user(
+        create_user(
             email="inactive@example.com",
             is_active=False,
             user_status="ACTIVE",
@@ -127,12 +123,13 @@ class AuthCommandsTests(TestCase):
         )
         original = RefreshToken.for_user(user)
         UserToken.save_refresh(user, str(original))
-        payload = commands.refresh_tokens(request, refresh_jwt=str(original))
+
+        payload, new_refresh_jwt = commands.refresh_tokens(request, refresh_jwt=str(original))
+
         self.assertIn("access", payload)
-        self.assertIn("refresh", payload)
-        self.assertNotEqual(payload["refresh"], str(original))
+        self.assertNotEqual(new_refresh_jwt, str(original))
         self.assertFalse(UserToken.exists_refresh(user, str(original)))
-        self.assertTrue(UserToken.exists_refresh(user, payload["refresh"]))
+        self.assertTrue(UserToken.exists_refresh(user, new_refresh_jwt))
 
     def test_refresh_tokens_missing_raises(self):
         request = self.factory.post("/api/auth/refresh/", {})
@@ -159,12 +156,8 @@ class AuthCommandsTests(TestCase):
         UserToken.save_refresh(user, str(refresh))
         request = self.factory.post("/api/auth/logout/", {})
         commands.logout_user(request, user=user)
-        self.assertFalse(
-            UserToken.objects.filter(user=user, type="REFRESH_TOKEN").exists()
-        )
-        self.assertTrue(
-            BlacklistedToken.objects.filter(token__user=user).exists()
-        )
+        self.assertFalse(UserToken.objects.filter(user=user, type="REFRESH_TOKEN").exists())
+        self.assertTrue(BlacklistedToken.objects.filter(token__user=user).exists())
 
     def test_reset_password_changes_password(self):
         user = create_user(email="reset@example.com")
@@ -183,9 +176,7 @@ class AuthCommandsTests(TestCase):
         with patch("identity.services.commands.emails.send_templated_email") as mock_email:
             data = commands.forgot_password(request, email=user.email)
         self.assertIn("message", data)
-        self.assertTrue(
-            UserToken.objects.filter(user=user, type="PASSWORD_RESET").exists()
-        )
+        self.assertTrue(UserToken.objects.filter(user=user, type="PASSWORD_RESET").exists())
         mock_email.assert_called_once()
 
     def test_forgot_password_does_not_send_email_for_inactive_user(self):
@@ -194,9 +185,7 @@ class AuthCommandsTests(TestCase):
         with patch("identity.services.commands.emails.send_templated_email") as mock_email:
             data = commands.forgot_password(request, email=user.email)
         self.assertIn("message", data)
-        self.assertFalse(
-            UserToken.objects.filter(user=user, type="PASSWORD_RESET").exists()
-        )
+        self.assertFalse(UserToken.objects.filter(user=user, type="PASSWORD_RESET").exists())
         mock_email.assert_not_called()
 
     def test_request_email_change_validates_uniqueness_and_sends_email(self):
@@ -269,9 +258,7 @@ class UserCommandsTests(TestCase):
             old_password="pass1234",
             new_password="NewStrongPass123!",
         )
-        self.assertFalse(
-            UserToken.objects.filter(user=user, type="REFRESH_TOKEN").exists()
-        )
+        self.assertFalse(UserToken.objects.filter(user=user, type="REFRESH_TOKEN").exists())
 
     def test_admin_create_update_delete_user(self):
         u = commands.admin_create_user(
@@ -315,12 +302,8 @@ class UserCommandsTests(TestCase):
         user.refresh_from_db()
         self.assertEqual(user.user_status, "SUSPENDED")
         self.assertFalse(user.is_active)
-        self.assertFalse(
-            UserToken.objects.filter(user=user, type="REFRESH_TOKEN").exists()
-        )
-        self.assertTrue(
-            BlacklistedToken.objects.filter(token__user=user).exists()
-        )
+        self.assertFalse(UserToken.objects.filter(user=user, type="REFRESH_TOKEN").exists())
+        self.assertTrue(BlacklistedToken.objects.filter(token__user=user).exists())
 
 
 class SellerCommandsTests(TestCase):
@@ -417,9 +400,7 @@ class BankAccountCommandsTests(TestCase):
             owner=owner,
             public_id=str(acc2.public_id),
         )
-        self.assertFalse(
-            SellerBankAccount.objects.filter(public_id=acc2.public_id).exists()
-        )
+        self.assertFalse(SellerBankAccount.objects.filter(public_id=acc2.public_id).exists())
 
     def test_member_bank_account_requires_member_with_owner_role(self):
         owner = create_user(email="shopowner@example.com", role="OWNER")

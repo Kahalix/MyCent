@@ -163,56 +163,6 @@ def set_transaction_status(*, tx: Transaction, to_status: str, reason: str = "")
 
     return tx
 
-
-# def preview_coupon_discount(
-#     *, tx: Transaction, coupon_code: Optional[str] = None, user_coupon_public_id: Optional[str] = None
-# ) -> dict:
-#     """
-#     Podgląd rabatu bez zapisywania na transakcji.
-#     Dla typów =/= PURCHASE zwracamy info, że kupony są niedostępne.
-#     """
-#     if tx.type != "PURCHASE":
-#         cur = tx.expected_total_currency or "PLN"
-#         from djmoney.money import Money as _M
-#         base = _M(tx.expected_total_amount or 0, cur)
-#         return {
-#             "ok": False,
-#             "reason": "Coupons are not available for this transaction.",
-#             "currency": str(base.currency),
-#             "gross_amount": str(base.amount),
-#             "discount_amount": "0",
-#             "net_amount": str(base.amount),
-#             "coupon_public_id": None,
-#             "user_coupon_public_id": None,
-#         }
-#
-#     coupon = None
-#     user_coupon = None
-#     if coupon_code:
-#         coupon = Coupon.objects.filter(code__iexact=coupon_code.strip()).first()
-#     elif user_coupon_public_id:
-#         user_coupon = UserCoupon.objects.select_related("coupon").filter(public_id=user_coupon_public_id.strip()).first()
-#         coupon = user_coupon.coupon if user_coupon else None
-#
-#     base = _base_total_for(tx)  # suma grand_total orderów
-#     dr = validate_and_compute_discount(transaction=tx, coupon=coupon, user_coupon=user_coupon)
-#
-#     discount = dr.discount if dr.ok else Money(0, base.currency)
-#     net = base - discount
-#     if net.amount < 0:
-#         net = Money(0, base.currency)
-#
-#     return {
-#         "ok": dr.ok,
-#         "reason": dr.reason,
-#         "currency": str(base.currency),
-#         "gross_amount": str(base.amount),
-#         "discount_amount": str(discount.amount),
-#         "net_amount": str(net.amount),
-#         "coupon_public_id": getattr(coupon, "public_id", None),
-#         "user_coupon_public_id": getattr(user_coupon, "public_id", None),
-#     }
-
 @dbtx.atomic
 def preview_coupon_discount(
     *, tx: Transaction, coupon_code: Optional[str] = None, user_coupon_public_id: Optional[str] = None

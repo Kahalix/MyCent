@@ -6,6 +6,7 @@ from rest_framework import permissions, viewsets, mixins, status
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
+from django.conf import settings
 
 from identity.permissions import IsAdmin
 from catalog.models import ItemType
@@ -26,12 +27,18 @@ class PublicListingPackageViewSet(mixins.ListModelMixin,
                                   mixins.RetrieveModelMixin,
                                   viewsets.GenericViewSet):
     permission_classes = [permissions.AllowAny]
-    queryset = ListingPackage.objects.select_related("item_type").all().order_by("price","points")
     lookup_field = "public_id"
     serializer_class = ListingPackagePublicResponse
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filterset_class = ListingPackageFilter
     ordering_fields = ("price", "points")
+
+    def get_queryset(self):
+        qs = ListingPackage.objects.select_related("item_type").all()
+        money_enabled = bool(getattr(settings, "SERVICES_ENABLE_MONEY_PURCHASES", False))
+        if not money_enabled:
+            qs = qs.filter(points__gt=0).order_by("points")
+        return qs.order_by("price", "points") if money_enabled else qs
 
 # ===== ADMIN: packages =====
 

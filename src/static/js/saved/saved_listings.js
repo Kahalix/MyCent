@@ -1,4 +1,3 @@
-// // static/js/saved/saved_listings.js
 // window.app = window.app || {};
 //
 // app.savedListingsPage = function () {

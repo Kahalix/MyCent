@@ -7,13 +7,21 @@ User = get_user_model()
 
 # ======= USER - Responses =======
 
+class PublicUserSafeResponse(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ("public_id", "first_name", "last_name", "phone_number", "role", "user_image")
+
+
 class PublicUserResponse(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("public_id", "email", "first_name", "last_name", "role", "is_staff",
-            "is_superuser", "user_status", "points", "user_image")
+        fields = (
+            "public_id", "email", "first_name", "last_name", "phone_number", "role",
+            "is_staff", "is_superuser", "user_status", "points", "user_image"
+        )
 
-class UserResponse(PublicUserResponse):
+class UserResponse(PublicUserSafeResponse):
     pass
 
 class UserAdminResponse(serializers.ModelSerializer):
@@ -46,7 +54,14 @@ class LoginRequest(serializers.Serializer):
     def validate_email(self, value): return value.lower()
 
 class RefreshRequest(serializers.Serializer):
-    refresh = serializers.CharField(required=False)  # cookie fallback
+    refresh = serializers.CharField(required=False, write_only=True)
+
+    def validate(self, attrs):
+        if attrs.get("refresh"):
+            raise serializers.ValidationError(
+                {"refresh": "Refresh token jest akceptowany wyłącznie przez HttpOnly cookie."}
+            )
+        return {}
 
 class ForgotPasswordRequest(serializers.Serializer):
     email = serializers.EmailField()
@@ -117,12 +132,13 @@ class AvatarUploadRequest(serializers.Serializer):
 # ======= SELLER PROFILE =======
 
 class SellerProfilePublicResponse(serializers.ModelSerializer):
-    owner = PublicUserResponse()
+    owner = PublicUserSafeResponse()
+
     class Meta:
         model = SellerProfile
         fields = (
-            "public_id","company_name","slug","description","contact_email","contact_phone",
-            "website_url","logo_image","banner_image","followers_count","rating","rating_count","owner"
+            "public_id", "company_name", "slug", "description", "contact_email", "contact_phone",
+            "website_url", "logo_image", "banner_image", "followers_count", "rating", "rating_count", "owner"
         )
 
 class SellerProfilePrivateResponse(serializers.ModelSerializer):
@@ -249,5 +265,6 @@ class SellerContextResponse(serializers.Serializer):
             None:        [],
         }
         return matrix.get(role, [])
+
 
 

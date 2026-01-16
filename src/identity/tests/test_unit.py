@@ -5,6 +5,8 @@ from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase, override_settings
 
+from rest_framework_simplejwt.exceptions import TokenError
+
 from identity.services import commands
 from identity.services.exceptions import (
     EmailAlreadyUsed,
@@ -15,6 +17,15 @@ from identity.services.exceptions import (
     RefreshInvalid,
     RefreshNotRecognized,
 )
+
+
+class DummyRefresh:
+    def __init__(self, refresh: str, access: str):
+        self._refresh = refresh
+        self.access_token = access
+
+    def __str__(self) -> str:
+        return self._refresh
 
 
 class UserTokenHelpersUnitTests(SimpleTestCase):
@@ -106,7 +117,7 @@ class AuthCommandsUnitTests(SimpleTestCase):
     @patch("identity.services.commands._auth_payload")
     @patch("identity.services.commands.save_refresh")
     @patch("identity.services.commands.RefreshToken")
-    @patch("identity.services.repositories.find_user_by_email_ci")
+    @patch("identity.services.commands.find_user_by_email_ci")
     def test_login_user_success_saves_refresh_and_returns_payload(
         self,
         mock_find,
@@ -123,25 +134,28 @@ class AuthCommandsUnitTests(SimpleTestCase):
         )
         mock_find.return_value = user
 
-        refresh_obj = SimpleNamespace()
+        refresh_obj = DummyRefresh("R", "A")
         mock_refresh_cls.for_user.return_value = refresh_obj
 
-        mock_payload.return_value = {"access": "A", "refresh": "R", "user": {"email": "login@example.com"}}
+        mock_payload.return_value = {"access": "A", "user": {"email": "login@example.com"}}
 
         req = self._request(ua="ua1", ip="10.0.0.1")
-        out = commands.login_user(req, email="LOGIN@EXAMPLE.COM", password="pass")
+        payload, refresh_jwt = commands.login_user(req, email="LOGIN@EXAMPLE.COM", password="pass")
 
-        self.assertEqual(out["refresh"], "R")
-        mock_payload.assert_called_once_with(user, refresh_obj)
+        self.assertEqual(refresh_jwt, "R")
+        self.assertEqual(payload, {"access": "A", "user": {"email": "login@example.com"}})
+
+        mock_payload.assert_called_once_with(user, "A")
 
         args, kwargs = mock_save_refresh.call_args
         self.assertIs(args[0], user)
         self.assertEqual(args[1], "R")
-        self.assertEqual(kwargs["data"]["ua"], "ua1")
         self.assertEqual(kwargs["data"]["ip"], "10.0.0.1")
+        self.assertIn("ua_hash", kwargs["data"])
+        self.assertIn("rotated_at", kwargs["data"])
 
     @patch("identity.services.commands._send_registration_confirmation_email")
-    @patch("identity.services.repositories.find_user_by_email_ci")
+    @patch("identity.services.commands.find_user_by_email_ci")
     def test_login_user_inactive_active_status_resends_confirmation_and_raises(
         self,
         mock_find,
@@ -163,7 +177,7 @@ class AuthCommandsUnitTests(SimpleTestCase):
         mock_send_confirm.assert_called_once()
 
     @patch("identity.services.commands._send_registration_confirmation_email")
-    @patch("identity.services.repositories.find_user_by_email_ci")
+    @patch("identity.services.commands.find_user_by_email_ci")
     def test_login_user_inactive_suspended_raises_without_resend(self, mock_find, mock_send_confirm):
         user = SimpleNamespace(
             id=10,
@@ -180,7 +194,7 @@ class AuthCommandsUnitTests(SimpleTestCase):
 
         mock_send_confirm.assert_not_called()
 
-    @patch("identity.services.repositories.find_user_by_email_ci")
+    @patch("identity.services.commands.find_user_by_email_ci")
     def test_login_user_invalid_credentials_raises(self, mock_find):
         user = SimpleNamespace(
             id=10,
@@ -212,7 +226,7 @@ class RefreshAndRevokeUnitTests(SimpleTestCase):
     @override_settings(JWT_REFRESH_IN_COOKIE=False)
     @patch("identity.services.commands.RefreshToken")
     def test_refresh_tokens_invalid_string_raises(self, mock_refresh_cls):
-        mock_refresh_cls.side_effect = Exception("bad token")
+        mock_refresh_cls.side_effect = TokenError("bad token")
         req = self._request()
         with self.assertRaises(RefreshInvalid):
             commands.refresh_tokens(req, refresh_jwt="not-a-token")
@@ -220,96 +234,90 @@ class RefreshAndRevokeUnitTests(SimpleTestCase):
     @override_settings(JWT_REFRESH_IN_COOKIE=False)
     @patch("identity.services.commands._auth_payload")
     @patch("identity.services.commands.save_refresh")
-    @patch("identity.services.commands.delete_refresh")
-    @patch("identity.services.commands.exists_refresh")
-    @patch("identity.services.commands.get_user_by_id")
+    @patch("identity.services.commands.UserToken.consume_refresh_atomic")
+    @patch("identity.services.commands.User")
     @patch("identity.services.commands.RefreshToken")
     def test_refresh_tokens_success_rotates_refresh(
         self,
         mock_refresh_cls,
-        mock_get_user,
-        mock_exists,
-        mock_delete,
+        mock_user_model,
+        mock_consume_atomic,
         mock_save,
         mock_payload,
     ):
-        def _old_getitem(k):
-            if k == "user_id":
-                return 99
-            raise KeyError(k)
-
         old = MagicMock()
-        old.__getitem__.side_effect = _old_getitem
+        old.get.side_effect = lambda k, d=None: 99 if k == "user_id" else None
         mock_refresh_cls.side_effect = lambda raw: old
 
-        class DummyRefresh:
-            def __init__(self, s: str):
-                self.s = s
-
-            def __str__(self) -> str:
-                return self.s
-
         user = SimpleNamespace(id=99, is_active=True)
-        mock_get_user.return_value = user
-        mock_exists.return_value = True
+        qs = MagicMock()
+        qs.first.return_value = user
+        mock_user_model.objects.filter.return_value = qs
 
-        new_refresh = DummyRefresh("R2")
+        mock_consume_atomic.return_value = True
+
+        new_refresh = DummyRefresh("R2", "A2")
         mock_refresh_cls.for_user.return_value = new_refresh
 
-        mock_payload.return_value = {"access": "A2", "refresh": "R2", "user": {"id": 99}}
+        mock_payload.return_value = {"access": "A2", "user": {"id": 99}}
 
         req = self._request(ua="ua2", ip="10.0.0.2")
-        out = commands.refresh_tokens(req, refresh_jwt="OLD")
+        payload, new_refresh_jwt = commands.refresh_tokens(req, refresh_jwt="OLD")
 
-        self.assertEqual(out["refresh"], "R2")
-        mock_delete.assert_called_once_with(user, "OLD")
+        self.assertEqual(new_refresh_jwt, "R2")
+        self.assertEqual(payload, {"access": "A2", "user": {"id": 99}})
+
+        mock_consume_atomic.assert_called_once()
+        ca_kwargs = mock_consume_atomic.call_args.kwargs
+        self.assertIs(ca_kwargs["user"], user)
+        self.assertEqual(ca_kwargs["raw_refresh_jwt"], "OLD")
+        self.assertEqual(ca_kwargs["ip"], "10.0.0.2")
+        self.assertIn("ua_hash", ca_kwargs)
+
+        mock_payload.assert_called_once_with(user, "A2")
 
         args, kwargs = mock_save.call_args
         self.assertIs(args[0], user)
         self.assertEqual(args[1], "R2")
-        self.assertEqual(kwargs["data"]["ua"], "ua2")
         self.assertEqual(kwargs["data"]["ip"], "10.0.0.2")
-
-        mock_payload.assert_called_once_with(user, new_refresh)
+        self.assertIn("ua_hash", kwargs["data"])
+        self.assertIn("rotated_at", kwargs["data"])
 
     @override_settings(JWT_REFRESH_IN_COOKIE=False)
-    @patch("identity.services.commands.get_user_by_id")
+    @patch("identity.services.commands.User")
     @patch("identity.services.commands.RefreshToken")
-    def test_refresh_tokens_user_not_found_or_inactive_raises(self, mock_refresh_cls, mock_get_user):
-        def _old_getitem(k):
-            if k == "user_id":
-                return 1
-            raise KeyError(k)
-
+    def test_refresh_tokens_user_not_found_or_inactive_raises(self, mock_refresh_cls, mock_user_model):
         old = MagicMock()
-        old.__getitem__.side_effect = _old_getitem
+        old.get.side_effect = lambda k, d=None: 1 if k == "user_id" else None
         mock_refresh_cls.side_effect = lambda raw: old
 
-        mock_get_user.return_value = None
+        qs = MagicMock()
+        qs.first.return_value = None
+        mock_user_model.objects.filter.return_value = qs
+
         req = self._request()
         with self.assertRaises(RefreshInvalid):
             commands.refresh_tokens(req, refresh_jwt="OLD")
 
-        mock_get_user.return_value = SimpleNamespace(id=1, is_active=False)
+        qs.first.return_value = SimpleNamespace(id=1, is_active=False)
         with self.assertRaises(RefreshInvalid):
             commands.refresh_tokens(req, refresh_jwt="OLD")
 
     @override_settings(JWT_REFRESH_IN_COOKIE=False)
-    @patch("identity.services.commands.exists_refresh")
-    @patch("identity.services.commands.get_user_by_id")
+    @patch("identity.services.commands.UserToken.consume_refresh_atomic")
+    @patch("identity.services.commands.User")
     @patch("identity.services.commands.RefreshToken")
-    def test_refresh_tokens_not_recognized_raises(self, mock_refresh_cls, mock_get_user, mock_exists):
-        def _old_getitem(k):
-            if k == "user_id":
-                return 1
-            raise KeyError(k)
-
+    def test_refresh_tokens_not_recognized_raises(self, mock_refresh_cls, mock_user_model, mock_consume_atomic):
         old = MagicMock()
-        old.__getitem__.side_effect = _old_getitem
+        old.get.side_effect = lambda k, d=None: 1 if k == "user_id" else None
         mock_refresh_cls.side_effect = lambda raw: old
 
-        mock_get_user.return_value = SimpleNamespace(id=1, is_active=True)
-        mock_exists.return_value = False
+        user = SimpleNamespace(id=1, is_active=True)
+        qs = MagicMock()
+        qs.first.return_value = user
+        mock_user_model.objects.filter.return_value = qs
+
+        mock_consume_atomic.return_value = False
 
         req = self._request()
         with self.assertRaises(RefreshNotRecognized):

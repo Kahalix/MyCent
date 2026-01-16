@@ -1,4 +1,3 @@
-// static/js/payments/list.js
 window.app = window.app || {};
 app.payList = function () {
   return {

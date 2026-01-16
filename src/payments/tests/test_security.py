@@ -1,4 +1,3 @@
-# src/payments/tests/test_security.py
 from unittest.mock import patch
 
 from django.test import override_settings

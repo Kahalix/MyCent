@@ -27,7 +27,7 @@ module.exports = {
                 }
             },
             {
-                // SZARY DARK (bez czerni, „graphite”)
+                // SZARY DARK (bez czerni, graphite)
                 lownDark: {
                     "primary": "#d4af37",
                     "primary-content": "#101216",

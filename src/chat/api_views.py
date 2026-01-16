@@ -1,29 +1,31 @@
 from __future__ import annotations
+
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
-
+from django.db import transaction
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
-from rest_framework import viewsets, mixins, permissions
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import mixins, permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django_filters.rest_framework import DjangoFilterBackend
 
-from identity.models import User
-from listings.models import ItemSet
+from chat.filters import ChatThreadFilter
 from chat.serializers import (
-    ChatThreadResponse, ChatMessageResponse,
-    StartDMRequest, SendMessageRequest, ListMessagesRequest
+    ChatMessageResponse,
+    ChatThreadResponse,
+    ListMessagesRequest,
+    SendMessageRequest,
+    StartDMRequest,
 )
-from chat.services import repositories as repo
 from chat.services import commands as cmd
 from chat.services import queries as q
-from chat.filters import ChatThreadFilter
+from chat.services import repositories as repo
+from identity.models import User
+from listings.models import ItemSet
 
 
-class UserChatThreadViewSet(mixins.ListModelMixin,
-                            mixins.RetrieveModelMixin,
-                            viewsets.GenericViewSet):
+class UserChatThreadViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ChatThreadResponse
     lookup_field = "public_id"
@@ -51,16 +53,33 @@ class UserChatThreadViewSet(mixins.ListModelMixin,
             )
         )
 
+    def _send_inbox_counts(self, *, layer, user: User):
+        async_to_sync(layer.group_send)(
+            f"chat.inbox.{user.public_id}",
+            {"type": "inbox.unread_counts", "payload": q.unread_counts_by_bucket(user)},
+        )
+
+    def _send_thread_updated(self, *, layer, user: User, payload: dict):
+        async_to_sync(layer.group_send)(
+            f"chat.inbox.{user.public_id}",
+            {"type": "inbox.thread_updated", "payload": payload},
+        )
+
+    def _send_thread_message(self, *, layer, thread_public_id: str, payload: dict):
+        async_to_sync(layer.group_send)(
+            f"chat.thread.{thread_public_id}",
+            {"type": "chat.message", "payload": payload},
+        )
+
     def destroy(self, request, *args, **kwargs):
         thread = self.get_object()
         repo.mark_thread_deleted_for_user(thread=thread, user=request.user)
         layer = get_channel_layer()
-        async_to_sync(
-            layer.group_send,
-        )(
-            f"chat.inbox.{request.user.public_id}",
-            {"type": "inbox.unread_counts", "payload": q.unread_counts_by_bucket(request.user)},
-        )
+
+        def _broadcast():
+            self._send_inbox_counts(layer=layer, user=request.user)
+
+        transaction.on_commit(_broadcast)
         return Response(status=204)
 
     @action(detail=False, methods=["get"], url_path="unread-counts")
@@ -83,10 +102,7 @@ class UserChatThreadViewSet(mixins.ListModelMixin,
             else None
         )
         thread = cmd.start_dm(initiator=request.user, other_user=other, item=item)
-        return Response(
-            ChatThreadResponse(thread, context=self.get_serializer_context()).data,
-            status=201,
-        )
+        return Response(ChatThreadResponse(thread, context=self.get_serializer_context()).data, status=201)
 
     @action(detail=True, methods=["get"], url_path="messages")
     def messages(self, request, public_id=None):
@@ -100,105 +116,112 @@ class UserChatThreadViewSet(mixins.ListModelMixin,
         )
         cmd.mark_read(thread=thread, user=request.user)
         layer = get_channel_layer()
-        async_to_sync(
-            layer.group_send,
-        )(
-            f"chat.inbox.{request.user.public_id}",
-            {"type": "inbox.unread_counts", "payload": q.unread_counts_by_bucket(request.user)},
-        )
-        return Response(
-            ChatMessageResponse(items, many=True, context=self.get_serializer_context()).data,
-            status=200,
-        )
+
+        def _broadcast():
+            self._send_inbox_counts(layer=layer, user=request.user)
+            self._send_thread_updated(
+                layer=layer,
+                user=request.user,
+                payload={
+                    "thread_public_id": str(thread.public_id),
+                    "last_message_preview": thread.last_message_preview,
+                    "last_message_at": thread.last_message_at.isoformat() if thread.last_message_at else None,
+                    "unread_count": 0,
+                },
+            )
+
+        transaction.on_commit(_broadcast)
+        return Response(ChatMessageResponse(items, many=True, context=self.get_serializer_context()).data, status=200)
 
     @action(detail=True, methods=["post"], url_path="messages/send")
     def send(self, request, public_id=None):
         thread = self.get_object()
         ser = SendMessageRequest(data=request.data)
         ser.is_valid(raise_exception=True)
+
         msg = cmd.send_message(thread=thread, sender=request.user, content=ser.validated_data["content"])
-        layer = get_channel_layer()
+
+        if hasattr(thread, "_prefetched_objects_cache"):
+            thread._prefetched_objects_cache = {}
+
+        thread.refresh_from_db(fields=["last_message_preview", "last_message_at"])
+
+        parts = list(thread.participants.select_related("user").all())
+
         sender = msg.sender
         if sender.first_name or sender.last_name:
             display_name = f"{(sender.first_name or '').strip()} {(sender.last_name or '').strip()}".strip()
         else:
             display_name = sender.email.split("@", 1)[0] if sender.email else "Użytkownik"
+
         sender_avatar = None
         if getattr(sender, "user_image", None):
             try:
                 sender_avatar = sender.user_image.url
             except Exception:
                 sender_avatar = None
+
         payload = {
-            "public_id": msg.public_id,
+            "public_id": str(msg.public_id),
             "content": msg.content,
             "sent_at": msg.sent_at.isoformat(),
-            "sender_public_id": sender.public_id,
+            "sender_public_id": str(sender.public_id),
             "sender_display_name": display_name,
             "sender_user_image": sender_avatar,
         }
-        async_to_sync(
-            layer.group_send,
-        )(
-            f"chat.thread.{thread.public_id}",
-            {"type": "chat.message", "payload": payload},
-        )
-        parts = thread.participants.select_related("user").all()
-        for p in parts:
-            async_to_sync(
-                layer.group_send,
-            )(
-                f"chat.inbox.{p.user.public_id}",
-                {
-                    "type": "inbox.thread_updated",
-                    "payload": {
-                        "thread_public_id": thread.public_id,
+
+        layer = get_channel_layer()
+        thread_pid = str(thread.public_id)
+
+        def _broadcast():
+            self._send_thread_message(layer=layer, thread_public_id=thread_pid, payload=payload)
+
+            for p in parts:
+                unread = int(p.unread_count)
+                if p.user_id == request.user.id:
+                    unread = 0
+
+                self._send_thread_updated(
+                    layer=layer,
+                    user=p.user,
+                    payload={
+                        "thread_public_id": thread_pid,
                         "last_message_preview": thread.last_message_preview,
-                        "last_message_at": thread.last_message_at.isoformat()
-                        if thread.last_message_at
-                        else None,
-                        "unread_count": p.unread_count if p.user_id != request.user.id else 0,
+                        "last_message_at": thread.last_message_at.isoformat() if thread.last_message_at else None,
+                        "unread_count": unread,
                     },
-                },
-            )
-            async_to_sync(
-                layer.group_send,
-            )(
-                f"chat.inbox.{p.user.public_id}",
-                {"type": "inbox.unread_counts", "payload": q.unread_counts_by_bucket(p.user)},
-            )
-        return Response(
-            ChatMessageResponse(msg, context=self.get_serializer_context()).data,
-            status=201,
-        )
+                )
+                self._send_inbox_counts(layer=layer, user=p.user)
+
+        transaction.on_commit(_broadcast)
+        return Response(ChatMessageResponse(msg, context=self.get_serializer_context()).data, status=201)
 
     @action(detail=True, methods=["post"], url_path="read")
     def mark_read(self, request, public_id=None):
         thread = self.get_object()
         cmd.mark_read(thread=thread, user=request.user)
+
+        if hasattr(thread, "_prefetched_objects_cache"):
+            thread._prefetched_objects_cache = {}
+
+        thread.refresh_from_db(fields=["last_message_preview", "last_message_at"])
+
         layer = get_channel_layer()
-        async_to_sync(
-            layer.group_send,
-        )(
-            f"chat.inbox.{request.user.public_id}",
-            {
-                "type": "inbox.thread_updated",
-                "payload": {
-                    "thread_public_id": thread.public_id,
+
+        def _broadcast():
+            self._send_thread_updated(
+                layer=layer,
+                user=request.user,
+                payload={
+                    "thread_public_id": str(thread.public_id),
                     "last_message_preview": thread.last_message_preview,
-                    "last_message_at": thread.last_message_at.isoformat()
-                    if thread.last_message_at
-                    else None,
+                    "last_message_at": thread.last_message_at.isoformat() if thread.last_message_at else None,
                     "unread_count": 0,
                 },
-            },
-        )
-        async_to_sync(
-            layer.group_send,
-        )(
-            f"chat.inbox.{request.user.public_id}",
-            {"type": "inbox.unread_counts", "payload": q.unread_counts_by_bucket(request.user)},
-        )
+            )
+            self._send_inbox_counts(layer=layer, user=request.user)
+
+        transaction.on_commit(_broadcast)
         return Response(status=204)
 
     @action(detail=True, methods=["post"], url_path="mute")
@@ -211,12 +234,12 @@ class UserChatThreadViewSet(mixins.ListModelMixin,
             muted = raw
         else:
             muted = str(raw).lower() in ("1", "true", "yes", "on")
+
         repo.set_thread_mute_for_user(thread=thread, user=request.user, muted=muted)
         layer = get_channel_layer()
-        async_to_sync(
-            layer.group_send,
-        )(
-            f"chat.inbox.{request.user.public_id}",
-            {"type": "inbox.unread_counts", "payload": q.unread_counts_by_bucket(request.user)},
-        )
+
+        def _broadcast():
+            self._send_inbox_counts(layer=layer, user=request.user)
+
+        transaction.on_commit(_broadcast)
         return Response(status=200)

@@ -13,12 +13,12 @@
       >
       <div class="min-w-0">
         <div class="font-semibold truncate" x-text="fullName()"></div>
-        <div class="text-xs opacity-70 truncate" x-text="data?.email || '—'"></div>
+<!--        <div class="text-xs opacity-70 truncate" x-text="data?.email || '—'"></div>-->
       </div>
     </div>
   </div>
 
-  <!-- Lista ogłoszeń użytkownika — layout jak public offers (z serduszkami) -->
+  <!-- Lista ogłoszeń użytkownika -->
   <div
     x-data="app.publicOffersList({ ownerPublicId: '{{ user_public_id }}' })"
     x-init="init()"
@@ -57,7 +57,7 @@
       <div class="alert alert-error whitespace-pre-line mt-2" x-text="err"></div>
     </template>
 
-    <!-- Lista (klikana, z sercem + datą; bez „sprzedawca/użytkownik”) -->
+    <!-- Lista (klikana, z sercem + datą; bez sprzedawca/użytkownik) -->
     <div class="offers-list space-y-1" x-show="!loading && items.length">
       <template x-for="it in items" :key="it.public_id || it.id">
         <div

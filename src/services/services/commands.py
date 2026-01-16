@@ -2,16 +2,21 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from django.db import transaction
+from django.conf import settings
+from django.db import transaction, IntegrityError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth import get_user_model
 from django.db.models import F
+
 
 from catalog.models import ItemType
 from listings.models import ItemSet
 from services.models import ListingPackage, UserListingPackage, ListingUsageHistory, ServicePurchaseHistory
 from .exceptions import BadRequest, Forbidden, NoSlotsLeft, PurchaseError
 from . import repositories as repo
+
+from coupons.services.points_backend import spend_points
+
 
 User = get_user_model()
 
@@ -28,67 +33,58 @@ def _clean_and_save(obj: Any):
 # ----- PURCHASE --------
 
 @transaction.atomic
-def purchase_package(*, user: User, package: ListingPackage,
-                     pay_with: str | None = None) -> UserListingPackage:
-    """
-    pay_with: "points" | "money" | None
-      - "points": wymagane package.points > 0 i user.points >= package.points
-      - "money" : wymagane package.price != None (tu nie integrujemy bramek; tylko zapis historii)
-      - None    : jeśli package.points>0 -> "points"; elif package.price -> "money"; else "free"
-    Efekt:
-      - jeśli package.listings_free > 0 -> zwiększa free_total o listings_free
-      - jeśli == 0 -> dodaje 1 paid credit (paid_total += 1)
-    """
-    # Lock user row (punkty) + user_package row
+def purchase_package(*, user, package: ListingPackage, pay_with: str | None = None) -> UserListingPackage:
+    money_enabled = bool(getattr(settings, "SERVICES_ENABLE_MONEY_PURCHASES", False))
+
     user = repo.lock_user_row(user)
+
     if pay_with is None:
         if package.points and package.points > 0:
             pay_with = "points"
-        elif package.price:
+        elif money_enabled and package.price:
             pay_with = "money"
         else:
-            pay_with = "free"
+            raise PurchaseError("Ten pakiet nie jest obecnie dostępny do zakupu.")
 
-    # Płatność punktami
     if pay_with == "points":
         if not package.points or package.points <= 0:
             raise PurchaseError("Ten pakiet nie może być opłacony punktami.")
-        if (user.points or 0) < package.points:
-            raise PurchaseError("Niewystarczająca liczba punktów.")
-        # zdejmij punkty
-        user.points = int(user.points) - int(package.points)
-        user.save(update_fields=["points", "updated_at"])
+        spend_points(user, int(package.points), reason=f"Zakup pakietu {package.public_id} za punkty")
         repo.create_purchase_history(
-            user=user, package=package,
-            cost_amount=None, cost_currency="PLN",
+            user=user,
+            package=package,
+            cost_amount=None,
+            cost_currency="PLN",
             points_used=int(package.points),
-            description=f"Zakup pakietu {package.public_id} za punkty"
+            description=f"Zakup pakietu {package.public_id} za punkty",
         )
 
-    # Płatność pieniędzmi
     elif pay_with == "money":
+        if not money_enabled:
+            raise PurchaseError("Zakup za środki pieniężne jest chwilowo wyłączony.")
         if not package.price:
             raise PurchaseError("Ten pakiet nie ma ceny pieniężnej.")
         repo.create_purchase_history(
-            user=user, package=package,
+            user=user,
+            package=package,
             cost_amount=Decimal(str(package.price.amount)),
             cost_currency=str(package.price.currency),
             points_used=None,
-            description=f"Zakup pakietu {package.public_id} za środki pieniężne"
+            description=f"Zakup pakietu {package.public_id} za środki pieniężne",
         )
 
-    # Bezpłatny (np. przyznany przez admina / 0)
     elif pay_with == "free":
         repo.create_purchase_history(
-            user=user, package=package,
-            cost_amount=None, cost_currency="PLN",
+            user=user,
+            package=package,
+            cost_amount=None,
+            cost_currency="PLN",
             points_used=None,
-            description=f"Przyznanie pakietu {package.public_id}"
+            description=f"Przyznanie pakietu {package.public_id}",
         )
     else:
         raise PurchaseError("Nieprawidłowa metoda płatności.")
 
-    # Zwiększ user-package totals (z blokadą)
     repo.lock_user_packages_for_type(user, package.item_type)
     up = repo.get_or_create_user_pkg(user, package)
     if package.listings_free and package.listings_free > 0:
@@ -101,11 +97,7 @@ def purchase_package(*, user: User, package: ListingPackage,
 # ----- SLOTS (consume/release) ------
 
 @transaction.atomic
-def consume_slot_for_itemset(*, user: User, itemset: ItemSet) -> ListingUsageHistory:
-    """
-    Zajmuje FREE (jeśli dostępny), w przeciwnym razie PAID.
-    Jeśli istnieje aktywny usage dla itemset -> zwraca go.
-    """
+def consume_slot_for_itemset(*, user, itemset: ItemSet) -> ListingUsageHistory:
     existing = repo.get_active_usage_for_itemset(itemset)
     if existing:
         return existing
@@ -117,9 +109,9 @@ def consume_slot_for_itemset(*, user: User, itemset: ItemSet) -> ListingUsageHis
 
     prev_paid = repo.get_any_paid_usage_for_itemset(itemset)
     if (
-            prev_paid
-            and getattr(prev_paid, "user_id", None) == getattr(user, "id", None)
-            and getattr(prev_paid, "item_type_id", None) == getattr(item_type, "id", None)
+        prev_paid
+        and getattr(prev_paid, "user_id", None) == getattr(user, "id", None)
+        and getattr(prev_paid, "item_type_id", None) == getattr(item_type, "id", None)
     ):
         repo.reopen_usage(prev_paid)
         return prev_paid
@@ -135,9 +127,22 @@ def consume_slot_for_itemset(*, user: User, itemset: ItemSet) -> ListingUsageHis
     paid_left = max(0, paid_total - paid_used)
 
     if free_left > 0:
-        return repo.create_usage(user, item_type, itemset, is_bought=False)
+        try:
+            return repo.create_usage(user, item_type, itemset, is_bought=False)
+        except IntegrityError:
+            got = repo.get_active_usage_for_itemset(itemset)
+            if got:
+                return got
+            raise
+
     if paid_left > 0:
-        return repo.create_usage(user, item_type, itemset, is_bought=True)
+        try:
+            return repo.create_usage(user, item_type, itemset, is_bought=True)
+        except IntegrityError:
+            got = repo.get_active_usage_for_itemset(itemset)
+            if got:
+                return got
+            raise
 
     raise NoSlotsLeft("Wyczerpałeś limit ogłoszeń w tej kategorii.")
 

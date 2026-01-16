@@ -1,4 +1,3 @@
-// static/js/identity/login.js
 window.app = window.app || {};
 
 app.loginForm = function () {
@@ -6,10 +5,8 @@ app.loginForm = function () {
     email: '',
     password: '',
     busy: false,
-    // inline errors
     emailErr: '',
     pwdErr: '',
-    // błąd z backendu pod formularzem
     formErr: '',
 
     _validEmail(v) { return /^\S+@\S+\.\S+$/.test(v || ''); },
@@ -28,38 +25,38 @@ app.loginForm = function () {
       this.busy = true; this.formErr = '';
 
       try {
-        const r = await fetch('/api/auth/login/', {
+        if (typeof app.ensureCsrfCookie === 'function') {
+          await app.ensureCsrfCookie();
+        }
+
+        const r = await app.api('/api/auth/login/', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ email: this.email, password: this.password })
+          body: JSON.stringify({ email: this.email, password: this.password }),
+          silent: true,
+          autoToast: false
         });
+
         const d = await r.json().catch(() => ({}));
 
         if (!r.ok) {
-          this.formErr = d?.detail || 'Błędne dane logowania';
+          this.formErr = (d?.detail && String(d.detail)) || 'Błędne dane logowania';
           return;
         }
 
-        if (d && d.access) localStorage.setItem('lown_access', d.access);
+        try { await app.ensureAuthed(); } catch {}
+        try { window.dispatchEvent(new CustomEvent('auth:changed', { detail: { authed: true } })); } catch {}
 
-        // poinformuj resztę UI
-        window.dispatchEvent(new CustomEvent('auth:changed', { detail: { authed: true } }));
-        window.dispatchEvent(new Event('login:success'));
-
-        // dokąd wrócić?
         let next =
           sessionStorage.getItem('post_login_redirect') ||
           new URLSearchParams(location.search).get('next') ||
           '/';
 
         try { sessionStorage.removeItem('post_login_redirect'); } catch {}
+        try { app.toast.flashOk('Zalogowano pomyślnie'); } catch {}
 
-        app.toast.flashOk('Zalogowano pomyślnie');
-
-        // replace = bez zaśmiecania historii (mniej duplikatów widoków przy cofaniu)
         window.location.replace(next);
 
-      } catch (e) {
+      } catch {
         this.formErr = 'Błąd sieci';
       } finally {
         this.busy = false;
@@ -68,16 +65,12 @@ app.loginForm = function () {
   }
 };
 
-/* ========== Auto-confirm helper caller (BEZ console.log) ==========
-   Jeśli URL zawiera ?confirm=<token>, wywołaj app.confirmRegistrationHelper()
-   (funkcja jest zdefiniowana w auth.js). Pokazujemy tylko toast z wynikiem.
-*/
 (function () {
   document.addEventListener('DOMContentLoaded', async () => {
     try {
       if (!window.app || typeof app.confirmRegistrationHelper !== 'function') return;
-      const params = app.urlParams && app.urlParams();
-      const token = params ? params.get('confirm') : new URLSearchParams(location.search).get('confirm');
+      const params = (app.urlParams && app.urlParams()) || new URLSearchParams(location.search);
+      const token = params.get('confirm');
       if (!token) return;
 
       const msg = await app.confirmRegistrationHelper();

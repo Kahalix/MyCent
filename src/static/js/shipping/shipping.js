@@ -1,6 +1,5 @@
 window.app = window.app || {};
 
-// Jeden adres (endpoint: /api/users/me/shipping-address)
 app.shippingAddress = function () {
   return {
     addr: {

@@ -46,7 +46,7 @@ services:
       sh -c "python src/manage.py migrate --noinput &&
              python src/manage.py collectstatic --noinput &&
              python src/manage.py seed_admin &&
-             gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --workers $${WEB_CONCURRENCY:-3}"
+             gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --workers $${WEB_CONCURRENCY:-4}"
     expose:
       - "8000"
     depends_on:
@@ -68,7 +68,7 @@ services:
         until python src/manage.py migrate --check; do
           echo "Waiting for migrations..."; sleep 2;
         done;
-        daphne -b 0.0.0.0 -p 8001 config.asgi:application
+        daphne -b 0.0.0.0 -p 8001 --ping-interval 20 --ping-timeout 30 config.asgi:application
       '
     expose:
       - "8001"
@@ -82,7 +82,6 @@ services:
     env_file: .env.docker
     volumes:
       - ./:/app
-
 
   caddy:
     image: caddy:2

@@ -108,7 +108,7 @@
   <!-- HEADER -->
   <header class="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-base-100/70 border-b border-base-300">
     <div class="mx-auto max-w-6xl px-4 py-3 flex items-center gap-4"
-         x-data="app.navState()" x-init="init()">
+         x-data="app.navState()">
       <!-- Logo -->
       <a class="flex items-center gap-2 font-semibold text-lg hover:opacity-90 transition"
          href="/" hx-boost="true" hx-target="#app-root" hx-push-url="true">
@@ -252,7 +252,7 @@
   </footer>
 
   <!-- GLOBALNE TOASTY -->
-  <div id="toasts" x-data="app.toasts()" x-init="init()" class="toast-tray">
+  <div id="toasts" x-data="app.toasts()" class="toast-tray">
     <template x-for="t in items" :key="t.id">
       <div x-show="t.show"
            x-transition:enter="duration-300 ease-out"

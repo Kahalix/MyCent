@@ -10,7 +10,7 @@ app.sellerPawnDetail = function (publicId) {
     _uiByPath: Object.create(null),
     uiNonce: 0,
 
-    // --- klient (jak w zamówieniach)
+    // --- klient
     custForm:{
       first_name:'', last_name:'', email:'', phone:'',
       address:{ line1:'', line2:'', postal_code:'', city:'', country:'' },
@@ -175,7 +175,7 @@ app.sellerPawnDetail = function (publicId) {
       } catch { return []; }
     },
 
-    // ==== AKCJE KLIENTA (jak w zamówieniu) ====
+    // ==== AKCJE KLIENTA ====
     async searchCustomers(){
       this.custSearch.loading=true; this.custSearch.results=[];
       try{

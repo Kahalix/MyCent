@@ -1,30 +1,43 @@
 window.app = window.app || {};
 
-// Prosty helper do obrazków (zachowuje absolutne URL-e)
 app.imgUrl = (p) => {
-  // brak obrazka -> placeholder
   if (!p) return 'https://placehold.co/96x96?text=IMG';
-
   if (/^https?:\/\//i.test(p)) return p;
 
   let s = String(p).replace(/^\/+/, '');
-
   s = s.replace(/^(?:media\/)+/, 'media/');
-
   if (s.startsWith('media/')) return '/' + s;
-
   return '/media/' + s;
 };
 
-// Po każdym swapie HTMX zainicjuj Alpine w drzewie docelowym.
-// umożliwia x-teleport -> #overlays
-document.addEventListener('htmx:afterSwap', (evt) => {
+
+// NEW (jakby coś nie działało zamienimy na OLD)
+if (window.htmx && window.htmx.config) {
+  window.htmx.config.historyCacheSize = 0;
+}
+
+document.body.addEventListener('htmx:beforeSwap', (e) => {
   try {
-    if (window.Alpine) window.Alpine.initTree(evt.target || document.body);
+    const tgt = e?.detail?.target;
+    if (tgt && window.Alpine) window.Alpine.destroyTree(tgt);
   } catch {}
 });
 
-// To czyści ewentualne resztki pustych kart z cache przeglądarki.
+document.body.addEventListener('htmx:afterSwap', (e) => {
+  try {
+    const tgt = e?.detail?.target || e.target;
+    if (tgt && window.Alpine) window.Alpine.initTree(tgt);
+  } catch {}
+  try { window.app?.wsHub?.wake?.(); } catch {}
+});
+
+// OLD
+//document.addEventListener('htmx:afterSwap', (evt) => {
+//  try {
+//    if (window.Alpine) window.Alpine.initTree(evt.target || document.body);
+//  } catch {}
+//});
+
 document.body.addEventListener('htmx:historyRestore', () => {
   if (!window.htmx) return;
   htmx.ajax('GET', location.pathname + location.search, {
@@ -36,7 +49,6 @@ document.body.addEventListener('htmx:historyRestore', () => {
   });
 });
 
-// === GLOBAL LOADING (HTMX + fetch) ===
 (function(){
   if (window.__GLOBAL_LOADING_INSTALLED__) return;
   window.__GLOBAL_LOADING_INSTALLED__ = true;
@@ -45,14 +57,14 @@ document.body.addEventListener('htmx:historyRestore', () => {
   const bar     = document.getElementById('route-indicator');
   const overlay = document.getElementById('global-loader');
 
-  let globalCount = 0;   // wszystkie requesty (fetch + htmx)
-  let routeCount  = 0;   // tylko trasa (#app-root)
+  let globalCount = 0;
+  let routeCount  = 0;
   let barTimer    = null;
   let ovlTimer    = null;
 
   const showBar = () => {
     if (barTimer) clearTimeout(barTimer);
-    barTimer = setTimeout(() => { bar && bar.classList.add('is-busy'); }, 120); // anty-migotanie
+    barTimer = setTimeout(() => { bar && bar.classList.add('is-busy'); }, 120);
     document.documentElement.setAttribute('data-loading', '1');
   };
   const hideBar = () => {
@@ -63,7 +75,6 @@ document.body.addEventListener('htmx:historyRestore', () => {
 
   const showOverlay = () => {
     if (ovlTimer) clearTimeout(ovlTimer);
-    // małe opóźnienie, żeby krótkie trasy nie mrugały
     ovlTimer = setTimeout(() => {
       overlay?.classList.add('is-visible');
       overlay?.setAttribute('aria-hidden', 'false');
@@ -77,7 +88,6 @@ document.body.addEventListener('htmx:historyRestore', () => {
 
   const routeOn  = () => {
     if (++routeCount === 1) {
-      // dim + overlay
       root && root.setAttribute('aria-busy', 'true');
       showOverlay();
     }
@@ -98,7 +108,6 @@ document.body.addEventListener('htmx:historyRestore', () => {
     routeOn, routeOff, reset: () => { globalCount = routeCount = 0; hideBar(); hideOverlay(); }
   };
 
-  // --- hook: fetch (obejmie app.api i każde inne fetch) ---
   const _fetch = window.fetch;
   const inflight = new Map();
 
@@ -129,12 +138,15 @@ document.body.addEventListener('htmx:historyRestore', () => {
     let key = null;
 
     if (dedupe) {
-      const tok = localStorage.getItem('lown_access') || '';
+      const uid = (window.app?.me?.public_id)
+        ? String(window.app.me.public_id)
+        : (window.app?.authed === true ? 'authed' : 'anon');
+
       try {
         const abs = new URL(url, location.href).href;
-        key = method + ' ' + abs + ' ' + tok;
+        key = method + ' ' + abs + ' ' + uid;
       } catch {
-        key = method + ' ' + String(url) + ' ' + tok;
+        key = method + ' ' + String(url) + ' ' + uid;
       }
 
       const ex = inflight.get(key);
@@ -154,7 +166,6 @@ document.body.addEventListener('htmx:historyRestore', () => {
     return done;
   };
 
-  // --- hook: HTMX (globalny) ---
   document.body.addEventListener('htmx:beforeRequest', (e) => {
     const tgt = e?.detail?.target || e.target;
     app.loading.inc();
@@ -174,15 +185,11 @@ document.body.addEventListener('htmx:historyRestore', () => {
     if (e.target === root) routeOff();
   });
 
-  // Na wypadek przywrócenia historii z cache (bez afterSwap)
   document.body.addEventListener('htmx:historyRestore', () => {
     app.loading.reset();
   });
 })();
 
-
-
-// CSRF dla HTMX (Authorization w utils.js)
 document.body.addEventListener('htmx:configRequest', (evt) => {
   const getCookie = (name) => {
     const pairs = document.cookie ? document.cookie.split('; ') : [];
@@ -197,14 +204,11 @@ document.body.addEventListener('htmx:configRequest', (evt) => {
   if (csrftoken) evt.detail.headers['X-CSRFToken'] = csrftoken;
 });
 
-
-// Fallback: po udanym ładowaniu do #app-root dopchnij URL ręcznie
 document.addEventListener('htmx:afterOnLoad', (evt) => {
   const root = document.getElementById('app-root');
   if (!root) return;
-  if (evt.detail?.target !== root) return; // tylko główny swap
+  if (evt.detail?.target !== root) return;
 
-  // spróbuj wziąć finalny adres z XHR
   const respURL = evt.detail?.xhr?.responseURL || '';
   let newUrl = '';
   if (respURL) {
@@ -213,12 +217,10 @@ document.addEventListener('htmx:afterOnLoad', (evt) => {
       newUrl = u.pathname + u.search + u.hash;
     } catch {}
   }
-  // fallback: ścieżka, o którą prosiliśmy
   if (!newUrl) newUrl = evt.detail?.pathInfo?.finalRequestPath
                     || evt.detail?.pathInfo?.requestPath
                     || '';
 
-  // jeżeli jest różnica — pchnij do historii
   const curr = location.pathname + location.search + location.hash;
   if (newUrl && newUrl !== curr) {
     history.pushState({}, '', newUrl);

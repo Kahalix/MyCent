@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from django.conf import settings
 from django.test import override_settings
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APITestCase, APIClient
 from djmoney.money import Money
 
 from identity.models import User
@@ -25,9 +26,35 @@ from orders.tests.factories import (
     STRIPE_PUBLISHABLE_KEY="",
     STRIPE_WEBHOOK_SECRET="",
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    JWT_ACCESS_IN_COOKIE=True,
+    JWT_REFRESH_IN_COOKIE=True,
+    ACCESS_COOKIE_NAME="access_token",
+    AUTH_COOKIE_NAME="refresh_token",
+    ACCESS_COOKIE_HTTPONLY=True,
+    AUTH_COOKIE_HTTPONLY=True,
+    ACCESS_COOKIE_SECURE=False,
+    AUTH_COOKIE_SECURE=False,
+    ACCESS_COOKIE_SAMESITE="Lax",
+    AUTH_COOKIE_SAMESITE="Lax",
+    ACCESS_COOKIE_DOMAIN="",
+    AUTH_COOKIE_DOMAIN="",
+    ACCESS_COOKIE_PATH="/api/",
+    AUTH_COOKIE_PATH="/api/auth/",
 )
 class OnlineCartPurchaseIntegrationTests(APITestCase):
-    def _register_and_login(self, *, email: str, password: str) -> str:
+    def setUp(self):
+        super().setUp()
+        self.client = APIClient(enforce_csrf_checks=True)
+        resp_csrf = self.client.get("/api/auth/csrf/")
+        self.assertIn(resp_csrf.status_code, (200, 204))
+        token = self.client.cookies.get("csrftoken")
+        self.assertIsNotNone(token)
+        self.csrf_token = token.value
+
+    def _post(self, path: str, data: dict):
+        return self.client.post(path, data, format="json", HTTP_X_CSRFTOKEN=self.csrf_token)
+
+    def _register_and_login(self, *, email: str, password: str) -> None:
         reg_payload = {
             "email": email,
             "password": password,
@@ -48,8 +75,15 @@ class OnlineCartPurchaseIntegrationTests(APITestCase):
         login_payload = {"email": email, "password": password}
         login = self.client.post("/api/auth/login/", login_payload, format="json")
         self.assertEqual(login.status_code, status.HTTP_200_OK, getattr(login, "data", None))
-        self.assertIn("access", login.data)
-        return str(login.data["access"])
+
+        access_cookie_name = getattr(settings, "ACCESS_COOKIE_NAME", "access_token")
+        refresh_cookie_name = getattr(settings, "AUTH_COOKIE_NAME", "refresh_token")
+        self.assertIn(access_cookie_name, self.client.cookies)
+        self.assertIn(refresh_cookie_name, self.client.cookies)
+
+        token = self.client.cookies.get("csrftoken")
+        self.assertIsNotNone(token)
+        self.csrf_token = token.value
 
     def test_online_purchase_from_cart_creates_tx_orders_reservations_and_updates_stock_after_payment(self):
         seller_owner_1 = create_user(email="seller1@example.com")
@@ -83,28 +117,23 @@ class OnlineCartPurchaseIntegrationTests(APITestCase):
 
         email = "buyer@example.com"
         password = "StrongPass123!"
-        access = self._register_and_login(email=email, password=password)
+        self._register_and_login(email=email, password=password)
 
-        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
-
-        add1 = self.client.post(
+        add1 = self._post(
             "/api/users/me/cart/items/",
             {"item_public_id": item_1.public_id, "quantity": 1},
-            format="json",
         )
         self.assertEqual(add1.status_code, status.HTTP_201_CREATED, getattr(add1, "data", None))
 
-        add2 = self.client.post(
+        add2 = self._post(
             "/api/users/me/cart/items/",
             {"item_public_id": item_2.public_id, "quantity": 1},
-            format="json",
         )
         self.assertEqual(add2.status_code, status.HTTP_201_CREATED, getattr(add2, "data", None))
 
-        checkout = self.client.post(
+        checkout = self._post(
             "/api/users/me/cart/checkout/",
             {"payment_method": "ONLINE_PAYMENT"},
-            format="json",
         )
         self.assertEqual(checkout.status_code, status.HTTP_201_CREATED, getattr(checkout, "data", None))
         self.assertIsInstance(checkout.data, list)
@@ -141,10 +170,9 @@ class OnlineCartPurchaseIntegrationTests(APITestCase):
         self.assertEqual(item_1.status, "AVAILABLE")
         self.assertEqual(item_2.status, "AVAILABLE")
 
-        intent = self.client.post(
+        intent = self._post(
             "/api/users/me/payments/intents/",
             {"transaction_public_id": tx.public_id, "provider": "SIM"},
-            format="json",
         )
         self.assertEqual(intent.status_code, status.HTTP_201_CREATED, getattr(intent, "data", None))
         pay_public_id = intent.data["public_id"]
@@ -155,10 +183,9 @@ class OnlineCartPurchaseIntegrationTests(APITestCase):
         self.assertEqual(pay.status, "REQUIRES_CONFIRMATION")
         self.assertEqual(str(pay.metadata.get("tx_public_id", "")), tx.public_id)
 
-        confirm = self.client.post(
+        confirm = self._post(
             f"/api/users/me/payments/{pay.public_id}/confirm/",
             {"result": "success"},
-            format="json",
         )
         self.assertEqual(confirm.status_code, status.HTTP_200_OK, getattr(confirm, "data", None))
 

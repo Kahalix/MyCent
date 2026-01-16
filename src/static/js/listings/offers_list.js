@@ -189,7 +189,7 @@ app.sellerOffersList = function () {
       await this.setStatus(it, newStatus);
     },
 
-    // ——— USUWANIE ———
+    // USUWANIE
     async deleteItem(it) {
       const name = it?.set_name || '(bez nazwy)';
       const ok = confirm(`Usunąć ogłoszenie:\n“${name}”?\n\nTej operacji nie można cofnąć.`);
@@ -216,7 +216,7 @@ app.sellerOffersList = function () {
       }
     },
 
-    // ——— Nawigacja ———
+    // Nawigacja
     end(it)   { return this.setStatus(it, 'CLOSED');    },
     resume(it){ return this.setStatus(it, 'AVAILABLE'); },
 

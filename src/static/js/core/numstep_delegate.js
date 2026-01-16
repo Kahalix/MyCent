@@ -1,5 +1,5 @@
 (function (root) {
-  if (root.__lownNumstepInited) return; // idempotent
+  if (root.__lownNumstepInited) return;
   root.__lownNumstepInited = true;
 
   const timers = new WeakMap(); // btn -> {hold:Timeout, rep:Interval}
@@ -58,7 +58,7 @@
   function onPointerDown(e) {
     const btn = nearestBtn(e.target);
     if (!btn) return;
-    // przejmij kontrolę — blokujemy inne listenery na przycisku (np. stare SSF)
+    // przejmij kontrolę - blokujemy inne listenery na przycisku (np. stare SSF)
     e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
 
     const dir = btn.classList.contains('numstep__btn--up') ? +1 : -1;
@@ -88,7 +88,7 @@
     clearTimers(btn);
   }
 
-  // --- click guard (CAPTURE) — żeby nie odpalały się stare „click” handlery
+  // --- click guard (CAPTURE) - żeby nie odpalały się stare click handlery
   function onClickCapture(e) {
     if (nearestBtn(e.target)) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); }
   }

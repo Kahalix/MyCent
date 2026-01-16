@@ -36,7 +36,7 @@ window.app = window.app || {};
       this.err(txt);
     },
 
-    // Flash – pokaż po nast. przeładowaniu
+    // Flash - pokaż po nast. przeładowaniu
     flash(type, message, timeout) {
       try {
         sessionStorage.setItem('app_flash_toast', JSON.stringify({

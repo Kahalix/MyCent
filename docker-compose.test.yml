@@ -63,6 +63,21 @@ services:
       SITE_URL: http://web-test:8000
       DJANGO_ALLOWED_HOSTS: "127.0.0.1,localhost,web,web-test,0.0.0.0"
       WEB_CONCURRENCY: 4
+
+      DRF_THROTTLE_ANON: "100000/min"
+      DRF_THROTTLE_USER: "100000/min"
+      DRF_THROTTLE_LOGIN: "100000/min"
+      DRF_THROTTLE_REFRESH: "100000/min"
+      DRF_THROTTLE_REGISTER: "100000/min"
+      DRF_THROTTLE_FORGOT_PASSWORD: "100000/min"
+      DRF_THROTTLE_RESET_PASSWORD: "100000/min"
+      DRF_THROTTLE_WS_TOKEN: "100000/min"
+
+      ACCESS_COOKIE_SECURE: "False"
+      AUTH_COOKIE_SECURE: "False"
+      CSRF_COOKIE_SECURE: "False"
+      SESSION_COOKIE_SECURE: "False"
+
     volumes:
       - ./:/app
 

@@ -1,4 +1,3 @@
-// static/js/coupons/my_list.js
 window.app = window.app || {};
 
 app.userCouponsList = function(){

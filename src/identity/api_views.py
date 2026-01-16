@@ -1,15 +1,24 @@
 from __future__ import annotations
 
+import hashlib
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 
 from django_filters.rest_framework import DjangoFilterBackend
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import ensure_csrf_cookie
+
+from rest_framework.authentication import CSRFCheck
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework import permissions, status, viewsets, mixins
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
+from rest_framework.parsers import JSONParser
 from django.core.cache import cache
+
 from .serializers import SellerContextResponse, AdminUserStatusUpdateRequest
 
 from .serializers import (
@@ -38,18 +47,39 @@ from .permissions import (
 )
 from .filters import UserFilter, UserCandidateFilter, SellerProfileFilter, SellerBankAccountFilter, SellerMembershipFilter
 from .models import SellerProfile, SellerBankAccount
+from chat.ws_reference_tokens import issue_ws_reference_token
 
 User = get_user_model()
 
 
-# ===== Helpers: cookies =====
+# ===== Helpers =====
+
+def set_access_cookie(resp: Response, access_jwt: str):
+    resp.set_cookie(
+        settings.ACCESS_COOKIE_NAME,
+        str(access_jwt or ""),
+        max_age=int(settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds()),
+        httponly=getattr(settings, "ACCESS_COOKIE_HTTPONLY", True),
+        secure=settings.ACCESS_COOKIE_SECURE,
+        samesite=settings.ACCESS_COOKIE_SAMESITE,
+        domain=settings.ACCESS_COOKIE_DOMAIN or None,
+        path=settings.ACCESS_COOKIE_PATH,
+    )
+
+
+def clear_access_cookie(resp: Response):
+    resp.delete_cookie(
+        settings.ACCESS_COOKIE_NAME,
+        domain=settings.ACCESS_COOKIE_DOMAIN or None,
+        path=settings.ACCESS_COOKIE_PATH,
+    )
 
 def set_refresh_cookie(resp: Response, refresh_jwt: str):
     resp.set_cookie(
         settings.AUTH_COOKIE_NAME,
         refresh_jwt,
         max_age=int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()),
-        httponly=True,
+        httponly=getattr(settings, "AUTH_COOKIE_HTTPONLY", True),
         secure=settings.AUTH_COOKIE_SECURE,
         samesite=settings.AUTH_COOKIE_SAMESITE,
         domain=settings.AUTH_COOKIE_DOMAIN or None,
@@ -64,12 +94,31 @@ def clear_refresh_cookie(resp: Response):
         path=settings.AUTH_COOKIE_PATH,
     )
 
+def _csrf_check(request) -> str | None:
+    req = getattr(request, "_request", request)
+    check = CSRFCheck(lambda r: None)
+    check.process_request(req)
+    reason = check.process_view(req, None, (), {})
+    return reason
+
+
+def _client_ip_from_request(request) -> str | None:
+    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if xff:
+        return xff.split(",", 1)[0].strip() or None
+    return request.META.get("REMOTE_ADDR") or None
+
+
+def _ua_hash(ua: str | None) -> str:
+    return hashlib.sha256((ua or "").encode("utf-8")).hexdigest()
 
 # ===== AUTH =====
 
 class RegisterView(mixins.CreateModelMixin, viewsets.GenericViewSet):
     permission_classes = [permissions.AllowAny]
     serializer_class = RegisterRequest
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "register"
 
     def create(self, request, *args, **kwargs):
         ser = self.get_serializer(data=request.data)
@@ -84,6 +133,8 @@ class RegisterView(mixins.CreateModelMixin, viewsets.GenericViewSet):
 class ConfirmRegistrationView(mixins.CreateModelMixin, viewsets.GenericViewSet):
     permission_classes = [permissions.AllowAny]
     serializer_class = ConfirmRegistrationRequest
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "register"
 
     def create(self, request, *args, **kwargs):
         ser = self.get_serializer(data=request.data)
@@ -97,16 +148,31 @@ class ConfirmRegistrationView(mixins.CreateModelMixin, viewsets.GenericViewSet):
 
 class LoginView(mixins.CreateModelMixin, viewsets.GenericViewSet):
     permission_classes = [permissions.AllowAny]
+    authentication_classes = ()
+    parser_classes = (JSONParser,)
     serializer_class = LoginRequest
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
 
+    @method_decorator(ensure_csrf_cookie)
     def create(self, request, *args, **kwargs):
         ser = self.get_serializer(data=request.data)
         ser.is_valid(raise_exception=True)
         try:
-            payload = commands.login_user(request, **ser.validated_data)
+            payload, refresh_jwt = commands.login_user(request, **ser.validated_data)
             resp = Response(payload, status=200)
+            resp["Cache-Control"] = "no-store"
+
+            if getattr(settings, "JWT_ACCESS_IN_COOKIE", False):
+                set_access_cookie(resp, payload.get("access"))
+                try:
+                    payload.pop("access", None)
+                except Exception:
+                    pass
+
             if settings.JWT_REFRESH_IN_COOKIE:
-                set_refresh_cookie(resp, payload["refresh"])
+                set_refresh_cookie(resp, refresh_jwt)
+
             return resp
         except InvalidCredentials as e:
             return Response({"detail": str(e)}, status=401)
@@ -116,33 +182,123 @@ class LoginView(mixins.CreateModelMixin, viewsets.GenericViewSet):
 
 class RefreshView(mixins.CreateModelMixin, viewsets.GenericViewSet):
     permission_classes = [permissions.AllowAny]
+    parser_classes = (JSONParser,)
     serializer_class = RefreshRequest
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "refresh"
 
     def create(self, request, *args, **kwargs):
-        ser = self.get_serializer(data=request.data)
-        ser.is_valid(raise_exception=True)
-        try:
-            payload = commands.refresh_tokens(request, refresh_jwt=ser.validated_data.get("refresh"))
-            resp = Response(payload, status=200)
-            if settings.JWT_REFRESH_IN_COOKIE:
-                set_refresh_cookie(resp, payload["refresh"])
+        if not getattr(settings, "JWT_REFRESH_IN_COOKIE", False):
+            resp = Response({"detail": "JWT_REFRESH_IN_COOKIE is disabled"}, status=500)
+            resp["Cache-Control"] = "no-store"
             return resp
+
+        refresh_from_cookie = request.COOKIES.get(settings.AUTH_COOKIE_NAME)
+        if not refresh_from_cookie:
+            resp = Response({"detail": "Missing refresh token"}, status=401)
+            resp["Cache-Control"] = "no-store"
+            if getattr(settings, "JWT_ACCESS_IN_COOKIE", False):
+                clear_access_cookie(resp)
+            clear_refresh_cookie(resp)
+            return resp
+
+        csrf_reason = _csrf_check(request)
+        if csrf_reason is not None:
+            resp = Response({"detail": "CSRF Failed", "reason": str(csrf_reason)}, status=403)
+            resp["Cache-Control"] = "no-store"
+            return resp
+
+        try:
+            payload, new_refresh = commands.refresh_tokens(
+                request,
+                refresh_jwt=refresh_from_cookie,
+            )
+            resp = Response(payload, status=200)
+            resp["Cache-Control"] = "no-store"
+
+            if getattr(settings, "JWT_ACCESS_IN_COOKIE", False):
+                set_access_cookie(resp, payload.get("access"))
+                try:
+                    payload.pop("access", None)
+                except Exception:
+                    pass
+
+            set_refresh_cookie(resp, new_refresh)
+            return resp
+
         except (RefreshMissing, RefreshInvalid, RefreshNotRecognized) as e:
-            return Response({"detail": str(e)}, status=401)
+            resp = Response({"detail": str(e)}, status=401)
+            resp["Cache-Control"] = "no-store"
+            if getattr(settings, "JWT_ACCESS_IN_COOKIE", False):
+                clear_access_cookie(resp)
+            clear_refresh_cookie(resp)
+            return resp
+
+
+class CsrfView(viewsets.ViewSet):
+    permission_classes = [permissions.AllowAny]
+
+    @method_decorator(ensure_csrf_cookie)
+    def list(self, request):
+        resp = Response(status=204)
+        resp["Cache-Control"] = "no-store"
+        return resp
+
+
+class WsTokenView(mixins.CreateModelMixin, viewsets.GenericViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "ws_token"
+
+    def create(self, request, *args, **kwargs):
+        ua = request.META.get("HTTP_USER_AGENT") or ""
+        ip = _client_ip_from_request(request)
+
+        token, ttl = issue_ws_reference_token(
+            user_id=request.user.id,
+            ua_hash=_ua_hash(ua),
+            ip=ip,
+        )
+
+        if hasattr(ttl, "total_seconds"):
+            expires_in = int(ttl.total_seconds())
+        else:
+            expires_in = int(ttl or 0)
+
+        resp = Response({"ws_token": str(token), "expires_in": expires_in}, status=200)
+        resp["Cache-Control"] = "no-store"
+        return resp
 
 
 class LogoutView(mixins.CreateModelMixin, viewsets.GenericViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (JSONParser,)
+
     def create(self, request, *args, **kwargs):
+        if settings.JWT_REFRESH_IN_COOKIE and request.COOKIES.get(settings.AUTH_COOKIE_NAME):
+            csrf_reason = _csrf_check(request)
+            if csrf_reason is not None:
+                resp = Response({"detail": "CSRF Failed", "reason": str(csrf_reason)}, status=403)
+                resp["Cache-Control"] = "no-store"
+                return resp
+
         commands.logout_user(request, user=request.user)
         resp = Response(status=204)
+        resp["Cache-Control"] = "no-store"
+
+        if getattr(settings, "JWT_ACCESS_IN_COOKIE", False):
+            clear_access_cookie(resp)
+
         if settings.JWT_REFRESH_IN_COOKIE:
             clear_refresh_cookie(resp)
-        return resp
 
+        return resp
 
 class ForgotPasswordView(mixins.CreateModelMixin, viewsets.GenericViewSet):
     permission_classes = [permissions.AllowAny]
     serializer_class = ForgotPasswordRequest
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "forgot_password"
 
     def create(self, request, *args, **kwargs):
         ser = self.get_serializer(data=request.data)
@@ -154,6 +310,8 @@ class ForgotPasswordView(mixins.CreateModelMixin, viewsets.GenericViewSet):
 class ResetPasswordView(mixins.CreateModelMixin, viewsets.GenericViewSet):
     permission_classes = [permissions.AllowAny]
     serializer_class = ResetPasswordRequest
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "reset_password"
 
     def create(self, request, *args, **kwargs):
         ser = self.get_serializer(data=request.data)
@@ -200,18 +358,25 @@ class ChangePasswordView(mixins.CreateModelMixin, viewsets.GenericViewSet):
         try:
             data = commands.change_password(user=request.user, **ser.validated_data)
             resp = Response(data, status=200)
+            resp["Cache-Control"] = "no-store"
+
+            if getattr(settings, "JWT_ACCESS_IN_COOKIE", False):
+                clear_access_cookie(resp)
+
             if settings.JWT_REFRESH_IN_COOKIE:
                 clear_refresh_cookie(resp)
+
             return resp
         except InvalidCredentials as e:
             return Response({"detail": str(e)}, status=400)
+
 
 
 # ===== USER – PUBLIC (pojedynczy) =====
 
 class PublicUserViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     permission_classes = [permissions.AllowAny]
-    queryset = User.objects.all()
+    queryset = User.objects.filter(is_active=True, user_status="ACTIVE")
     lookup_field = "public_id"
     serializer_class = UserResponse
 

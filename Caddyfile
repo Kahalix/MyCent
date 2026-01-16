@@ -1,28 +1,21 @@
-https://localhost, https://caddy {
+https://localhost {
   tls internal
   encode zstd gzip
 
-  # Media
   handle_path /media/* {
     root * /srv/media
     file_server
   }
 
-  # REST API (Gunicorn/Uvicorn)
-  reverse_proxy /api/* web-http:8000 {
-    header_up Host {host}
-    header_up X-Forwarded-Proto {scheme}
-  }
+  reverse_proxy /api/* web-http:8000
 
-  # WebSockety (Chat)
   reverse_proxy /ws/* web-ws:8001 {
-    header_up Host {host}
-    header_up X-Forwarded-Proto {scheme}
     transport http {
       versions 1.1
     }
+    stream_timeout 24h
+    stream_close_delay 30s
   }
 
-  # SPA / frontend
   reverse_proxy /* web-http:8000
 }

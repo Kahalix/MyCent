@@ -1,4 +1,3 @@
-// // static/js/saved/saved.js
 // window.app = window.app || {};
 // app.savedPage = function() {
 //   return {

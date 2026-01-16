@@ -1,4 +1,3 @@
-// static/js/saved/saved_results.js
 window.app = window.app || {};
 
 app.savedSearchResultsPage = function (opts={}) {
@@ -17,7 +16,7 @@ app.savedSearchResultsPage = function (opts={}) {
 
     async loadMeta() {
       try {
-        // nie mamy endpointu „GET one”, pobierz listę i wyfiltruj
+        // nie mamy endpointu GET one, pobierz listę i wyfiltruj
         const r = await app.api('/api/users/me/saved/searches?page_size=500', { method: 'GET' });
         const j = await r.json().catch(()=>({}));
         const list = Array.isArray(j?.results) ? j.results : (Array.isArray(j)?j:[]);

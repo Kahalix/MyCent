@@ -1,4 +1,3 @@
-// static/js/orders/seller_list.js
 window.app = window.app || {};
 
 app.sellerOrders = function () {
@@ -75,7 +74,7 @@ app.sellerOrders = function () {
       return null;
     },
 
-    // PL etykiety statusów zamówień (użyj w HTML)
+    // PL etykiety statusów zamówień
     statusLabel(st) {
       switch ((st || '').toUpperCase()) {
         case 'PENDING':    return 'Oczekujące';

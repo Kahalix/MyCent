@@ -64,7 +64,7 @@
         </div>
       </div>
 
-      <!-- Adres dostawy – rozwijalny panel -->
+      <!-- Adres dostawy: rozwijalny panel -->
       <template x-if="order.shipping_address && Object.values(order.shipping_address).some(v => String(v||'').trim() !== '')">
         <div class="elevated-panel p-0">
           <!-- Nagłówek -->
@@ -284,7 +284,7 @@
         </div>
       </div>
 
-      <!-- Klient (stały, bez zwijania) -->
+      <!-- Klient -->
       <div class="elevated-panel p-4">
         <div class="panel-head">
           <div class="font-medium">Klient</div>

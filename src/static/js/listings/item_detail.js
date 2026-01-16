@@ -1,6 +1,6 @@
 window.app = window.app || {};
 
-/* ---------- Fallbacki core + toasty ---------- */
+/* ---- Fallbacki core + toasty -- */
 app._emitToast = app._emitToast || function (type, message) {
   const detail = { type, message };
   try { window.dispatchEvent(new CustomEvent('toast', { detail })); } catch {}
@@ -26,7 +26,7 @@ app.goto = app.goto || (u => { location.href = u; });
 app.requireAuth = app.requireAuth || (ret =>
   app.goto(`/login?next=${encodeURIComponent(ret || location.pathname + location.search)}`));
 
-/* ---------- Canvasowe miniatury ---------- */
+/* -- Canvasowe miniatury ---- */
 app._paintThumb = app._paintThumb || function (canvas, src) {
   if (!canvas) return;
   const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
@@ -70,7 +70,7 @@ app._paintThumb = app._paintThumb || function (canvas, src) {
   img.src = app.imgUrl(src);
 };
 
-/* ---------- Detal ogłoszenia ---------- */
+/* -- Detal ogłoszenia ---- */
 app.itemDetailPage = function (opts = {}) {
   const COND_PL = { NEW:'Nowy', USED:'Używany', DAMAGED:'Uszkodzony' };
   const TYPE_PL = { LISTING:'Ogłoszenie', EXCHANGE:'Wymiana', BUY:'Sprzedaż' };
@@ -118,7 +118,7 @@ app.itemDetailPage = function (opts = {}) {
         this.item = j;
         this.isSaved = !!j.is_saved;
 
-        // UI-schema do ładnych etykiet (jeśli mamy path)
+        // UI-schema do ładnych etykiet
         await this._loadUiForPath(this.item?.type?.path || '');
       } catch {
         this.err = 'Błąd sieci.';
@@ -127,7 +127,7 @@ app.itemDetailPage = function (opts = {}) {
       }
     },
 
-    // tylko zdjęcia z ogłoszenia użytkownika/sprzedawcy – BEZ obrazka katalogowego
+    // tylko zdjęcia z ogłoszenia użytkownika/sprzedawcy: bez obrazka katalogowego
     imgs() {
       if (!this.item) return [];
       const list = Array.isArray(this.item.images) ? this.item.images : [];

@@ -2,7 +2,7 @@ window.app = window.app || {};
 
 app._apiErr = async (r) => {
   try {
-    const d = await r.json();
+    const d = await r.clone().json();
     if (d?.detail) return typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);
     if (d && typeof d === 'object') {
       const parts = [];
@@ -14,6 +14,62 @@ app._apiErr = async (r) => {
     }
   } catch {}
   return `Błąd (${r.status})`;
+};
+
+app.loginForm = function () {
+  return {
+    email: '',
+    password: '',
+    busy: false,
+    err: '',
+    emailErr: '',
+    pwdErr: '',
+
+    _clearErrors() { this.err = this.emailErr = this.pwdErr = ''; },
+    _validEmail(v) { return /^\S+@\S+\.\S+$/.test(v || ''); },
+
+    _validate() {
+      this._clearErrors();
+      let ok = true;
+      if (!this._validEmail(this.email)) { this.emailErr = 'Wpisz poprawny adres e-mail'; ok = false; }
+      if (!this.password) { this.pwdErr = 'Podaj hasło'; ok = false; }
+      return ok;
+    },
+
+    async submit() {
+      if (!this._validate()) return;
+      this.busy = true;
+      try {
+        if (typeof app.ensureCsrfCookie === 'function') {
+          await app.ensureCsrfCookie();
+        }
+        const r = await app.api('/api/auth/login/', {
+          method: 'POST',
+          body: JSON.stringify({ email: this.email, password: this.password })
+        });
+        if (!r.ok) {
+          this.err = await app._apiErr(r);
+          return;
+        }
+
+        try { await app.ensureAuthed(); } catch {}
+        try { window.dispatchEvent(new CustomEvent('auth:changed', { detail: { authed: true } })); } catch {}
+
+        let next = '/';
+        try {
+          const saved = sessionStorage.getItem('post_login_redirect');
+          if (saved) next = saved;
+          sessionStorage.removeItem('post_login_redirect');
+        } catch {}
+
+        app.goto(next);
+      } catch {
+        this.err = 'Błąd sieci';
+      } finally {
+        this.busy = false;
+      }
+    }
+  };
 };
 
 app.registerForm = function () {
@@ -40,35 +96,41 @@ app.registerForm = function () {
       if (!this._validate()) return;
       this.busy = true; this.ok = ''; this.formErr = '';
       try {
+        if (typeof app.ensureCsrfCookie === 'function') {
+          await app.ensureCsrfCookie();
+        }
         const r = await app.api('/api/auth/register/', {
-              method: 'POST',
-              body: JSON.stringify({
-                email: this.email,
-                first_name: this.first_name,
-                last_name: this.last_name,
-                password: this.password
-              })
-            });
+          method: 'POST',
+          body: JSON.stringify({
+            email: this.email,
+            first_name: this.first_name,
+            last_name: this.last_name,
+            password: this.password
+          })
+        });
         if (!r.ok) {
           this.formErr = await app._apiErr(r);
           return;
         }
-        const d = await r.json();
+        const d = await r.json().catch(() => ({}));
         app.toast.flashOk(d.message || 'Rejestracja udana. Sprawdź e-mail, aby aktywować konto.');
-        window.location.replace('/');
+        app.goto('/login');
       } catch {
         this.formErr = 'Błąd sieci';
       } finally {
         this.busy = false;
       }
     }
-  }
+  };
 };
 
 app.confirmRegistrationHelper = async function () {
   const t = (window.app.urlParams && app.urlParams().get('confirm')) || null;
   if (!t) return null;
   try {
+    if (typeof app.ensureCsrfCookie === 'function') {
+      await app.ensureCsrfCookie();
+    }
     const r = await app.api('/api/auth/confirm-registration/', {
       method: 'POST',
       body: JSON.stringify({ token: t })
@@ -76,7 +138,7 @@ app.confirmRegistrationHelper = async function () {
     if (!r.ok) throw new Error(await app._apiErr(r));
     return 'Konto aktywowane. Możesz się zalogować.';
   } catch (e) {
-    return e.message || 'Nie udało się potwierdzić rejestracji.';
+    return e?.message || 'Nie udało się potwierdzić rejestracji.';
   }
 };
 
@@ -88,6 +150,9 @@ app.forgotForm = function () {
       if (!this._validEmail(this.email)) { app.error('Wpisz poprawny adres e-mail.'); return; }
       this.busy = true; this.err='';
       try {
+        if (typeof app.ensureCsrfCookie === 'function') {
+          await app.ensureCsrfCookie();
+        }
         const r = await app.api('/api/auth/forgot-password/', {
           method:'POST', body: JSON.stringify({ email: this.email })
         });
@@ -99,10 +164,13 @@ app.forgotForm = function () {
           app.toast.ok('Jeśli konto istnieje, wysłaliśmy link do resetu hasła.');
           app.goto('/login');
         }
-      } catch { this.err='Błąd sieci'; app.error(this.err); }
-      finally { this.busy=false; }
+      } catch {
+        this.err='Błąd sieci'; app.error(this.err);
+      } finally {
+        this.busy=false;
+      }
     }
-  }
+  };
 };
 
 app.resetForm = function () {
@@ -119,12 +187,15 @@ app.resetForm = function () {
         this.err = 'Hasła muszą być identyczne.'; this.busy = false; return;
       }
       try {
+        if (typeof app.ensureCsrfCookie === 'function') {
+          await app.ensureCsrfCookie();
+        }
         const r = await app.api('/api/auth/reset-password/', {
           method: 'POST',
           body: JSON.stringify({ token: this.token, new_password: this.new_password })
         });
         if (!r.ok) { this.err = await app._apiErr(r); return; }
-        const d = await r.json();
+        const d = await r.json().catch(() => ({}));
         this.ok = d.message || 'Hasło ustawione. Zaloguj się.';
       } catch {
         this.err = 'Błąd sieci';
@@ -132,7 +203,7 @@ app.resetForm = function () {
         this.busy = false;
       }
     }
-  }
+  };
 };
 
 app.changeEmailForm = function () {
@@ -144,16 +215,23 @@ app.changeEmailForm = function () {
       this.ok=''; this.err=''; this.emailErr=''; this.busy = true;
       if (!this._validEmail(this.new_email)) { this.emailErr='Wpisz poprawny e-mail'; this.busy=false; return; }
       try {
+        if (typeof app.ensureCsrfCookie === 'function') {
+          await app.ensureCsrfCookie();
+        }
         const r = await app.api('/api/auth/change-email/', {
           method: 'POST',
           body: JSON.stringify({ new_email: this.new_email })
         });
         if (!r.ok) { this.err = await app._apiErr(r); return; }
-        const d = await r.json(); this.ok = d.message || 'Sprawdź nową skrzynkę i kliknij link.';
-      } catch { this.err = 'Błąd sieci'; }
-      finally { this.busy = false; }
+        const d = await r.json().catch(() => ({}));
+        this.ok = d.message || 'Sprawdź nową skrzynkę i kliknij link.';
+      } catch {
+        this.err = 'Błąd sieci';
+      } finally {
+        this.busy = false;
+      }
     }
-  }
+  };
 };
 
 app.confirmEmailChangeView = function () {
@@ -163,16 +241,23 @@ app.confirmEmailChangeView = function () {
       const token = (window.app.urlParams && app.urlParams().get('token')) || '';
       if (!token) { this.state='done'; this.err='Brak tokenu.'; return; }
       try {
+        if (typeof app.ensureCsrfCookie === 'function') {
+          await app.ensureCsrfCookie();
+        }
         const r = await app.api('/api/auth/confirm-email-change/', {
           method: 'POST',
           body: JSON.stringify({ token })
         });
         if (!r.ok) throw new Error(await app._apiErr(r));
-        const d = await r.json(); this.msg = d.message || 'E-mail zmieniony.';
-      } catch(e){ this.err = e.message || 'Błąd potwierdzania.'; }
-      finally { this.state = 'done'; }
+        const d = await r.json().catch(() => ({}));
+        this.msg = d.message || 'E-mail zmieniony.';
+      } catch(e){
+        this.err = e?.message || 'Błąd potwierdzania.';
+      } finally {
+        this.state = 'done';
+      }
     }
-  }
+  };
 };
 
 app.changePasswordForm = function () {
@@ -189,23 +274,34 @@ app.changePasswordForm = function () {
         this.err = 'Hasła muszą być identyczne.'; this.busy=false; return;
       }
       try {
+        if (typeof app.ensureCsrfCookie === 'function') {
+          await app.ensureCsrfCookie();
+        }
         const r = await app.api('/api/auth/change-password/', {
           method: 'POST',
           body: JSON.stringify({ old_password: this.old_password, new_password: this.new_password })
         });
         if (!r.ok) { this.err = await app._apiErr(r); return; }
-        const d = await r.json();
+        const d = await r.json().catch(() => ({}));
         this.ok = d.message || 'Hasło zmienione.';
         app.toast.flashOk('Hasło zmienione. Zaloguj się ponownie.');
         app._onSignedOut({ redirect: true });
-      } catch { this.err = 'Błąd sieci'; }
-      finally { this.busy=false; }
+      } catch {
+        this.err = 'Błąd sieci';
+      } finally {
+        this.busy=false;
+      }
     }
-  }
+  };
 };
 
 app.logout = async function () {
-  try { await app.api('/api/auth/logout/', { method: 'POST', silent: true }); } catch {}
+  try {
+    if (typeof app.ensureCsrfCookie === 'function') {
+      await app.ensureCsrfCookie();
+    }
+    await app.api('/api/auth/logout/', { method: 'POST', silent: true, autoToast: false });
+  } catch {}
+  try { app.toast.flashOk('Wylogowano'); } catch {}
   app._onSignedOut({ redirect: true });
-  app.ok('Wylogowano');
 };

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from django.conf import settings
 from django.test import override_settings
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APITestCase, APIClient
 
 from customers.models import Customer
-from identity.models import SellerMembership
+from identity.models import SellerMembership, User
 from pawns.models import Pawn, PawnLine
 from transactions.models import Transaction
 
@@ -17,23 +18,72 @@ from pawns.tests.factories import (
 )
 
 
-@override_settings(SECURE_SSL_REDIRECT=False)
+@override_settings(
+    SECURE_SSL_REDIRECT=False,
+    JWT_ACCESS_IN_COOKIE=True,
+    JWT_REFRESH_IN_COOKIE=True,
+    ACCESS_COOKIE_NAME="access_token",
+    AUTH_COOKIE_NAME="refresh_token",
+    ACCESS_COOKIE_HTTPONLY=True,
+    AUTH_COOKIE_HTTPONLY=True,
+    ACCESS_COOKIE_SECURE=False,
+    AUTH_COOKIE_SECURE=False,
+    ACCESS_COOKIE_SAMESITE="Lax",
+    AUTH_COOKIE_SAMESITE="Lax",
+    ACCESS_COOKIE_DOMAIN="",
+    AUTH_COOKIE_DOMAIN="",
+    ACCESS_COOKIE_PATH="/api/",
+    AUTH_COOKIE_PATH="/api/auth/",
+)
 class PawnCreateIntegrationTests(APITestCase):
-    def _login(self, *, email: str, password: str) -> str:
+    def setUp(self):
+        super().setUp()
+        self.client = APIClient(enforce_csrf_checks=True)
+
+        resp_csrf = self.client.get("/api/auth/csrf/")
+        self.assertIn(resp_csrf.status_code, (200, 204))
+        token = self.client.cookies.get("csrftoken")
+        self.assertIsNotNone(token)
+        self.csrf_token = token.value
+
+    def _post(self, path: str, data: dict):
+        return self.client.post(path, data, format="json", HTTP_X_CSRFTOKEN=self.csrf_token)
+
+    def _activate_user(self, u):
+        dbu = User.objects.get(pk=u.pk)
+        dbu.is_active = True
+        if hasattr(dbu, "user_status"):
+            dbu.user_status = "ACTIVE"
+            dbu.save(update_fields=["is_active", "user_status"])
+        else:
+            dbu.save(update_fields=["is_active"])
+
+    def _login(self, *, email: str, password: str) -> None:
         resp = self.client.post(
             "/api/auth/login/",
             {"email": email, "password": password},
             format="json",
         )
         self.assertEqual(resp.status_code, status.HTTP_200_OK, getattr(resp, "data", None))
-        self.assertIn("access", resp.data)
-        return str(resp.data["access"])
+
+        access_cookie_name = getattr(settings, "ACCESS_COOKIE_NAME", "access_token")
+        refresh_cookie_name = getattr(settings, "AUTH_COOKIE_NAME", "refresh_token")
+        self.assertIn(access_cookie_name, self.client.cookies)
+        self.assertIn(refresh_cookie_name, self.client.cookies)
+
+        token = self.client.cookies.get("csrftoken")
+        self.assertIsNotNone(token)
+        self.csrf_token = token.value
 
     def test_create_pawn_creates_pledge_tx_links_seller_and_ensures_customer(self):
         owner = create_user(email="owner@example.com", role="OWNER")
+        employee = create_user(email="employee@example.com", role="EMPLOYEE")
+
+        self._activate_user(owner)
+        self._activate_user(employee)
+
         seller = create_seller_profile(owner=owner, slug="shop-pledge")
 
-        employee = create_user(email="employee@example.com", role="EMPLOYEE")
         SellerMembership.objects.create(
             seller_profile=seller,
             user=employee,
@@ -48,8 +98,7 @@ class PawnCreateIntegrationTests(APITestCase):
             stock_quantity=1,
         )
 
-        access = self._login(email=employee.email, password="pwd")
-        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+        self._login(email=employee.email, password="pwd")
 
         create_payload = {
             "seller_public_id": seller.public_id,
@@ -66,12 +115,11 @@ class PawnCreateIntegrationTests(APITestCase):
             ],
         }
 
-        created = self.client.post(
+        created = self._post(
             "/api/sellers/mine/pawns/create/",
             create_payload,
-            format="json",
         )
-        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, getattr(created, "data", None))
 
         pawn_public_id = created.data.get("public_id")
         self.assertTrue(pawn_public_id)
@@ -108,10 +156,9 @@ class PawnCreateIntegrationTests(APITestCase):
             "document_number": "ABC123456",
         }
 
-        ensured = self.client.post(
+        ensured = self._post(
             f"/api/sellers/mine/pawns/{pawn.public_id}/ensure-customer/",
             ensure_payload,
-            format="json",
         )
         self.assertIn(
             ensured.status_code,

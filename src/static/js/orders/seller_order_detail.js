@@ -9,7 +9,7 @@ app.sellerOrderDetail = function (orderPublicId) {
     pkgTypes: [], shippingByLine:{}, expanded:{},
     statuses:['PENDING','SHIPPED','DELIVERED','CANCELLED','RETURNED'],
 
-    // formularze per linia (x-model — brak getElementById)
+    // formularze per linia (x-model - brak getElementById)
     linePkgSelection: {},      // { [linePid]: package_type_public_id | '' (pickup) }
     priceOverrideByLine: {},   // { [linePid]: '12.99' }
     statusByLine: {},          // { [linePid]: 'PENDING' | ... }
@@ -151,7 +151,7 @@ app.sellerOrderDetail = function (orderPublicId) {
       } catch(e){ app.error?.(e?.message || 'Błąd'); }
     },
 
-    // ---- eksport (tylko w panelu podsumowania) ----
+    // ---- eksport ----
     async downloadReceipt(kind){
       try{
         const url = `/api/sellers/mine/orders/${this.order.public_id}/receipt.${kind}`;
