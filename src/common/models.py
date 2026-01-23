@@ -97,7 +97,7 @@ class IdempotencyKey(models.Model):
     """
     magazyn idempotentnych wywołań.
     Unikalność: (user, scope, key).
-    target_ids: JSON – np. ["pay_public_id"] albo lista public_id zamówień.
+    target_ids: JSON - np. ["pay_public_id"] albo lista public_id zamówień.
     """
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="idempo_keys")
     scope = models.CharField(max_length=64)  # np. "payments:intent:<tx_public_id>", "carts:checkout:<cart_public_id>"

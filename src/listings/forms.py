@@ -43,7 +43,7 @@ class ItemSetAdminForm(forms.ModelForm):
             "attributes",
         )
         widgets = {
-            # startowo pusty schemat – JS i tak go nadpisze po odczycie current type
+            # startowo pusty schemat - JS i tak go nadpisze po odczycie current type
             "attributes": SimpleJSONSchemaWidget(schema=DEFAULT_EMPTY_SCHEMA),
         }
 

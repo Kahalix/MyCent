@@ -14,7 +14,7 @@ class Coupon(PublicIdModel):
     """
     Definicja kuponu:
       - globalny (ma code) — użytkownik podaje kod w transakcji,
-      - „sklepik punktowy” (bez code) — użytkownik kupuje egzemplarz UserCoupon za punkty.
+      - sklepik punktowy (bez code) — użytkownik kupuje egzemplarz UserCoupon za punkty.
     """
     code = models.CharField(max_length=50, unique=True, null=True, blank=True)
 
@@ -58,7 +58,7 @@ class Coupon(PublicIdModel):
 
 class UserCoupon(PublicIdModel):
     """
-    Kupon „należący” do użytkownika – powstaje po zakupie za punkty, a potem może być
+    Kupon należący do użytkownika - powstaje po zakupie za punkty, a potem może być
     użyty w transakcji (doklejamy go do Transaction.user_coupon i po COMPLETED oznaczamy redeemed).
     """
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="user_coupons")

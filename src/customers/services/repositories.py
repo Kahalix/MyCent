@@ -16,7 +16,7 @@ def admin_customers_qs():
 
 def seller_customers_qs(user: User):
     """
-    Globalna baza klientów – dostęp jeśli user ma aktywne członkostwo w dowolnym sklepie.
+    Globalna baza klientów - dostęp jeśli user ma aktywne członkostwo w dowolnym sklepie.
     (Filtr po sprzedawcy można dorobić później, jeśli model się zmieni.)
     """
     from identity.models import SellerProfile

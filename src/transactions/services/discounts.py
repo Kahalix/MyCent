@@ -33,7 +33,7 @@ def _base_total_for(transaction: Transaction) -> Money:
     for o in transaction.orders.all():
         gt = o.grand_total
         if gt.currency != total.currency:
-            gt = Money(gt.amount, total.currency)  # brak FX – 1:1
+            gt = Money(gt.amount, total.currency)
         total += gt
     return total
 

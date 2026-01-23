@@ -247,6 +247,14 @@ app._fetchMeOnce = async function () {
   }
 };
 
+app._refreshLock = async function (fn) {
+  const locks = navigator && navigator.locks;
+  if (locks && typeof locks.request === 'function') {
+    return await locks.request('mycent:refresh', { mode: 'exclusive' }, async () => await fn());
+  }
+  return await fn();
+};
+
 app._refreshAccess = async function (opts) {
   const o = (opts && typeof opts === 'object') ? opts : {};
   const forceMe = o.forceMe === true;
@@ -255,7 +263,9 @@ app._refreshAccess = async function (opts) {
 
   if (app._refreshPromise) return app._refreshPromise;
 
-  app._refreshPromise = (async () => {
+  const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+  app._refreshPromise = app._refreshLock(async () => {
     await app.ensureCsrfCookie();
 
     const mkHeaders = () => {
@@ -275,6 +285,7 @@ app._refreshAccess = async function (opts) {
     };
 
     let resp;
+
     try { resp = await doRefresh(); } catch { throw new Error('Network error'); }
 
     if (resp.status === 403) {
@@ -282,7 +293,42 @@ app._refreshAccess = async function (opts) {
       try { resp = await doRefresh(); } catch { throw new Error('Network error'); }
     }
 
-    if (!resp.ok) throw new Error('Refresh failed');
+    let tries409 = 0;
+    let tries5xx = 0;
+    let tries429 = 0;
+
+    while (!resp.ok) {
+      if (resp.status === 409 && tries409 < 3) {
+        tries409++;
+        await wait(150 * tries409);
+        try { resp = await doRefresh(); } catch { throw new Error('Network error'); }
+        continue;
+      }
+
+      if (resp.status === 429 && tries429 < 2) {
+        tries429++;
+        let ms = 800 * tries429;
+        try {
+          const ra = resp.headers.get('Retry-After');
+          if (ra) {
+            const n = Number(ra);
+            if (Number.isFinite(n) && n > 0) ms = Math.min(5000, Math.max(ms, Math.floor(n * 1000)));
+          }
+        } catch {}
+        await wait(ms);
+        try { resp = await doRefresh(); } catch { throw new Error('Network error'); }
+        continue;
+      }
+
+      if (resp.status >= 500 && tries5xx < 2) {
+        tries5xx++;
+        await wait(200 * tries5xx);
+        try { resp = await doRefresh(); } catch { throw new Error('Network error'); }
+        continue;
+      }
+
+      throw new Error('Refresh failed');
+    }
 
     if (app._refreshNeedMe && !app._hasMe()) {
       await app._fetchMeOnce();
@@ -290,7 +336,7 @@ app._refreshAccess = async function (opts) {
 
     app._setAuthState(true, app.me || window.app?.me || null);
     return true;
-  })();
+  });
 
   try {
     return await app._refreshPromise;

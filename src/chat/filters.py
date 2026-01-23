@@ -8,12 +8,12 @@ class ChatThreadFilter(django_filters.FilterSet):
     """
     Filtry do skrzynki czatów (inbox).
     - listing_bucket / thread_kind:
-        * my_user       – rozmowy do moich ogłoszeń USER (added_by=USER & owner_user==me)
-        * users_other   – rozmowy do ogłoszeń innych użytkowników (added_by=USER & owner!=me)
-        * users         – wszystkie rozmowy do ogłoszeń USER (niezależnie czy moje)
-        * sellers       – rozmowy do ogłoszeń sprzedawców (added_by=STAFF)
-        * all_listings  – wszystkie rozmowy powiązane z ogłoszeniem (USER+STAFF)
-        * dm            – rozmowy bez ogłoszenia (DM)
+        * my_user       - rozmowy do moich ogłoszeń USER (added_by=USER & owner_user==me)
+        * users_other   - rozmowy do ogłoszeń innych użytkowników (added_by=USER & owner!=me)
+        * users         - wszystkie rozmowy do ogłoszeń USER (niezależnie czy moje)
+        * sellers       - rozmowy do ogłoszeń sprzedawców (added_by=STAFF)
+        * all_listings  - wszystkie rozmowy powiązane z ogłoszeniem (USER+STAFF)
+        * dm            - rozmowy bez ogłoszenia (DM)
     - q: pełnotekstowe (preview, tytuł ogłoszenia, dane uczestników)
     - unread_only: tylko wątki z nieprzeczytanymi
     - item_public_id: ograniczenie do konkretnego ogłoszenia
@@ -25,7 +25,7 @@ class ChatThreadFilter(django_filters.FilterSet):
 
     # kubełki
     listing_bucket = django_filters.CharFilter(method="filter_listing_bucket")
-    # alias – żeby można było wołać ?thread_kind=...
+    # alias  żeby można było wołać ?thread_kind=...
     thread_kind = django_filters.CharFilter(method="filter_listing_bucket")
 
     ordering = django_filters.OrderingFilter(

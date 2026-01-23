@@ -44,7 +44,7 @@ app.userPawnDetail = function (publicId) {
         const j = await r.json();
         const txid = j.public_id;
         if (!txid){ app.error?.('Brak transaction_public_id.'); return; }
-        app.ok?.('Przedłużenie utworzone – przejdź do płatności.');
+        app.ok?.('Przedłużenie utworzone - przejdź do płatności.');
         app.goto?.(`/pay/${txid}`);
       } catch(e){ app.error?.(e?.message || 'Błąd'); }
       finally { this.extending=false; }

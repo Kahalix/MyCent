@@ -208,25 +208,79 @@ class RefreshView(mixins.CreateModelMixin, viewsets.GenericViewSet):
             resp["Cache-Control"] = "no-store"
             return resp
 
+        ttl = int(getattr(settings, "REFRESH_IDEMPOTENCY_TTL", 20))
+        if ttl < 1:
+            ttl = 1
+        if ttl > 60:
+            ttl = 60
+
+        ua = request.META.get("HTTP_USER_AGENT", "") or ""
+        key_raw = f"{refresh_from_cookie}:{_ua_hash(ua)}"
+        cache_key = "refresh:idempo:" + hashlib.sha256(key_raw.encode("utf-8")).hexdigest()
+        lock_key = cache_key + ":lock"
+
+        def build_ok(payload: dict, new_refresh: str) -> Response:
+            data = dict(payload or {})
+            resp = Response(data, status=200)
+            resp["Cache-Control"] = "no-store"
+            if getattr(settings, "JWT_ACCESS_IN_COOKIE", False):
+                access = data.get("access")
+                if access:
+                    set_access_cookie(resp, access)
+                    data.pop("access", None)
+                    resp.data = data
+            set_refresh_cookie(resp, new_refresh)
+            return resp
+
+        cached = cache.get(cache_key)
+        if isinstance(cached, dict):
+            payload = cached.get("payload")
+            new_refresh = cached.get("refresh")
+            if isinstance(payload, dict) and isinstance(new_refresh, str) and new_refresh:
+                return build_ok(payload, new_refresh)
+
+        got_lock = bool(cache.add(lock_key, "1", timeout=5))
+        if not got_lock:
+            cached2 = cache.get(cache_key)
+            if isinstance(cached2, dict):
+                payload2 = cached2.get("payload")
+                new_refresh2 = cached2.get("refresh")
+                if isinstance(payload2, dict) and isinstance(new_refresh2, str) and new_refresh2:
+                    return build_ok(payload2, new_refresh2)
+            resp = Response({"detail": "Refresh in progress"}, status=409)
+            resp["Cache-Control"] = "no-store"
+            return resp
+
         try:
             payload, new_refresh = commands.refresh_tokens(
                 request,
                 refresh_jwt=refresh_from_cookie,
             )
-            resp = Response(payload, status=200)
+
+            if isinstance(new_refresh, str) and new_refresh:
+                payload_for_cache = dict(payload)
+                cache.set(cache_key, {"payload": payload_for_cache, "refresh": new_refresh}, timeout=ttl)
+
+            if not isinstance(new_refresh, str) or not new_refresh:
+                resp = Response({"detail": "Refresh failed"}, status=401)
+                resp["Cache-Control"] = "no-store"
+                return resp
+
+            return build_ok(payload, new_refresh)
+
+        except RefreshNotRecognized as e:
+            cached3 = cache.get(cache_key)
+            if isinstance(cached3, dict):
+                payload3 = cached3.get("payload")
+                new_refresh3 = cached3.get("refresh")
+                if isinstance(payload3, dict) and isinstance(new_refresh3, str) and new_refresh3:
+                    return build_ok(payload3, new_refresh3)
+
+            resp = Response({"detail": str(e)}, status=409)
             resp["Cache-Control"] = "no-store"
-
-            if getattr(settings, "JWT_ACCESS_IN_COOKIE", False):
-                set_access_cookie(resp, payload.get("access"))
-                try:
-                    payload.pop("access", None)
-                except Exception:
-                    pass
-
-            set_refresh_cookie(resp, new_refresh)
             return resp
 
-        except (RefreshMissing, RefreshInvalid, RefreshNotRecognized) as e:
+        except (RefreshMissing, RefreshInvalid) as e:
             resp = Response({"detail": str(e)}, status=401)
             resp["Cache-Control"] = "no-store"
             if getattr(settings, "JWT_ACCESS_IN_COOKIE", False):
@@ -234,6 +288,8 @@ class RefreshView(mixins.CreateModelMixin, viewsets.GenericViewSet):
             clear_refresh_cookie(resp)
             return resp
 
+        finally:
+            cache.delete(lock_key)
 
 class CsrfView(viewsets.ViewSet):
     permission_classes = [permissions.AllowAny]
@@ -372,7 +428,7 @@ class ChangePasswordView(mixins.CreateModelMixin, viewsets.GenericViewSet):
 
 
 
-# ===== USER – PUBLIC (pojedynczy) =====
+# ===== USER - PUBLIC (pojedynczy) =====
 
 class PublicUserViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     permission_classes = [permissions.AllowAny]
@@ -381,13 +437,9 @@ class PublicUserViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     serializer_class = UserResponse
 
 
-# ===== USER – SELF =====
+# ===== USER SELF =====
 
 class SelfUserViewSet(viewsets.ViewSet):
-    """
-    /api/users/me  [GET, PATCH]
-    /api/users/me/avatar [POST, DELETE]
-    """
     permission_classes = [permissions.IsAuthenticated]
 
     def retrieve(self, request):
@@ -412,7 +464,7 @@ class SelfUserViewSet(viewsets.ViewSet):
         return Response(status=204)
 
 
-# ===== USER – ADMIN CRUD + LIST =====
+# ===== USER =====
 
 class AdminUserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdmin]
@@ -462,7 +514,7 @@ class AdminUserViewSet(viewsets.ModelViewSet):
         return Response(UserAdminResponse(u).data, status=200)
 
 
-# ===== SELLER PROFILE – PUBLIC LIST/DETAIL =====
+# ===== SELLER PROFILE =====
 
 class PublicSellerProfileViewSet(mixins.ListModelMixin,
                                  mixins.RetrieveModelMixin,
@@ -478,7 +530,7 @@ class PublicSellerProfileViewSet(mixins.ListModelMixin,
     serializer_class = SellerProfilePublicResponse
 
 
-# ===== SELLER PROFILE - OWNER (create/own/detail/update + images) =====
+# ===== SELLER PROFILE  OWNER (create/own/detail/update + images) =====
 class MySellerProfileViewSet(viewsets.ViewSet):
     def get_permissions(self):
         if getattr(self, "action", None) == "retrieve":
@@ -559,7 +611,7 @@ class MySellerProfileViewSet(viewsets.ViewSet):
         return Response(status=204)
 
 
-# ===== SELLER PROFILE – ADMIN CRUD =====
+# ===== SELLER PROFILE ADMIN =====
 
 class AdminSellerProfileViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdmin]
@@ -686,14 +738,9 @@ class MySellerBankAccountViewSet(viewsets.GenericViewSet,
         return Response({"message": "Ustawiono jako domyślne", "public_id": acc.public_id}, status=200)
 
 
-# ===== BANK ACCOUNTS – ADMIN =====
+# ===== BANK ACCOUNTS ADMIN =====
 
 class AdminSellerBankAccountViewSet(viewsets.ModelViewSet):
-    """
-    /api/sellers/mine/bank-accounts/...
-    - LIST/RETRIEVE/CREATE/UPDATE/DELETE: tylko administrator (superuser).
-    - CREATE wymaga w body: seller_public_id (ID własnego sklepu).
-    """
     permission_classes = [IsAdmin]
     queryset = (
         SellerBankAccount.objects
@@ -740,11 +787,6 @@ class AdminSellerBankAccountViewSet(viewsets.ModelViewSet):
         return Response({"message": "Ustawiono jako domyślne", "public_id": acc.public_id}, status=200)
 
 class SellerMembersViewSet(viewsets.GenericViewSet):
-    """
-    /api/sellers/<seller_public_id>/members [GET, POST]
-    /api/sellers/<seller_public_id>/members/<member_public_id> [PATCH, DELETE]
-    Paginacja, sortowanie i szukanie przez wbudowane backendy DRF.
-    """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = SellerMembershipResponse
     filterset_class = SellerMembershipFilter
@@ -762,7 +804,6 @@ class SellerMembersViewSet(viewsets.GenericViewSet):
         if not queries.can_manage_members(request.user, seller):
             return Response({"detail": "Forbidden"}, status=403)
 
-        # --- twarde reguły biznesowe (nie-parametryzowalne) ---
         qs = (
             User.objects
             .filter(is_active=True)
@@ -774,7 +815,6 @@ class SellerMembersViewSet(viewsets.GenericViewSet):
             .order_by("email")
         )
 
-        # domyślna rola = EMPLOYEE (jeśli nie podano)
         if "role" not in request.query_params:
             qs = qs.filter(role="EMPLOYEE")
 
@@ -793,7 +833,6 @@ class SellerMembersViewSet(viewsets.GenericViewSet):
         if not queries.can_manage_members(request.user, seller):
             return Response({"detail": "Forbidden"}, status=403)
 
-        # bazowy QS (aktywni członkowie, z sensownym sortem wg roli)
         qs = queries.members_for_seller(seller)
 
         # DRF-owe backendy: search/order wg query params (?search=..., ?ordering=...)
@@ -870,9 +909,6 @@ class SellerMembersViewSet(viewsets.GenericViewSet):
             return Response({"detail": str(e)}, status=400)
 
 class MySellerMembershipsViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
-    """
-    /api/sellers/mine/memberships [GET]
-    """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = SellerMembershipResponse
     filterset_class = SellerMembershipFilter
@@ -898,7 +934,6 @@ class SellerContextView(viewsets.ViewSet):
             if cached:
                 return Response(SellerContextResponse(cached).data, status=200)
 
-        # 1) jeśli user posiada własny SellerProfile – traktujemy to jako OWNER
         sp = (SellerProfile.objects
               .only("public_id", "slug", "owner_id")
               .filter(owner=u).first())
@@ -910,7 +945,6 @@ class SellerContextView(viewsets.ViewSet):
                 "seller_slug": sp.slug,
             }
         else:
-            # 2) w przeciwnym razie – wybierz najlepsze aktywne membership
             mem = queries.best_membership_for_user(u)
             if mem:
                 data = {

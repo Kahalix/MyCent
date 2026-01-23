@@ -47,7 +47,7 @@ class CouponCreateUpdateRequest(serializers.ModelSerializer):
         if dtype == "PERCENTAGE":
             pct = float(dval.amount)
             if pct < 0 or pct > 100:
-                raise serializers.ValidationError({"discount_value": "Dla PERCENTAGE podaj wartość 0–100 (procent)."})
+                raise serializers.ValidationError({"discount_value": "Dla PERCENTAGE podaj wartość 0-100 (procent)."})
         elif dtype == "AMOUNT":
             if Decimal(str(dval.amount)) <= 0:
                 raise serializers.ValidationError({"discount_value": "Dla AMOUNT podaj wartość > 0."})

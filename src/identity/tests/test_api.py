@@ -10,6 +10,7 @@ from .factories import (
     create_user,
     create_seller_profile,
     create_seller_bank_account,
+    create_seller_membership,
 )
 
 
@@ -264,3 +265,132 @@ class BankAccountApiTests(APITestCase):
         self.client.force_authenticate(user=admin)
         resp2 = self.client.get("/api/admin/seller-bank-accounts/")
         self.assertEqual(resp2.status_code, status.HTTP_200_OK)
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class SellerRolesPermissionsIntegrationTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            email="admin-@example.com",
+            password="StrongPass123!",
+        )
+
+    def _results(self, data):
+        if isinstance(data, dict) and "results" in data:
+            return data["results"]
+        return data
+
+    def _admin_create_user(self, *, email: str, role: str) -> User:
+        self.client.force_authenticate(user=self.admin)
+        payload = {
+            "email": email,
+            "password": "StrongPass123!",
+            "first_name": "A",
+            "last_name": "B",
+            "role": role,
+            "user_status": "ACTIVE",
+            "is_active": True,
+            "is_staff": False,
+        }
+        resp = self.client.post("/api/admin/users/", payload, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        return User.objects.get(email=email)
+
+    def _admin_create_seller(self, *, owner: User, slug: str) -> str:
+        self.client.force_authenticate(user=self.admin)
+        payload = {
+            "company_name": "Sklep",
+            "legal_name": "Sklep Sp. z o.o.",
+            "slug": slug,
+            "description": "Test",
+            "contact_email": "contact@example.com",
+            "contact_phone": "123",
+            "website_url": "https://example.com",
+            "owner_id": owner.id,
+        }
+        resp = self.client.post("/api/admin/sellers/", payload, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        return resp.data["public_id"]
+
+    def test_roles_permissions_hierarchy_for_members_management(self):
+        owner = self._admin_create_user(email="owner@example.com", role="OWNER")
+        manager = self._admin_create_user(email="manager@example.com", role="EMPLOYEE")
+        employee = self._admin_create_user(email="employee@example.com", role="EMPLOYEE")
+        moderator = self._admin_create_user(email="moderator@example.com", role="MODERATOR")
+        outsider = self._admin_create_user(email="outsider@example.com", role="EMPLOYEE")
+
+        seller_public_id = self._admin_create_seller(owner=owner, slug="sklep-roles")
+        members_url = f"/api/sellers/{seller_public_id}/members/"
+
+        self.client.force_authenticate(user=None)
+        resp_unauth_list = self.client.get(members_url)
+        self.assertEqual(resp_unauth_list.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.client.force_authenticate(user=outsider)
+        resp_forbidden_list = self.client.get(members_url)
+        self.assertEqual(resp_forbidden_list.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.client.force_authenticate(user=owner)
+        resp_owner_list = self.client.get(members_url)
+        self.assertEqual(resp_owner_list.status_code, status.HTTP_200_OK)
+
+        self.client.force_authenticate(user=outsider)
+        resp_unauth_create_like = self.client.post(
+            members_url,
+            {"email": employee.email, "role": "EMPLOYEE"},
+            format="json",
+        )
+        self.assertEqual(resp_unauth_create_like.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.client.force_authenticate(user=owner)
+        resp_add_manager = self.client.post(
+            members_url,
+            {"email": manager.email, "role": "MANAGER"},
+            format="json",
+        )
+        self.assertEqual(resp_add_manager.status_code, status.HTTP_201_CREATED)
+        manager_member_public_id = resp_add_manager.data["public_id"]
+
+        self.client.force_authenticate(user=manager)
+        resp_manager_list = self.client.get(members_url)
+        self.assertEqual(resp_manager_list.status_code, status.HTTP_200_OK)
+
+        resp_manager_add_employee = self.client.post(
+            members_url,
+            {"email": employee.email, "role": "EMPLOYEE"},
+            format="json",
+        )
+        self.assertEqual(resp_manager_add_employee.status_code, status.HTTP_201_CREATED)
+        employee_member_public_id = resp_manager_add_employee.data["public_id"]
+
+        resp_manager_add_moderator = self.client.post(
+            members_url,
+            {"email": moderator.email, "role": "MODERATOR"},
+            format="json",
+        )
+        self.assertEqual(resp_manager_add_moderator.status_code, status.HTTP_403_FORBIDDEN)
+
+        resp_manager_add_manager = self.client.post(
+            members_url,
+            {"email": moderator.email, "role": "MANAGER"},
+            format="json",
+        )
+        self.assertEqual(resp_manager_add_manager.status_code, status.HTTP_403_FORBIDDEN)
+
+        member_url = f"/api/sellers/{seller_public_id}/members/{employee_member_public_id}/"
+
+        self.client.force_authenticate(user=None)
+        resp_unauth_patch = self.client.patch(member_url, {"role": "MODERATOR"}, format="json")
+        self.assertEqual(resp_unauth_patch.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.client.force_authenticate(user=manager)
+        resp_manager_patch = self.client.patch(member_url, {"role": "MANAGER"}, format="json")
+        self.assertEqual(resp_manager_patch.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.client.force_authenticate(user=owner)
+        resp_owner_patch = self.client.patch(member_url, {"role": "MODERATOR"}, format="json")
+        self.assertEqual(resp_owner_patch.status_code, status.HTTP_200_OK)
+
+        member_manager_url = f"/api/sellers/{seller_public_id}/members/{manager_member_public_id}/"
+        self.client.force_authenticate(user=manager)
+        resp_manager_patch_self = self.client.patch(member_manager_url, {"role": "MODERATOR"}, format="json")
+        self.assertEqual(resp_manager_patch_self.status_code, status.HTTP_403_FORBIDDEN)

@@ -38,6 +38,13 @@ app.userOfferForm = function (opts = {}) {
     busy:false, err:'', ok:'', schemaErr:'',
     errors: {},
 
+    slotOfferOpen:false,
+    slotOfferLoading:false,
+    slotOfferErr:'',
+    slotOfferPkg:null,
+    slotOfferCategoryName:'',
+    slotOfferCategoryPath:'',
+
     _clearErrors(){ this.errors = {}; this.schemaErr=''; this.err=''; },
     _setError(field, msg){ if (msg) this.errors[field] = String(msg); else delete this.errors[field]; },
 
@@ -50,6 +57,87 @@ app.userOfferForm = function (opts = {}) {
           try { el?.focus({ preventScroll: true }); } catch {}
           break;
         }
+      }
+    },
+
+    closeSlotOffer(){
+      this.slotOfferOpen = false;
+      this.slotOfferLoading = false;
+      this.slotOfferErr = '';
+      this.slotOfferPkg = null;
+      this.slotOfferCategoryName = '';
+      this.slotOfferCategoryPath = '';
+    },
+
+    async _openSlotOffer(){
+      this.slotOfferOpen = true;
+      this.slotOfferErr = '';
+      this.slotOfferPkg = null;
+
+      this.slotOfferCategoryName = (this.selectedType?.name || '').trim();
+      this.slotOfferCategoryPath = (this.selectedType?.path || '').trim();
+
+      if (!this.slotOfferCategoryPath){
+        this.slotOfferErr = 'Wybierz kategorię.';
+        return;
+      }
+
+      this.slotOfferLoading = true;
+      try{
+        const u = `/api/public/services/listing-packages/?item_type_path=${encodeURIComponent(this.slotOfferCategoryPath)}&points_min=1&ordering=points`;
+        const r = await app.api(u, { method:'GET' });
+        const j = await app.readJson(r);
+        const rows = j.results ?? j ?? [];
+
+        const pkgs = rows.filter(x => Number(x?.points || 0) > 0);
+        pkgs.sort((a,b) => Number(a.points||0) - Number(b.points||0));
+        this.slotOfferPkg = pkgs.length ? pkgs[0] : null;
+
+        if (!this.slotOfferPkg){
+          this.slotOfferErr = 'Brak dostępnych pakietów do zakupu w tej kategorii.';
+        }
+      } catch {
+        this.slotOfferErr = 'Nie udało się pobrać oferty pakietu.';
+      } finally {
+        this.slotOfferLoading = false;
+      }
+    },
+
+    async buySlot(){
+      if (!this.slotOfferPkg?.public_id) return;
+
+      this.slotOfferLoading = true;
+      this.slotOfferErr = '';
+      try{
+        const r = await app.api(`/api/users/me/services/purchase-package/`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            listing_package_public_id: this.slotOfferPkg.public_id,
+            pay_with: 'points'
+          })
+        });
+        const j = await app.readJson(r);
+
+        if (!r.ok){
+          const msg = j?.detail || _toErrorString(j) || 'Nie udało się kupić slotu.';
+          this.slotOfferErr = msg;
+          app.warn?.(msg);
+          return;
+        }
+
+        this.closeSlotOffer();
+        delete this.errors.type;
+
+        const okMsg = 'Kupiono slot. Możesz teraz kliknąć „Zapisz”.';
+        this.ok = okMsg;
+        app.ok?.(okMsg);
+      } catch (e) {
+        const msg = e?.message || 'Błąd';
+        this.slotOfferErr = msg;
+        app.error?.(msg);
+      } finally {
+        this.slotOfferLoading = false;
       }
     },
 
@@ -314,6 +402,7 @@ app.userOfferForm = function (opts = {}) {
         this.selectedTypePk='';
       }
       this.selectedType = { name, path, children_count: 0 };
+      this.closeSlotOffer();
     },
 
     _mountSSF(){
@@ -344,6 +433,7 @@ app.userOfferForm = function (opts = {}) {
 
     clearCategory(){
       if (this.selectedCatalog) return;
+      this.closeSlotOffer();
       this.selectedType=null; this.selectedTypePk='';
       this.schema={type:'object',properties:{}};
       this.ui_schema={};
@@ -354,6 +444,7 @@ app.userOfferForm = function (opts = {}) {
     openCatalogPicker(){ this.ciPicker.openWith(this.selectedType?.path || ''); },
 
     clearCatalog(){
+      this.closeSlotOffer();
       this.selectedCatalog=null; this.catalogItemUUID=''; this.catalogPublicId='';
       this._mountSSF();
       this._validateField('type');
@@ -556,6 +647,7 @@ app.userOfferForm = function (opts = {}) {
       this.err = msg;
       app.warn?.(msg);
       this._scrollToFirstError();
+      this._openSlotOffer().catch(()=>{});
     },
 
     _mapServerErrorsToFields(j){

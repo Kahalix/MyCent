@@ -8,13 +8,13 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 
-from saved.models import SavedListing, SavedSearch, SavedSearchItem
 from saved.serializers import (
     SavedListingCreateRequest, SavedListingResponse,
     SavedSearchCreateRequest, SavedSearchUpdateRequest, SavedSearchResponse, SavedSearchItemResponse
 )
 from saved.filters import SavedListingFilter, SavedSearchFilter
 from saved.services import commands
+from saved.services import queries
 from saved.services.exceptions import InvalidQuery, NotFound
 from listings.serializers import ItemSetPublicResponse
 from saved.services.repositories import get_saved_search_by_public_id
@@ -33,7 +33,7 @@ class MySavedListingsViewSet(viewsets.GenericViewSet):
     lookup_url_kwarg = "item_public_id"
 
     def list(self, request):
-        qs = commands.list_saved_listings(user=request.user)
+        qs = queries.list_saved_listings(user=request.user)
         page = self.paginate_queryset(qs)
         if page is not None:
             ser = SavedListingResponse(page, many=True, context={"request": request})
@@ -58,11 +58,18 @@ class MySavedSearchesViewSet(viewsets.GenericViewSet):
     lookup_url_kwarg = "public_id"
 
     def list(self, request):
-        qs = commands.list_saved_searches(user=request.user)
+        qs = queries.list_saved_searches(user=request.user)
         page = self.paginate_queryset(qs)
         if page is not None:
             return self.get_paginated_response(SavedSearchResponse(page, many=True).data)
         return Response(SavedSearchResponse(qs, many=True).data, status=200)
+
+    def retrieve(self, request, public_id=None):
+        try:
+            ss = queries.get_saved_search_meta(user=request.user, public_id=public_id)
+            return Response(SavedSearchResponse(ss).data, status=200)
+        except NotFound as e:
+            return Response({"detail": str(e)}, status=404)
 
     def create(self, request):
         ser = SavedSearchCreateRequest(data=request.data); ser.is_valid(raise_exception=True)
@@ -73,7 +80,8 @@ class MySavedSearchesViewSet(viewsets.GenericViewSet):
             return Response({"detail": str(e)}, status=400)
 
     def partial_update(self, request, public_id=None):
-        ser = SavedSearchUpdateRequest(data=request.data, partial=True); ser.is_valid(raise_exception=True)
+        ser = SavedSearchUpdateRequest(data=request.data, partial=True);
+        ser.is_valid(raise_exception=True)
         try:
             ss = commands.update_saved_search_cmd(user=request.user, public_id=public_id, **ser.validated_data)
             return Response(SavedSearchResponse(ss).data, status=200)
@@ -90,7 +98,7 @@ class MySavedSearchesViewSet(viewsets.GenericViewSet):
         Zwraca snapshot NIEPRZECZYTANYCH wyników (SavedSearchItem).
         """
         try:
-            qs = commands.list_saved_search_items(user=request.user, public_id=public_id)
+            qs = queries.list_saved_search_items(user=request.user, public_id=public_id)
             page = self.paginate_queryset(qs)
             ser = SavedSearchItemResponse(page or qs, many=True, context={"request": request})
             return self.get_paginated_response(ser.data) if page is not None else Response(ser.data, status=200)

@@ -88,7 +88,7 @@ class ItemTypeAdmin(admin.ModelAdmin):
 # ========= CatalogItem admin =========
 
 class CatalogItemAdminForm(forms.ModelForm):
-    image_upload = forms.ImageField(required=False, help_text="Wgraj plik – zapisze się do 'image_path'.")
+    image_upload = forms.ImageField(required=False, help_text="Wgraj plik - zapisze się do 'image_path'.")
     image_clear  = forms.BooleanField(required=False, label="Usuń obecny obrazek")
 
     class Meta:

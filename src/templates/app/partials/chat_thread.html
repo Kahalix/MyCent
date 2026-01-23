@@ -79,7 +79,8 @@
       <textarea class="cm-input"
                 placeholder="Napisz wiadomość…"
                 x-model="input"
-                @input="onTyping"></textarea>
+                @input="onTyping"
+                @blur="onTypingStop"></textarea>
       <button type="submit"
               class="cm-btn cm-btn--primary"
               :disabled="sending || !trimmed()"

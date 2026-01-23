@@ -127,8 +127,8 @@ def get_membership_by_public_id_for_seller(public_id: str, seller: SellerProfile
 
 def best_membership_for_user(user: User) -> Optional[SellerMembership]:
     """
-    Zwraca „najsilniejsze” aktywne członkostwo usera wg priorytetu:
-    OWNER > MANAGER > MODERATOR > EMPLOYEE (a w ramach roli – najnowsze).
+    Zwraca najsilniejsze aktywne członkostwo usera wg priorytetu:
+    OWNER > MANAGER > MODERATOR > EMPLOYEE (a w ramach roli - najnowsze).
     """
     return (
         SellerMembership.objects

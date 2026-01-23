@@ -12,7 +12,6 @@ app.navState = function () {
     sellerCtx: null,
     cartCount: 0,
     chatUnread: 0,
-    _threadUnread: new Map(),
     _unsubInbox: null,
     _cartReq: null,
     _userReq: null,
@@ -44,7 +43,6 @@ app.navState = function () {
           this.sellerCtx = null;
           this.cartCount = 0;
           this.chatUnread = 0;
-          this._threadUnread.clear();
         }
       });
 
@@ -69,18 +67,13 @@ app.navState = function () {
           this.sellerCtx = null;
           this.cartCount = 0;
           this.chatUnread = 0;
-          this._threadUnread.clear();
         }
       });
 
       window.addEventListener('seller:exists', () => { this.hasSeller = true; });
 
-      window.addEventListener('chat:unread-total', (e) => {
-        const d = e?.detail || {};
-        if (d.countDeltaToZeroFor) {
-          this._threadUnread.set(String(d.countDeltaToZeroFor), 0);
-          this._recalcUnreadSum();
-        }
+      window.addEventListener('chat:unread-total', () => {
+        if (this.authed) this.fetchChatUnread();
       });
 
       (async () => {
@@ -105,11 +98,16 @@ app.navState = function () {
       this._unsubscribeInbox();
       this._unsubInbox = app.wsHub.subscribe('inbox', (msg) => {
         try {
-          if (msg.type === 'inbox.thread_updated') {
-            const pid = msg.thread_public_id;
-            const unread = Number(msg.unread_count || 0);
-            if (pid) this._threadUnread.set(pid, unread);
-            this._recalcUnreadSum();
+          if (msg.type === 'inbox.unread_total') {
+            const n = Number(msg.unread_messages || 0);
+            this.chatUnread = Number.isFinite(n) ? n : 0;
+            return;
+          }
+
+          if (msg.type === 'inbox.unread_counts') {
+            const n = Number(msg?.total?.unread_messages || 0);
+            this.chatUnread = Number.isFinite(n) ? n : 0;
+            return;
           }
         } catch {}
       });
@@ -198,39 +196,16 @@ app.navState = function () {
       if (this._chatReq) return this._chatReq;
 
       this._chatReq = (async () => {
-        this._threadUnread.clear();
-        let url = '/api/users/me/chats/threads/?page_size=10';
-        let pages = 0;
-
         try {
-          while (url && pages < 10) {
-            pages++;
-            const r = await app.api(url, { method: 'GET' });
-            if (!r.ok) break;
-            const j = await r.json().catch(() => ({}));
-            const results = Array.isArray(j) ? j : (j.results || []);
-            const mePid = this.user?.public_id || window.app?.me?.public_id || null;
-
-            for (const th of results) {
-              const myPart = (th.participants || []).find(p => p.user?.public_id === mePid);
-              const unread = myPart ? Number(myPart.unread_count || 0) : 0;
-              this._threadUnread.set(th.public_id, unread);
-            }
-
-            url = Array.isArray(j) ? null : (j.next || null);
-          }
+          const r = await app.api('/api/users/me/chats/threads/unread-total/', { method: 'GET' });
+          if (!r.ok) return;
+          const j = await r.json().catch(() => ({}));
+          const n = Number(j?.unread_messages || 0);
+          this.chatUnread = Number.isFinite(n) ? n : 0;
         } catch {}
-
-        this._recalcUnreadSum();
       })();
 
       try { return await this._chatReq; } finally { this._chatReq = null; }
-    },
-
-    _recalcUnreadSum() {
-      let sum = 0;
-      for (const v of this._threadUnread.values()) sum += (Number(v) || 0);
-      this.chatUnread = sum;
     },
 
     async logout() {

@@ -29,7 +29,7 @@
 
 
 
-/* Złoty przycisk (zostawiamy) */
+/* Złoty przycisk */
 .btn-gold{
   background-image: linear-gradient(180deg, var(--fallback-p, oklch(var(--p))) 0%, color-mix(in oklab, oklch(var(--p)) 90%, black) 100%);
   border: none;
@@ -37,7 +37,7 @@
 }
 .btn-gold:hover{ filter: brightness(1.05); }
 
-/* „Glass” karta */
+/* Glass karta */
 .glass-card{
   background: color-mix(in oklab, oklch(var(--b1)) 94%, transparent);
   border: 1px solid color-mix(in oklab, oklch(var(--b3)) 70%, transparent);
@@ -65,11 +65,11 @@
   border-color:     oklch(var(--b3));
 }
 
-/* Nav link hover – subtelna pigułka */
+/* Nav link hover */
 .navlink{ padding:.5rem .75rem; border-radius:.5rem; }
 .navlink:hover{ background: color-mix(in oklab, oklch(var(--b2)) 85%, white 15%); }
 
-/* Avatar limit (jak było) */
+/* Avatar limit */
 img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
 
 /* Upewnij się, że cloak działa natychmiast */
@@ -152,7 +152,7 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
 }
 .toast-close:hover{ opacity: 1; background: color-mix(in oklab, oklch(var(--b2)) 70%, transparent); }
 
-/* Tryb dark – odrobinę mocniejszy glass */
+/* Tryb dark: odrobinę mocniejszy glass */
 :root[data-theme="lownDark"] .toast-card{
   background:
     linear-gradient(180deg,
@@ -238,7 +238,7 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
   background-color: color-mix(in oklab, oklch(var(--b2)) 90%, white 10%);
 }
 
-/* Delikatny „tap” po kliknięciu */
+/* Delikatny tap po kliknięciu */
 .fancy-area:active,
 .fancy-select:active{ transform: translateY(0.5px); }
 
@@ -267,7 +267,7 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
   padding-right: calc(var(--numstep-btn-w) + .35rem); /* miejsce na przyciski */
   -moz-appearance: textfield; /* bez natywnych strzałek w FF (tylko w tym komponencie) */
 }
-/* Bez natywnych strzałek w WebKit – TYLKO w tym komponencie */
+/* Bez natywnych strzałek w WebKit: TYLKO w tym komponencie */
 .numstep__input::-webkit-outer-spin-button,
 .numstep__input::-webkit-inner-spin-button{
   -webkit-appearance: none;
@@ -301,7 +301,7 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
   border-bottom-right-radius: .5rem;
 }
 
-/* Ikony chevronów – przez maskę */
+/* Ikony chevronów przez maskę */
 .numstep__btn::before{
   content: "";
   inline-size: 14px;
@@ -321,7 +321,7 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
   box-shadow: inset 0 0 0 2px color-mix(in oklab, oklch(var(--p)) 18%, transparent);
 }
 
-/* Dark – delikatnie mocniejsze tło/obramowania */
+/* Dark delikatnie mocniejsze tło/obramowania */
 :root[data-theme="lownDark"] .numstep__btn{
   background: color-mix(in oklab, var(--frame-bg) 88%, black 12%);
   border-left-color: color-mix(in oklab, oklch(var(--b3)) 70%, #fff 22%);
@@ -577,7 +577,7 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
 
 .cm-msgline{
   display:flex; align-items:flex-end; gap:.5rem;
-  margin: 6px 0;                  /* lekki odstęp góra–dół dla każdej wiadomości */
+  margin: 6px 0;                  /* lekki odstęp góra-dół dla każdej wiadomości */
 }
 .cm-msgline.is-same{
   margin-block: 4px;              /* minimalnie ciaśniej, gdy ten sam nadawca */
@@ -656,7 +656,7 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
   margin: 6px 0; /* delikatny oddech pionowy */
 }
 
-/* 2) Wszyscy od lewej – neutralizujemy me */
+/* 2) Wszyscy od lewej: neutralizujemy me */
 .cm-msgline--me{
   justify-content: initial !important;
   flex-direction: initial !important;
@@ -680,7 +680,7 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
 .cm-msgline.is-same{ margin-top: 4px; }
 .cm-msgline:not(.is-same){ margin-top: 14px; }
 
-/* 7) Stempel czasu – wyrównaj do kolumny tekstu (kol. 2) */
+/* 7) Stempel czasu: wyrównaj do kolumny tekstu (kol. 2) */
 .cm-time{
   text-align: left !important;
   padding-left: calc(var(--cm-avatar-size) + var(--cm-gap)) !important;
@@ -760,7 +760,7 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
 
 .ci-spacer{ margin-top:auto; }
 
-/* Atrybuty (pills) – czytelne w light/dark */
+/* Atrybuty (pills): czytelne w light/dark */
 .attr-pills{ display:flex; flex-wrap:wrap; gap:.35rem .4rem; }
 .attr-pill{
   display:inline-flex; align-items:center; gap:.3rem;
@@ -982,7 +982,7 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
 
 /* === przycisk filtra (light/dark) === */
 .btn-filter{
-  /* tło neutralne, lekki „glass” */
+  /* tło neutralne, lekki glass */
   background: color-mix(in oklab, oklch(var(--b1)) 96%, white 4%);
   /* grubsza, wyraźna ramka */
   border-width: 1.5px !important;
@@ -1001,13 +1001,13 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
     0 0 0 3px color-mix(in oklab, oklch(var(--p)) 28%, transparent),
     0 1px 0 rgba(0,0,0,.04);
 }
-/* aktywny – gdy dropdown otwarty */
+/* aktywny gdy dropdown otwarty */
 .btn-filter[aria-expanded="true"]{
   background: color-mix(in oklab, oklch(var(--b1)) 90%, white 10%);
   border-color: oklch(var(--p)) !important;
 }
 
-/* badge wewnątrz przycisku – wyraźny kontur */
+/* badge wewnątrz przycisku wyraźny kontur */
 .btn-filter__badge{
   border: 1px solid color-mix(in oklab, oklch(var(--b3)) 70%, #000 18%);
   background: color-mix(in oklab, oklch(var(--b1)) 94%, transparent);
@@ -1222,7 +1222,7 @@ button, .btn, .cm-btn, .numstep__btn, .img-tile__btn {
   overflow-wrap: anywhere;         /* niech nawet długie słowa nie wypychają układu */
 }
 
-/* XS/SM Daisy bywają zbyt drobne - na wąskich ekranach podnieś je do 40–44px */
+/* XS/SM Daisy bywają zbyt drobne - na wąskich ekranach podnieś je do 40-44px */
 @media (max-width: 640px){
   .btn-xs, .btn-sm { min-height: 40px; padding-inline: .85rem; font-size: .95rem; }
 }
@@ -1231,7 +1231,7 @@ button, .btn, .cm-btn, .numstep__btn, .img-tile__btn {
 @media (max-width: 640px){
   .btn, .cm-btn, .btn-gold, .btn-filter { width: 100%; }
 
-  /* „wiersze akcji” - uogólnienie: każdy .flex z przyciskami niech się zawija */
+  /* wiersze akcji - uogólnienie: każdy .flex z przyciskami niech się zawija */
   .prod-actions,
   .cm-itembar .actions,
   .card-body .flex.gap-2,
@@ -1254,7 +1254,7 @@ button, .btn, .cm-btn, .numstep__btn, .img-tile__btn {
   /* Stepper: powiększ przyciski ↑/↓ i cel w dotyku */
   .numstep--md{ --numstep-btn-w: 2.6rem; }
   .numstep__btn{ height: calc(50% - .5px); }
-  /* Ikonka na miniaturze – też urosnij */
+  /* Ikonka na miniaturze - też urosnij */
   .img-tile__btn{ width: 2.75rem; height: 2.75rem; }
 }
 
@@ -1290,7 +1290,7 @@ button, .btn, .cm-btn, .numstep__btn, .img-tile__btn {
   .tab-btn { flex: 1 1 auto; text-align: center; }
 }
 
-/* 8) Zmniejsz „sztywność” elementów w ciasnych gridach (przyciski w kartach) */
+/* 8) Zmniejsz sztywność elementów w ciasnych gridach (przyciski w kartach) */
 .prod-card .prod-actions .btn,
 .ci-card .attr-pill .btn {
   min-width: min(100%, 240px);   /* pozwól rosnąć, ale bez rozpychania kart */
@@ -1311,7 +1311,7 @@ button, .btn, .cm-btn, .numstep__btn, .img-tile__btn {
   }
 }
 
-/* 2) Kompaktowe wymiary w pasku nawigacji (nadpisują globalne 40–44px) */
+/* 2) Kompaktowe wymiary w pasku nawigacji */
 header .btn,
 header .cm-btn{
   min-height: 36px;
@@ -1373,7 +1373,7 @@ header .btn[aria-label]{ min-width: 0; }
 /* stała rezerwa miejsca na szynę, żeby treść nie wpadała pod nią */
 .offers-list{ --offer-rail-w: 3.25rem; }           /* desktop */
 @media (max-width: 480px){
-  .offers-list{ --offer-rail-w: 2.9rem; }         /* mobile – ciut węższa */
+  .offers-list{ --offer-rail-w: 2.9rem; }         /* mobile ciut węższa */
 }
 
 .offer-body{
@@ -1435,7 +1435,7 @@ item-price{
   box-shadow: 0 2px 10px rgba(0,0,0,.12);
 }
 
-/* ===== Rezerwa pod prawą „szynę” i data/serce ===== */
+/* ===== Rezerwa pod prawą szynę i data/serce ===== */
 .offers-list{ --offer-rail-w: 3.25rem; }
 @media (max-width: 480px){ .offers-list{ --offer-rail-w: 2.9rem; } }
 .offer-body{ padding-right: calc(var(--offer-rail-w) + .25rem); padding-bottom: 2rem; }
@@ -1457,21 +1457,44 @@ item-price{
 .modal .btn,
 .offers-list .list-row .btn{ margin-block:.125rem; } /* 2px */
 
+.shop-card{
+  position: relative;
+  background: var(--frame-bg);
+  border: 1px solid var(--frame-border);
+  overflow: hidden;
+}
+
+.shop-card--has-banner{
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* warstwa przyciemniająca / glass na treści */
+.shop-card__overlay{
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, oklch(var(--b2)) 72%, transparent) 0%,
+      color-mix(in oklab, oklch(var(--b2)) 86%, transparent) 55%,
+      color-mix(in oklab, oklch(var(--b2)) 92%, transparent) 100%);
+  backdrop-filter: blur(10px);
+}
+
 /* =====
-    globalna responsywność i oddechy przycisków (bez zmian w HTML)
+    globalna responsywność i oddechy przycisków
 ==== */
 
 /* A. Uniwersalny, subtelny odstęp pionowy wokół przycisków */
 .btn, .cm-btn, a.btn { margin-block: .125rem; } /* ~2px */
 
-/* B. Mobile – małe przyciski nie są blokowe (auto width) */
+/* B. Mobile - małe przyciski nie są blokowe (auto width) */
 @media (max-width: 640px){
   .btn-sm, .btn-xs,
   a.btn.btn-sm, a.btn.btn-xs,
   button.btn.btn-sm, button.btn.btn-xs {
     width: auto !important;       /* nie rozciągaj */
     min-width: 0;                  /* pozwól się zawijać w klastrach */
-    flex: 0 0 auto;                /* zachowuj się jak „chip” */
+    flex: 0 0 auto;                /* zachowuj się jak chip */
   }
 }
 
@@ -1487,7 +1510,7 @@ item-price{
   }
 }
 
-/* D. Mobile – klastery z .flex.gap-2/.gap-3 (np. saved_center, landing)
+/* D. Mobile: klastery z .flex.gap-2/.gap-3 (np. saved_center, landing)
    Wymuś zawijanie + bezpieczne odstępy, aby nic nie wychodziło poza ekran. */
 @media (max-width: 640px){
   .flex.gap-2, .flex.gap-3 {
@@ -1593,7 +1616,7 @@ item-price{
 .list-row .text-sm{               /* podtytuł/meta (cena/kategoria) */
   color: color-mix(in oklab, oklch(var(--bc)) 70%, transparent);
 }
-.list-row .badge.badge-ghost{     /* pigułki meta – spójna ramka */
+.list-row .badge.badge-ghost{     /* pigułki meta */
   border: 1px solid color-mix(in oklab, var(--frame-border) 78%, transparent);
   background: color-mix(in oklab, oklch(var(--b1)) 94%, white 6%);
 }
@@ -1747,7 +1770,7 @@ item-price{
   box-shadow:
     0 16px 40px rgba(0,0,0,.25),
     0 0 0 1px color-mix(in oklab, oklch(var(--b3)) 55%, transparent);
-  padding: .35rem; /* p-2 w HTML zostaje – to tylko baza */
+  padding: .35rem; /* p-2 w HTML zostaje to tylko baza */
 }
 
 /* Strzałka od boku: kwadrat 12x12 obrócony o 45 stopni (side arrow) */

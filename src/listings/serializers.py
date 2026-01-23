@@ -99,7 +99,7 @@ class CatalogItemMini(serializers.ModelSerializer):
 class UserMini(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("public_id", "first_name", "last_name", "email", "user_image")
+        fields = ("public_id", "first_name", "last_name", "user_image")
 
 
 class ItemSetPublicResponse(serializers.ModelSerializer):

@@ -94,7 +94,6 @@ def confirm_registration(*, token: str) -> dict:
     user.save(update_fields=["is_active"])
     return {"message": "Konto aktywowane."}
 
-
 def login_user(request, *, email: str, password: str) -> tuple[dict, str]:
     email = email.lower()
     user = find_user_by_email_ci(email)
@@ -103,13 +102,15 @@ def login_user(request, *, email: str, password: str) -> tuple[dict, str]:
         raise InvalidCredentials("Invalid credentials")
 
     if not user.is_active:
-        status = getattr(user, "user_status", "")
-        if status == "ACTIVE":
+        if getattr(user, "user_status", "") == "ACTIVE":
             _send_registration_confirmation_email(request, user=user, hours_valid=24)
             raise AccountNotActive(
                 "Konto nie zostało jeszcze aktywowane. Wysłaliśmy ponownie link aktywacyjny na e-mail."
             )
         raise AccountNotActive("Konto jest nieaktywne lub zablokowane. Skontaktuj się z administratorem.")
+
+    if getattr(user, "user_status", "") != "ACTIVE":
+        raise AccountNotActive("Konto jest zablokowane. Skontaktuj się z administratorem.")
 
     refresh = RefreshToken.for_user(user)
     refresh_jwt = str(refresh)
@@ -130,7 +131,6 @@ def login_user(request, *, email: str, password: str) -> tuple[dict, str]:
 
     return _auth_payload(user, access_jwt), refresh_jwt
 
-
 def refresh_tokens(request, *, refresh_jwt: str | None) -> tuple[dict, str]:
     if not refresh_jwt:
         raise RefreshMissing("Missing refresh token")
@@ -148,8 +148,14 @@ def refresh_tokens(request, *, refresh_jwt: str | None) -> tuple[dict, str]:
         raise RefreshInvalid("Invalid refresh token")
 
     user = User.objects.filter(**{user_id_field: ident}).first()
-    if not user or not user.is_active:
-        raise RefreshInvalid("User not found/inactive")
+    if not user:
+        raise RefreshInvalid("Nie odnaleziono użytkownika")
+
+    if not user.is_active:
+        raise RefreshInvalid("Użytkownik nieaktywny")
+
+    if getattr(user, "user_status", "") != "ACTIVE":
+        raise RefreshInvalid("Użytkownik zablokowny/usunięty")
 
     ua = request.META.get("HTTP_USER_AGENT", "")
     ip = _client_ip_from_request(request)
@@ -173,7 +179,6 @@ def refresh_tokens(request, *, refresh_jwt: str | None) -> tuple[dict, str]:
     )
 
     return _auth_payload(user, new_access_jwt), new_refresh_jwt
-
 
 def logout_user(request, *, user) -> None:
     delete_all_refreshes(user)
@@ -213,7 +218,7 @@ def reset_password(*, token: str, new_password: str) -> dict:
 def request_email_change(request, *, user, new_email: str) -> dict:
     new_email = new_email.lower()
     if is_email_taken_ci(new_email, exclude_user_id=user.id):
-        raise EmailAlreadyUsed("Email already in use")
+        raise EmailAlreadyUsed("Konto o podanym adresie e-mail już istnieje")
     token = issue_ephemeral(user, "EMAIL_CHANGE", minutes=60, data={"new_email": new_email})
     url = request.build_absolute_uri(reverse("core:confirm_email")) + f"?token={token}"
     emails.send_templated_email(
@@ -300,16 +305,21 @@ def admin_update_user(*, public_id: str, **changes):
     u = get_user_by_public_id(public_id)
     if not u:
         raise TokenInvalid("User not found")
+
     allowed = {"first_name", "last_name", "phone_number", "role", "user_status", "is_staff", "is_active"}
     updated = {}
     for k, v in changes.items():
         if k in allowed and v is not None:
             setattr(u, k, v)
             updated[k] = v
+
     if updated:
         u.save()
-    return u
 
+    if (not u.is_active) or (u.user_status in ("SUSPENDED", "DELETED")):
+        _revoke_all_tokens(u)
+
+    return u
 
 def admin_delete_user(*, public_id: str) -> None:
     u = get_user_by_public_id(public_id)
@@ -327,20 +337,35 @@ def _revoke_all_tokens(user):
         BlacklistedToken.objects.get_or_create(token=t)
 
 
+# def admin_set_user_status(*, public_id: str, user_status: str, is_active: bool | None = None):
+#     u = get_user_by_public_id(public_id)
+#     if not u:
+#         raise TokenInvalid("User not found")
+#
+#     u.user_status = user_status
+#     u.is_active = _map_is_active_for_status(user_status) if is_active is None else bool(is_active)
+#     u.save(update_fields=["user_status", "is_active"])
+#
+#     if not u.is_active or user_status in ("SUSPENDED", "DELETED"):
+#         _revoke_all_tokens(u)
+#
+#     return u
+
 def admin_set_user_status(*, public_id: str, user_status: str, is_active: bool | None = None):
     u = get_user_by_public_id(public_id)
     if not u:
         raise TokenInvalid("User not found")
 
     u.user_status = user_status
-    u.is_active = _map_is_active_for_status(user_status) if is_active is None else bool(is_active)
-    u.save(update_fields=["user_status", "is_active"])
+    if is_active is not None:
+        u.is_active = bool(is_active)
 
-    if not u.is_active or user_status in ("SUSPENDED", "DELETED"):
+    u.save(update_fields=["user_status", "is_active"] if is_active is not None else ["user_status"])
+
+    if (not u.is_active) or (u.user_status in ("SUSPENDED", "DELETED")):
         _revoke_all_tokens(u)
 
     return u
-
 
 def _replace_file_and_set(model_instance, field_name: str, file) -> str:
     field = getattr(model_instance, field_name, None)

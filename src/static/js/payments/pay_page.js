@@ -110,7 +110,7 @@ app.payPage = function (opts = {}) {
         this.txId = this.tx?.public_id || this.txId || '';
         if (!this.txId) this.err = 'Nie znaleziono aktywnej transakcji do opłacenia.';
         if (this.tx && this.tx.status !== 'PENDING') {
-          this.err = 'Ta transakcja nie jest już w statusie „Oczekująca” – płatność niedostępna.';
+          this.err = 'Ta transakcja nie jest już w statusie „Oczekująca” - płatność niedostępna.';
         }
       } catch (e) {
         this.err = e?.message || 'Błąd sieci.';
@@ -309,7 +309,7 @@ app.payPage = function (opts = {}) {
       if (!this.txId) return;
 
       if (provider === 'STRIPE' && !this.stripePk()) {
-        app.warn('Brak publicznego klucza Stripe – używam trybu symulacji.');
+        app.warn('Brak publicznego klucza Stripe - używam trybu symulacji.');
         provider = 'SIM';
       }
 

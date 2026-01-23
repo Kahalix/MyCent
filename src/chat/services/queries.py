@@ -28,6 +28,13 @@ def messages_window_qs(thread: ChatThread, *, limit: int = 50, before: Optional[
             qs = qs.filter(id__lt=prev.id)
     return qs[:limit]
 
+def unread_total(user) -> int:
+    row = (
+        ChatParticipant.objects
+        .filter(user=user, is_deleted=False, is_muted=False)
+        .aggregate(total=Sum("unread_count"))
+    )
+    return int(row.get("total") or 0)
 
 def unread_counts_by_bucket(user) -> Dict[str, dict]:
     base = (

@@ -60,16 +60,16 @@ class AdminListingPackageViewSet(viewsets.ModelViewSet):
 class MyServicesViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
-    # @action(methods=["post"], detail=False, url_path="purchase-package")
-    # def purchase_package(self, request):
-    #     ser = PurchasePackageRequest(data=request.data)
-    #     ser.is_valid(raise_exception=True)
-    #     pkg = get_object_or_404(ListingPackage, public_id=ser.validated_data["listing_package_public_id"])
-    #     pay_with = ser.validated_data.get("pay_with") or "auto"
-    #     pay_with = None if pay_with == "auto" else pay_with
-    #
-    #     up = commands.purchase_package(user=request.user, package=pkg, pay_with=pay_with)
-    #     return Response(UserListingPackageResponse(up).data, status=201)
+    @action(methods=["post"], detail=False, url_path="purchase-package")
+    def purchase_package(self, request):
+        ser = PurchasePackageRequest(data=request.data)
+        ser.is_valid(raise_exception=True)
+        pkg = get_object_or_404(ListingPackage, public_id=ser.validated_data["listing_package_public_id"])
+        pay_with = ser.validated_data.get("pay_with") or "auto"
+        pay_with = None if pay_with == "auto" else pay_with
+
+        up = commands.purchase_package(user=request.user, package=pkg, pay_with=pay_with)
+        return Response(UserListingPackageResponse(up).data, status=201)
 
     @action(methods=["get"], detail=False, url_path="slot-summary")
     def slot_summary(self, request):

@@ -26,6 +26,6 @@ class CouponAdminForm(forms.ModelForm):
         if dtype == "PERCENTAGE":
             pct = float(dval.amount)
             if pct < 0 or pct > 100:
-                raise ValidationError({"discount_value": "Dla procentu podaj wartość 0–100."})
+                raise ValidationError({"discount_value": "Dla procentu podaj wartość 0-100."})
 
         return cleaned

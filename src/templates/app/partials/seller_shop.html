@@ -1,13 +1,54 @@
 <section
-  x-data="app.publicOffersList({ sellerSlug: '{{ seller_slug }}' })"
+  x-data="app.publicSellerShop({ sellerSlug: '{{ seller_slug }}' })"
   x-init="init()"
   x-effect="() => { return () => destroy() }"
 >
-  <!-- Nagłówek + sort -->
-  <div class="mb-4 flex items-center gap-2 flex-wrap">
-    <h1 class="text-xl font-semibold">
-      Sklep: <span class="opacity-70">{{ seller_slug }}</span>
-    </h1>
+  <template x-if="sellerErr">
+    <div class="alert alert-error whitespace-pre-line mb-3" x-text="sellerErr"></div>
+  </template>
+
+  <div
+    class="mb-4 rounded-xl shop-card"
+    :class="bannerSrc() ? 'shop-card--has-banner' : ''"
+    :style="bannerSrc() ? `background-image:url('${bannerSrc()}')` : ''"
+  >
+    <div class="shop-card__overlay p-3 rounded-xl">
+      <div class="flex items-start gap-3">
+        <template x-if="logoSrc()">
+          <img :src="logoSrc()" alt=""
+               class="object-contain rounded p-1 bg-base-200/50"
+               style="width: var(--list-thumb); height: var(--list-thumb);">
+        </template>
+
+        <div class="min-w-0 flex-1">
+          <h1 class="text-xl font-semibold truncate" x-text="shopTitle()"></h1>
+
+          <template x-if="seller?.description">
+            <div class="text-sm opacity-80 mt-1" x-text="seller.description"></div>
+          </template>
+
+          <div class="mt-2 flex flex-wrap items-center gap-2 text-sm">
+            <template x-if="hasRating()">
+              <span class="badge badge-ghost" x-text="ratingText()"></span>
+            </template>
+
+            <template x-if="(seller?.followers_count ?? 0) > 0">
+              <span class="badge badge-ghost" x-text="'Obserwujący: ' + seller.followers_count"></span>
+            </template>
+
+            <template x-if="phone()">
+              <span class="badge badge-ghost" x-text="'Tel: ' + phone()"></span>
+            </template>
+
+            <template x-if="email()">
+              <span class="badge badge-ghost" x-text="'Email: ' + email()"></span>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
     <button class="btn btn-ghost btn-sm" @click="resetAll()">Wyczyść filtry</button>
 
@@ -22,7 +63,7 @@
     </select>
   </div>
 
-  <!-- Pasek filtrów (analogiczny do public offers) -->
+  <!-- Pasek filtrów -->
   <div class="mb-3 grid grid-cols-1 md:grid-cols-12 gap-2">
     <!-- Szukaj -->
     <div class="md:col-span-6">
@@ -85,7 +126,7 @@
     </div>
   </div>
 
-  <!-- Skeleton (jak public offers) -->
+  <!-- Skeleton -->
   <template x-if="loading && !items.length">
     <div class="space-y-1">
       <template x-for="i in 6" :key="i">

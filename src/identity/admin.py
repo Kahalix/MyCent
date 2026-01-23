@@ -32,7 +32,7 @@ def _is_protected_target(target: User, acting_user: User) -> bool:
     """
     Czy konto jest chronione przed edycją/usunięciem przez działającego użytkownika?
     - superuser: może wszystko
-    - staff / superuser / OWNER – zawsze chronione dla nie-superusera
+    - staff / superuser / OWNER - zawsze chronione dla nie-superusera
     - MANAGER/MODERATOR - chronione
     - własne konto - chronione
     """
@@ -360,11 +360,11 @@ class SellerProfileAdmin(admin.ModelAdmin):
 
     def logo_preview(self, obj):
         return self._img_field(getattr(obj, "logo_image", None), 240, 160)
-    logo_preview.short_description = "Logo – podgląd"
+    logo_preview.short_description = "Logo - podgląd"
 
     def banner_preview(self, obj):
         return self._img_field(getattr(obj, "banner_image", None), 480, 180)
-    banner_preview.short_description = "Banner – podgląd"
+    banner_preview.short_description = "Banner - podgląd"
 
     @admin.display(description="Logo")
     def logo_thumb(self, obj):
@@ -400,7 +400,7 @@ class UserTokenAdmin(admin.ModelAdmin):
     search_fields = ("public_id", "user__email")
 
 
-# ========= SellerMembershipAdmin (sklep – członkowie) =========
+# ========= SellerMembershipAdmin (sklep - członkowie) =========
 # Ograniczenia:
 # - Nikt poza superuserem nie może edytować/usuwać członkostwa OWNERA.
 # - Nie można dodać/ustawić roli OWNER (z wyjątkiem superusera ale i tak zwykle nie robimy tego w adminie).

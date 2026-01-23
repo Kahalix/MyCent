@@ -86,8 +86,15 @@ class ThreadConsumer(AsyncWebsocketConsumer):
             if not content or len(content) > 5000:
                 return
 
-            msg = await self._send(user.id, self.thread_pid, content)
-            await self.channel_layer.group_send(self.group, {"type": "chat.message", "payload": msg})
+            res = await self._send_with_inbox_updates(user.id, self.thread_pid, content)
+
+            await self.channel_layer.group_send(self.group, {"type": "chat.message", "payload": res["message"]})
+
+            for it in res["inbox_updates"]:
+                grp = f"chat.inbox.{it['user_public_id']}"
+                await self.channel_layer.group_send(grp, {"type": "inbox.thread_updated", "payload": it["thread_updated"]})
+                await self.channel_layer.group_send(grp, {"type": "inbox.unread_counts", "payload": it["unread_counts"]})
+                await self.channel_layer.group_send(grp, {"type": "inbox.unread_total", "unread_messages": it["unread_total"]})
 
     async def chat_message(self, event):
         await self.send(text_data=json.dumps({"type": "message", **event["payload"]}))
@@ -122,8 +129,10 @@ class ThreadConsumer(AsyncWebsocketConsumer):
         repo.ensure_participant(th, u)
 
     @database_sync_to_async
-    def _send(self, user_id: int, thread_pid: str, content: str) -> dict:
+    def _send_with_inbox_updates(self, user_id: int, thread_pid: str, content: str) -> dict:
         from identity.models import User
+        from chat.services import queries as q
+
         user = User.objects.get(id=user_id)
         th = repo.get_thread_by_public_id(thread_pid)
         msg = cmd.send_message(thread=th, sender=user, content=content)
@@ -140,13 +149,44 @@ class ThreadConsumer(AsyncWebsocketConsumer):
             except Exception:
                 avatar = None
 
+        th.refresh_from_db(fields=["last_message_preview", "last_message_at"])
+
+        parts = list(th.participants.select_related("user").all())
+
+        inbox_updates = []
+        for p in parts:
+            u = p.user
+            unread = int(p.unread_count or 0)
+            if u.id == user_id:
+                unread = 0
+
+            counts = q.unread_counts_by_bucket(u)
+            total = int(counts.get("total", {}).get("unread_messages") or 0)
+
+            inbox_updates.append(
+                {
+                    "user_public_id": str(u.public_id),
+                    "thread_updated": {
+                        "thread_public_id": str(th.public_id),
+                        "last_message_preview": th.last_message_preview,
+                        "last_message_at": th.last_message_at.isoformat() if th.last_message_at else None,
+                        "unread_count": unread,
+                    },
+                    "unread_counts": counts,
+                    "unread_total": total,
+                }
+            )
+
         return {
-            "public_id": str(msg.public_id),
-            "content": msg.content,
-            "sent_at": msg.sent_at.isoformat(),
-            "sender_public_id": str(user.public_id),
-            "sender_display_name": display_name,
-            "sender_user_image": avatar,
+            "message": {
+                "public_id": str(msg.public_id),
+                "content": msg.content,
+                "sent_at": msg.sent_at.isoformat(),
+                "sender_public_id": str(user.public_id),
+                "sender_display_name": display_name,
+                "sender_user_image": avatar,
+            },
+            "inbox_updates": inbox_updates,
         }
 
 
@@ -170,6 +210,9 @@ class InboxConsumer(AsyncWebsocketConsumer):
             await self.accept(subprotocol=chosen)
         else:
             await self.accept()
+
+        total = await self._unread_total_for_user(user.id)
+        await self.send(text_data=json.dumps({"type": "inbox.unread_total", "unread_messages": total}))
 
     async def disconnect(self, code):
         if hasattr(self, "group"):
@@ -199,3 +242,15 @@ class InboxConsumer(AsyncWebsocketConsumer):
 
     async def inbox_unread_counts(self, event):
         await self.send(text_data=json.dumps({"type": "inbox.unread_counts", **event["payload"]}))
+
+    async def inbox_unread_total(self, event):
+        await self.send(text_data=json.dumps({"type": "inbox.unread_total", "unread_messages": int(event.get("unread_messages") or 0)}))
+
+    @database_sync_to_async
+    def _unread_total_for_user(self, user_id: int) -> int:
+        from identity.models import User
+        from chat.services import queries as q
+        u = User.objects.filter(id=user_id).first()
+        if not u:
+            return 0
+        return q.unread_total(u)

@@ -109,7 +109,7 @@ app.buyerOrderDetail = function (orderPublicId) {
                 const m = row.effective_price || row.price_override || row.package_type?.price || null;
                 return {
                   typePublicId: row.package_type?.public_id,
-                  label: `${row.package_type?.provider || 'Paczka'} – ${app.moneyText(m)}`,
+                  label: `${row.package_type?.provider || 'Paczka'} - ${app.moneyText(m)}`,
                   amount: app.moneyAmount?.(m) ?? null,
                   currency: (app.moneyNormalize?.(m)?.currency || 'PLN')
                 };
@@ -135,7 +135,7 @@ app.buyerOrderDetail = function (orderPublicId) {
                 const m = row.price || null;
                 return {
                   typePublicId: pt.public_id,
-                  label: `${pt.provider || 'Paczka'} – ${app.moneyText(m)}`,
+                  label: `${pt.provider || 'Paczka'} - ${app.moneyText(m)}`,
                   amount: app.moneyAmount?.(m) ?? null,
                   currency: (app.moneyNormalize?.(m)?.currency || 'PLN')
                 };
@@ -202,7 +202,7 @@ app.buyerOrderDetail = function (orderPublicId) {
         }
 
         const cancelled = r.headers.get('X-Active-Payment-Cancelled') === '1';
-        if (cancelled) app.toast?.info?.('Aktywna płatność została anulowana – utwórz nową po zmianie wysyłki.');
+        if (cancelled) app.toast?.info?.('Aktywna płatność została anulowana - utwórz nową po zmianie wysyłki.');
 
         await this._loadOrder();
         this._indexShippings();

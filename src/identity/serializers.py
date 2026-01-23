@@ -10,7 +10,7 @@ User = get_user_model()
 class PublicUserSafeResponse(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("public_id", "first_name", "last_name", "phone_number", "role", "user_image")
+        fields = ("public_id", "first_name", "last_name", "user_image")
 
 
 class PublicUserResponse(serializers.ModelSerializer):
@@ -132,7 +132,7 @@ class AvatarUploadRequest(serializers.Serializer):
 # ======= SELLER PROFILE =======
 
 class SellerProfilePublicResponse(serializers.ModelSerializer):
-    owner = PublicUserSafeResponse()
+    # owner = PublicUserSafeResponse()
 
     class Meta:
         model = SellerProfile

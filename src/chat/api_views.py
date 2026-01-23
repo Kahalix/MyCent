@@ -54,9 +54,14 @@ class UserChatThreadViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vi
         )
 
     def _send_inbox_counts(self, *, layer, user: User):
+        payload = q.unread_counts_by_bucket(user)
         async_to_sync(layer.group_send)(
             f"chat.inbox.{user.public_id}",
-            {"type": "inbox.unread_counts", "payload": q.unread_counts_by_bucket(user)},
+            {"type": "inbox.unread_counts", "payload": payload},
+        )
+        async_to_sync(layer.group_send)(
+            f"chat.inbox.{user.public_id}",
+            {"type": "inbox.unread_total", "unread_messages": int(payload.get("total", {}).get("unread_messages") or 0)},
         )
 
     def _send_thread_updated(self, *, layer, user: User, payload: dict):
@@ -85,6 +90,11 @@ class UserChatThreadViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vi
     @action(detail=False, methods=["get"], url_path="unread-counts")
     def unread_counts(self, request):
         data = q.unread_counts_by_bucket(request.user)
+        return Response(data, status=200)
+
+    @action(detail=False, methods=["get"], url_path="unread-total")
+    def unread_total(self, request):
+        data = {"unread_messages": q.unread_total(request.user)}
         return Response(data, status=200)
 
     @action(detail=False, methods=["post"], url_path="start")
