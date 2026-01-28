@@ -188,7 +188,6 @@ class PublicCatalogItemViewSet(mixins.ListModelMixin,
             "attributes": obj.attributes or {},
         }, status=200)
 
-    # wariant pod admina (select2 w adminie używa PK/UUID z bazy):
     @action(detail=False, methods=["get"], url_path=r"by-id/(?P<pk>[0-9a-f-]{36})/attrs")
     def attrs_by_pk(self, request, pk=None):
         obj = get_object_or_404(CatalogItem, pk=pk)

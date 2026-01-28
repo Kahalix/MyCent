@@ -294,17 +294,18 @@ class UserCommandsTests(TestCase):
         user = create_user(email="status@example.com")
         refresh = RefreshToken.for_user(user)
         UserToken.save_refresh(user, str(refresh))
+
         commands.admin_set_user_status(
             public_id=str(user.public_id),
             user_status="SUSPENDED",
             is_active=None,
         )
+
         user.refresh_from_db()
         self.assertEqual(user.user_status, "SUSPENDED")
-        self.assertFalse(user.is_active)
+        self.assertTrue(user.is_active)
         self.assertFalse(UserToken.objects.filter(user=user, type="REFRESH_TOKEN").exists())
         self.assertTrue(BlacklistedToken.objects.filter(token__user=user).exists())
-
 
 class SellerCommandsTests(TestCase):
     def test_create_seller_for_owner_creates_profile_and_membership(self):

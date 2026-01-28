@@ -72,7 +72,8 @@ app.landing = function () {
           map.set(path, {
             path, name, img,
             count: null,
-            href: this.offersLink({ type_path: path })
+            href: '/offers',
+            prefill: { type_path: path, ordering: '-created_at' }
           });
         }
       }
@@ -98,6 +99,9 @@ app.landing = function () {
         || first?.image_path || first?.url || first?.image_url
         || it.catalog_item?.image_path || '';
       return app.imgUrl ? app.imgUrl(pic) : (pic || 'https://placehold.co/600x600?text=%20');
+    },
+    stashOffersPrefill(payload){
+      if (app.offersNav && app.offersNav.set) app.offersNav.set(payload);
     },
     money(it){ return app.moneyText(it?.price || null); },
     itemUrl(it){

@@ -52,7 +52,7 @@ class UserManager(BaseUserManager):
 
 class User(AbstractUser, PublicIdModel):
     """
-    Użytkownik: logowanie e-mailem (case-insensitive unikalność).
+    Użytkownik: logowanie e-mailem.
     """
     username = None
     email = models.EmailField(unique=True)

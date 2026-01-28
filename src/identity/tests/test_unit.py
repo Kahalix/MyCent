@@ -249,7 +249,7 @@ class RefreshAndRevokeUnitTests(SimpleTestCase):
         old.get.side_effect = lambda k, d=None: 99 if k == "user_id" else None
         mock_refresh_cls.side_effect = lambda raw: old
 
-        user = SimpleNamespace(id=99, is_active=True)
+        user = SimpleNamespace(id=99, is_active=True, user_status="ACTIVE")
         qs = MagicMock()
         qs.first.return_value = user
         mock_user_model.objects.filter.return_value = qs
@@ -299,7 +299,7 @@ class RefreshAndRevokeUnitTests(SimpleTestCase):
         with self.assertRaises(RefreshInvalid):
             commands.refresh_tokens(req, refresh_jwt="OLD")
 
-        qs.first.return_value = SimpleNamespace(id=1, is_active=False)
+        qs.first.return_value = SimpleNamespace(id=1, is_active=False, user_status="ACTIVE")
         with self.assertRaises(RefreshInvalid):
             commands.refresh_tokens(req, refresh_jwt="OLD")
 
@@ -312,7 +312,7 @@ class RefreshAndRevokeUnitTests(SimpleTestCase):
         old.get.side_effect = lambda k, d=None: 1 if k == "user_id" else None
         mock_refresh_cls.side_effect = lambda raw: old
 
-        user = SimpleNamespace(id=1, is_active=True)
+        user = SimpleNamespace(id=1, is_active=True, user_status="ACTIVE")
         qs = MagicMock()
         qs.first.return_value = user
         mock_user_model.objects.filter.return_value = qs
@@ -361,7 +361,7 @@ class RefreshAndRevokeUnitTests(SimpleTestCase):
 
         self.assertIs(out, user)
         self.assertEqual(user.user_status, "SUSPENDED")
-        self.assertFalse(user.is_active)
-        user.save.assert_called_once_with(update_fields=["user_status", "is_active"])
+        self.assertTrue(user.is_active)
+        user.save.assert_called_once_with(update_fields=["user_status"])
         mock_delete_all.assert_called_once_with(user)
         mock_blacklisted.objects.get_or_create.assert_called_once()

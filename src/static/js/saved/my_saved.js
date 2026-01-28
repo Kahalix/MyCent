@@ -16,16 +16,11 @@ app.savedCenterPage = function () {
 
     setTab(t) { this.tab = t; },
 
-    normQS(qs) {
-      const s = (qs || '').trim();
-      if (!s) return '';
-      return s.startsWith('?') ? s.slice(1) : s;
+    stashOffersFromSavedQS(qs) {
+      const payload = app.offersNav && app.offersNav.fromQueryString ? app.offersNav.fromQueryString(qs) : null;
+      if (app.offersNav && app.offersNav.set) app.offersNav.set(payload);
     },
-
-    offersHref(qs) {
-      const n = this.normQS(qs);
-      return `/offers${n ? ('?' + n) : ''}`;
-    },
+    offersHref() { return '/offers'; },
 
     async loadItems() {
       this.loadingItems = true;

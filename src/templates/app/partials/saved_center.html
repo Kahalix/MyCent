@@ -93,7 +93,8 @@
             <div class="flex gap-2">
               <button class="btn btn-xs" @click="openResults(s)">Pokaż nowe</button>
               <a class="btn btn-xs btn-outline"
-                 :href="offersHref(s.query_string)"
+                 href="/offers"
+                 @click="stashOffersFromSavedQS(s.query_string)"
                  hx-boost="true" hx-target="#app-root" hx-push-url="true">W ogłoszeniach</a>
               <button class="btn btn-xs btn-outline" :disabled="busy" @click="deleteSearch(s)">Usuń</button>
             </div>

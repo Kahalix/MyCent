@@ -26,11 +26,6 @@ class CallModelCleanMixin:
 
 
 class CustomerAdminForm(CallModelCleanMixin, forms.ModelForm):
-    """
-    Proste reguły higieny danych:
-      - co najmniej jeden kontakt: email lub telefon,
-      - normalizacja kodu kraju (ISO-2, upper).
-    """
     class Meta:
         model = Customer
         fields = "__all__"

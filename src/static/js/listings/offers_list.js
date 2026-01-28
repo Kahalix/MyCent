@@ -59,7 +59,7 @@ app.sellerOffersList = function () {
       this._debounce = setTimeout(() => this.reload(), 350);
     },
 
-    // ——— FILTRY statusów ———
+    // FILTRY statusów
     toggleStatusFilter(code) {
       if (this.statusSel.has(code)) this.statusSel.delete(code);
       else this.statusSel.add(code);

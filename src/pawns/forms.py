@@ -27,9 +27,6 @@ class CallModelCleanMixin:
 
 
 class PawnAdminForm(CallModelCleanMixin, forms.ModelForm):
-    """
-    Spójność dat i statusów oraz dodatnia kwota principal.
-    """
     class Meta:
         model = Pawn
         fields = "__all__"

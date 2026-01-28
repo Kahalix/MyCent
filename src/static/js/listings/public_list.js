@@ -50,6 +50,54 @@ app.publicOffersList = function (opts = {}) {
     _reqId: 0,
     _obs: null,
 
+    _applyPrefill(p) {
+      if (!p || typeof p !== 'object') return;
+
+      const truthy = v => ['1','true','True','yes','on'].includes(String(v || '').trim());
+
+      const typePath = String(p.type_path || p.typePath || p.cat || '').trim();
+      if (typePath) {
+        this.typePath = typePath;
+        this.selectedType = { name: typePath.split('/').at(-1), path: typePath, children_count: 0 };
+      } else if ('type_path' in p || 'typePath' in p || 'cat' in p) {
+        this.typePath = '';
+        this.selectedType = null;
+      }
+
+      const q = String(p.search || p.q || '').trim();
+      if (q) this.q = q;
+      else if ('search' in p || 'q' in p) this.q = '';
+
+      const src = String(p.added_by || p.source || '').toUpperCase().trim();
+      if (src === 'STAFF' || src === 'USER') this.source = src;
+      else if ('added_by' in p || 'source' in p) this.source = 'ALL';
+
+      const lt = String(p.listing_type || '').toUpperCase().trim();
+      if (['BUY','LISTING','EXCHANGE'].includes(lt)) this.listing_type = lt;
+      else if ('listing_type' in p) this.listing_type = 'ANY';
+
+      const cond = String(p.condition || '').toUpperCase().trim();
+      if (['NEW','USED','DAMAGED'].includes(cond)) this.condition = cond;
+      else if ('condition' in p) this.condition = 'ANY';
+
+      const ao = truthy(p.allow_online_checkout) || truthy(p.allow_checkout_only) || truthy(p.checkout);
+      if ('allow_online_checkout' in p || 'allow_checkout_only' in p || 'checkout' in p) {
+        this.allow_checkout_only = !!ao;
+      }
+
+      const ord = String(p.ordering || '').trim();
+      if (ord) this.ordering = ord;
+
+      if ('price_min' in p) this.price_min = String(p.price_min ?? '');
+      if ('price_max' in p) this.price_max = String(p.price_max ?? '');
+
+      const sellerSlug = String(p.seller_slug || '').trim();
+      if (sellerSlug) this.sellerSlug = sellerSlug;
+
+      const ownerPublicId = String(p.owner_public_id || '').trim();
+      if (ownerPublicId) this.ownerPublicId = ownerPublicId;
+    },
+
     init() {
       // picker
       this.catPicker = app._makeCategoryPicker ? app._makeCategoryPicker() : {
@@ -61,37 +109,48 @@ app.publicOffersList = function (opts = {}) {
         this.reload();
       };
 
-      // prefill z URL
+      // prefill z shared (sessionStorage) landing/saved
+      let usedPrefill = false;
       try {
-        const p = app.urlParams();
-        const typePath = p.get('type_path') || p.get('cat') || '';
-        const q = p.get('search') || p.get('q') || '';
-        const src = (p.get('added_by') || p.get('source') || '').toUpperCase();
-        const lt  = (p.get('listing_type') || '').toUpperCase();
-        const cond= (p.get('condition')    || '').toUpperCase();
-        const truthy = v => ['1','true','True','yes','on'].includes(String(v||'').trim());
-        const ao  = truthy(p.get('allow_online_checkout')) || truthy(p.get('checkout'));
-        const o   = p.get('ordering') || '';
-        const pmin= p.get('price_min') || p.get('min') || '';
-        const pmax= p.get('price_max') || p.get('max') || '';
-
-        if (!this.sellerSlug)     this.sellerSlug     = (p.get('seller_slug')      || '').trim();
-        if (!this.ownerPublicId)  this.ownerPublicId  = (p.get('owner_public_id')  || '').trim();
-
-        if (typePath) {
-          this.typePath = typePath;
-          this.selectedType = { name:typePath.split('/').at(-1), path:typePath, children_count:0 };
+        const pre = app.offersNav && app.offersNav.take ? app.offersNav.take() : null;
+        if (pre) {
+          this._applyPrefill(pre);
+          usedPrefill = true;
         }
-        if (q) this.q = q;
-        if (src === 'STAFF' || src === 'USER') this.source = src;
-        if (['BUY','LISTING','EXCHANGE'].includes(lt)) this.listing_type = lt;
-        if (['NEW','USED','DAMAGED'].includes(cond))   this.condition    = cond;
-        if (ao) this.allow_checkout_only = true;
-        if (o)  this.ordering = o;
-        if (pmin) this.price_min = pmin;
-        if (pmax) this.price_max = pmax;
       } catch {}
 
+      // fallback: prefill z URL (OLD)
+      if (!usedPrefill) {
+        try {
+          const p = app.urlParams();
+          const typePath = p.get('type_path') || p.get('cat') || '';
+          const q = p.get('search') || p.get('q') || '';
+          const src = (p.get('added_by') || p.get('source') || '').toUpperCase();
+          const lt  = (p.get('listing_type') || '').toUpperCase();
+          const cond= (p.get('condition')    || '').toUpperCase();
+          const truthy = v => ['1','true','True','yes','on'].includes(String(v||'').trim());
+          const ao  = truthy(p.get('allow_online_checkout')) || truthy(p.get('checkout'));
+          const o   = p.get('ordering') || '';
+          const pmin= p.get('price_min') || p.get('min') || '';
+          const pmax= p.get('price_max') || p.get('max') || '';
+
+          if (!this.sellerSlug)     this.sellerSlug     = (p.get('seller_slug')      || '').trim();
+          if (!this.ownerPublicId)  this.ownerPublicId  = (p.get('owner_public_id')  || '').trim();
+
+          if (typePath) {
+            this.typePath = typePath;
+            this.selectedType = { name:typePath.split('/').at(-1), path:typePath, children_count:0 };
+          }
+          if (q) this.q = q;
+          if (src === 'STAFF' || src === 'USER') this.source = src;
+          if (['BUY','LISTING','EXCHANGE'].includes(lt)) this.listing_type = lt;
+          if (['NEW','USED','DAMAGED'].includes(cond))   this.condition    = cond;
+          if (ao) this.allow_checkout_only = true;
+          if (o)  this.ordering = o;
+          if (pmin) this.price_min = pmin;
+          if (pmax) this.price_max = pmax;
+        } catch {}
+      }
       this.reload();
       this.$nextTick(() => this._setupObserver());
     },

@@ -6,7 +6,7 @@ DEFAULT_EMPTY_SCHEMA = {"type": "object", "properties": {}}
 
 class SimpleJSONSchemaWidget(forms.Textarea):
     """
-    Ukryty <textarea> + atrybuty data-*, a UI buduje JS (simple_schema_form.js).
+    Ukryty <textarea> + atrybuty data-*, a UI buduje JS.
     """
     def __init__(self, schema: dict | None = None, attrs=None):
         schema = schema or DEFAULT_EMPTY_SCHEMA

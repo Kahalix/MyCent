@@ -1,8 +1,3 @@
-/* ==========================================================================
-   app.css
-   ========================================================================== */
-
-
 /* Indykator trasy (górna belka) */
 .route-indicator{
   position: fixed; inset: 0 0 auto 0; height: 3px; z-index: 60; pointer-events: none; display: none;
@@ -72,7 +67,7 @@
 /* Avatar limit */
 img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
 
-/* Upewnij się, że cloak działa natychmiast */
+/* Ukrywa elementy z x-cloak do momentu inicjalizacji js */
 [x-cloak]{ display:none !important; }
 
 /* === TOAST TRAY (pozycja + bezpieczne marginesy) === */
@@ -152,7 +147,7 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
 }
 .toast-close:hover{ opacity: 1; background: color-mix(in oklab, oklch(var(--b2)) 70%, transparent); }
 
-/* Tryb dark: odrobinę mocniejszy glass */
+/* Tryb dark */
 :root[data-theme="lownDark"] .toast-card{
   background:
     linear-gradient(180deg,
@@ -265,9 +260,9 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
 .numstep__input{
   width: 100%;
   padding-right: calc(var(--numstep-btn-w) + .35rem); /* miejsce na przyciski */
-  -moz-appearance: textfield; /* bez natywnych strzałek w FF (tylko w tym komponencie) */
+  -moz-appearance: textfield; /* bez natywnych strzałek w FF */
 }
-/* Bez natywnych strzałek w WebKit: TYLKO w tym komponencie */
+/* Bez natywnych strzałek w WebKit */
 .numstep__input::-webkit-outer-spin-button,
 .numstep__input::-webkit-inner-spin-button{
   -webkit-appearance: none;
@@ -410,11 +405,11 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
   background: color-mix(in oklab, oklch(var(--b2)) 92%, white 8%);
 }
 
-/* --- Teleport root (modale) --- */
+/* Teleport root (modale) */
 .overlay-root{ position: fixed; inset: 0; z-index: 1000; pointer-events: none; }
 .overlay-root > *{ pointer-events: auto; }
 
-/* --- Kafelki zdjęć — 96x96 --- */
+/* Kafelki zdjęć 96x96 */
 .img-tiler{ display:flex; flex-wrap:wrap; gap:.5rem; }
 .img-tile{
   position: relative; width: 6rem; height: 6rem; border-radius: .5rem; overflow: hidden;
@@ -656,7 +651,7 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
   margin: 6px 0; /* delikatny oddech pionowy */
 }
 
-/* 2) Wszyscy od lewej: neutralizujemy me */
+/* 2) Wszyscy od lewej */
 .cm-msgline--me{
   justify-content: initial !important;
   flex-direction: initial !important;
@@ -689,21 +684,20 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
 
 /* 1) Grid nie rozciąga dzieci w osi inline */
 .cm-msgline{
-  justify-items: start !important;     /* zamiast domyślnego 'stretch' */
+  justify-items: start !important;     /* zamiast domyślnego stretch */
 }
 
 /* 2) Sam bąbelek ma szerokość wg treści z limitem */
 .cm-bubble{
-  display: inline-block !important;    /* shrink-to-fit */
+  display: inline-block !important;
   width: auto !important;
-  max-width: var(--bubble-max) !important;  /* np. 66% jak masz wyżej */
-  min-width: 0 !important;                  /* bez wymuszania min-content */
+  max-width: var(--bubble-max) !important;
+  min-width: 0 !important;
   box-sizing: border-box;
 }
 
 .cm-bubble--them,
 .cm-bubble--me{
-  /* bazowy radius masz 16px w .cm-bubble — tu tylko korygujemy narożniki */
   border-top-left-radius: 6px !important;   /* lekko ścięty przy avatarze (LEWO) */
   border-top-right-radius: 16px !important; /* pełny po prawej */
 }
@@ -715,7 +709,7 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
   display:grid;
   gap:.5rem;
   align-content:start;  /* start od góry kontenera */
-  align-items:stretch;  /* <— WAŻNE: elementy (karty) rozciągają się do wysokości rzędu */
+  align-items:stretch;  /* elementy (karty) rozciągają się do wysokości rzędu */
 }
 .grid-autofill-220{ grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); }
 .grid-autofill-240{ grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); }
@@ -788,7 +782,7 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
 /* drobny boost dla input-error */
 .input-error{ border-color: oklch(var(--error)) !important; }
 
-/* ===== Item gallery (responsywna) ===== */
+/* ===== Item gallery ===== */
 .item-gallery{ display:grid; gap:.75rem; }
 
 /* duże podglądowe */
@@ -796,7 +790,7 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;               /* kwadrat, ale */
-  max-height: min(72vh, 720px);      /* …nie rośnie bez końca */
+  max-height: min(72vh, 720px);      /* nie rośnie bez końca */
   overflow: hidden;
   border-radius: 12px;
   border: 1px solid color-mix(in oklab, oklch(var(--b3)) 70%, transparent);
@@ -1161,7 +1155,7 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
   box-shadow: 0 10px 30px rgba(0,0,0,.45);
 }
 
-/* Spinner - prosty, lekki, w kolorze brandu (bierze currentColor) */
+/* Spinner w kolorze brandu (bierze currentColor) */
 .loader-spinner{
   width: 44px; height: 44px; border-radius: 50%;
   border: 4px solid rgba(0,0,0,.12);
@@ -1202,9 +1196,9 @@ img.rounded-full{ max-width: 2.25rem; max-height: 2.25rem; }
 }
 
 
-/* ============================================================
-   RESPONSYWNOŚĆ PRZYCISKÓW (MOBILE-FIRST)
-   ============================================================ */
+/* ==
+   RESPONSYWNOŚĆ PRZYCISKÓW
+   == */
 
 /* 0) Uspokojenie klików na mobilu */
 button, .btn, .cm-btn, .numstep__btn, .img-tile__btn {
@@ -1258,7 +1252,7 @@ button, .btn, .cm-btn, .numstep__btn, .img-tile__btn {
   .img-tile__btn{ width: 2.75rem; height: 2.75rem; }
 }
 
-/* 4) Klaster przycisków - helper bez ingerencji w HTML */
+/* 4) Klaster przycisków helper */
 .btn-group, .actions, .prod-actions {
   display: flex;
   align-items: center;
@@ -1297,9 +1291,9 @@ button, .btn, .cm-btn, .numstep__btn, .img-tile__btn {
 }
 
 
-/* =========================
+/* =======
    NAVBAR
-   ========================= */
+   ======== */
 
 /* 1) Nie rób z przycisków w headerze 100% szerokości */
 @media (max-width: 640px){
@@ -1700,7 +1694,7 @@ item-price{
   }
 }
 
-/* Skeletony list - spójne z naszym skinem (gdy zapomni się .list-row) */
+/* Skeletony list - spójne ze skinem (gdy zapomni się .list-row) */
 .animate-pulse.list-row,
 .space-y-2 > .animate-pulse{
   background: color-mix(in oklab, oklch(var(--b1)) 92%, transparent);
@@ -1751,7 +1745,7 @@ item-price{
   filter: brightness(1.02);
 }
 
-/* Avatar w headerze: idealnie okrągły, BEZ obramówki */
+/* Avatar w headerze: okrągły, BEZ obramówki */
 .user-menu__avatar{
   width: 32px; height: 32px;
   border-radius: 9999px;
@@ -1842,7 +1836,7 @@ header img.rounded-full{ border: none !important; }
   transition: transform .15s ease, background-color .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease;
 }
 
-/* Ikonka strzałki w chipie przez maskę (ostre, niezależnie od DPI) */
+/* Ikonka strzałki w chipie przez maskę */
 .user-menu__caret::before{
   content:"";
   inline-size: 12px; block-size: 12px;
@@ -1866,7 +1860,7 @@ header img.rounded-full{ border: none !important; }
   color: oklch(var(--bc));
 }
 
-/* ====== Theme toggle (sun/moon) v2 ====== */
+/* ====== Theme toggle (sun/moon) ====== */
 .btn-theme{
   inline-size: 34px; block-size: 34px;
   border-radius: 9999px;
@@ -1875,7 +1869,7 @@ header img.rounded-full{ border: none !important; }
   transition:
     color .15s ease, transform .08s ease, box-shadow .15s ease;
 }
-/* wyłącz starą pseudo-ikonę, jeśli została wcześniej zdefiniowana */
+/* wyłącz starą ikone */
 .btn-theme::before{ content: none !important; }
 
 .btn-theme:hover{

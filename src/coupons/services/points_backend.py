@@ -35,7 +35,7 @@ def spend_points(user, amount: int, reason: str = "") -> None:
 
 def add_points(user, amount: int, reason: str = "") -> None:
     """
-    Opcjonalny helper do przyznawania punktów (np. za zakupy).
+    helper do przyznawania punktów (np. za zakupy).
     """
     if amount <= 0:
         return

@@ -84,6 +84,7 @@ MIDDLEWARE = [
     "common.middleware.EnsureCSRFCookieMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "identity.middleware.BlockAdminForSuspendedUsersMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -232,6 +233,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+# Tu wklejamy public_id darmowych pakietów
 SERVICES_SIGNUP_FREE_PACKAGE_PUBLIC_IDS = [
     "awqsblage859z8sp99u21hpy",
     "awqsblagq859z8sqaap9yyyt",

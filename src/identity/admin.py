@@ -5,6 +5,8 @@ from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.core.exceptions import PermissionDenied
 from django.utils.html import format_html
 from django.db.models import F
+from django.contrib.admin.forms import AdminAuthenticationForm
+from django.forms import ValidationError
 
 from .models import User, SellerProfile, SellerBankAccount, UserToken, SellerMembership
 
@@ -52,6 +54,26 @@ def _is_protected_target(target: User, acting_user: User) -> bool:
 
     return False
 
+# ========= Auth Admin =========
+
+# class StatusAdminAuthenticationForm(AdminAuthenticationForm):
+#     def confirm_login_allowed(self, user):
+#         super().confirm_login_allowed(user)
+#         if getattr(user, "user_status", "ACTIVE") in STATUS_THAT_DISABLE_LOGIN:
+#             raise ValidationError("Konto jest zablokowane.", code="inactive")
+
+# Ignorujemy status dla superuser
+class StatusAdminAuthenticationForm(AdminAuthenticationForm):
+    def confirm_login_allowed(self, user):
+        super().confirm_login_allowed(user)
+        if user.is_superuser:
+            return
+        if getattr(user, "user_status", "ACTIVE") in STATUS_THAT_DISABLE_LOGIN:
+            raise ValidationError("Konto jest zablokowane.", code="inactive")
+
+admin.site.login_form = StatusAdminAuthenticationForm
+
+admin.site.login_form = StatusAdminAuthenticationForm
 
 # ========= UserAdmin =========
 
@@ -66,7 +88,7 @@ class UserAdmin(DjangoUserAdmin):
     )
     list_display_links = ("email",)
     # domyślnie pozwalamy na edycję inline; ukryjemy dla osób bez SPECIAL_PERM
-    list_editable = ("user_status", "is_active")
+    list_editable = ("user_status",)
     list_filter = ("role", "user_status", "is_active", "is_staff")
     ordering = ("email",)
     search_fields = ("email", "first_name", "last_name")
@@ -150,7 +172,7 @@ class UserAdmin(DjangoUserAdmin):
 
     # ---------- widok listy ----------
     def changelist_view(self, request, extra_context=None):
-        # schowaj inline edycję statusu/aktywności jeśli brak SPECIAL_PERM
+        # schowaj inline edycję statusu jeśli brak SPECIAL_PERM
         if not (request.user.is_superuser or request.user.has_perm(SPECIAL_PERM)):
             original = self.list_editable
             self.list_editable = ()
@@ -179,6 +201,7 @@ class UserAdmin(DjangoUserAdmin):
         ALWAYS_RO = {"is_staff", "is_superuser", "groups", "user_permissions"}
 
         if not request.user.is_superuser:
+            ALWAYS_RO = ALWAYS_RO | {"is_active"}
             ro = sorted(set(ro) | ALWAYS_RO)
 
             if obj is not None:
@@ -186,11 +209,11 @@ class UserAdmin(DjangoUserAdmin):
                 if _is_protected_target(obj, request.user):
                     ro = sorted(set(ro) | {"role", "user_status", "is_active"})
                 else:
-                    # Osoba z samym SPECIAL_PERM (bez standardowego change) - pozwól tylko na status/aktywność
+                    # Osoba z samym SPECIAL_PERM (bez standardowego change) - pozwól tylko na status
                     has_std_change = super().has_change_permission(request, obj)
                     has_special = request.user.has_perm(SPECIAL_PERM)
                     if has_special and not has_std_change:
-                        editable = {"user_status", "is_active"}
+                        editable = {"user_status"}
                         all_fields = set()
                         for _title, fs in self.fieldsets:
                             f = fs.get("fields", ())
@@ -233,7 +256,7 @@ class UserAdmin(DjangoUserAdmin):
             raise PermissionDenied("Brak uprawnienia do zmiany statusu użytkownika.")
 
         creating = not change
-        super().save_model(request, obj, form, change)  # zapisz, żeby istniał PK
+        super().save_model(request, obj, form, change)
 
         if not request.user.is_superuser:
             if creating:
@@ -246,9 +269,9 @@ class UserAdmin(DjangoUserAdmin):
                 if must_update:
                     obj.save(update_fields=["role", "is_staff", "is_superuser"])
 
-            # wyloguj, jeśli status blokuje logowanie
-            if changed_status_fields and (obj.user_status in STATUS_THAT_DISABLE_LOGIN or obj.is_active is False):
-                self._revoke_tokens(obj)
+        # wyloguj, jeśli status blokuje logowanie
+        if changed_status_fields and (obj.user_status in STATUS_THAT_DISABLE_LOGIN or obj.is_active is False):
+            self._revoke_tokens(obj)
 
     # nie pozwól nadawać grup/perms przy save_related (osoby nie superuser)
     def save_related(self, request, form, formsets, change):
@@ -263,7 +286,7 @@ class UserAdmin(DjangoUserAdmin):
                 obj.save(update_fields=["role"])
 
     # ---------- akcje masowe (status) ----------
-    def _bulk_set(self, request, queryset, status_value: str, is_active: bool):
+    def _bulk_set(self, request, queryset, status_value: str):
         if not (request.user.is_superuser or request.user.has_perm(SPECIAL_PERM)):
             raise PermissionDenied("Brak uprawnień.")
         updated, skipped = 0, 0
@@ -272,9 +295,8 @@ class UserAdmin(DjangoUserAdmin):
                 skipped += 1
                 continue
             u.user_status = status_value
-            u.is_active = is_active
-            u.save(update_fields=["user_status", "is_active"])
-            if (status_value in STATUS_THAT_DISABLE_LOGIN) or (is_active is False):
+            u.save(update_fields=["user_status"])
+            if status_value in STATUS_THAT_DISABLE_LOGIN:
                 self._revoke_tokens(u)
             updated += 1
 
@@ -289,15 +311,15 @@ class UserAdmin(DjangoUserAdmin):
 
     @admin.action(description="Ustaw status: ACTIVE")
     def mark_active(self, request, queryset):
-        self._bulk_set(request, queryset, "ACTIVE", True)
+        self._bulk_set(request, queryset, "ACTIVE")
 
     @admin.action(description="Ustaw status: SUSPENDED (wyloguj)")
     def mark_suspended(self, request, queryset):
-        self._bulk_set(request, queryset, "SUSPENDED", False)
+        self._bulk_set(request, queryset, "SUSPENDED")
 
     @admin.action(description="Ustaw status: DELETED (wyloguj)")
     def mark_deleted(self, request, queryset):
-        self._bulk_set(request, queryset, "DELETED", False)
+        self._bulk_set(request, queryset, "DELETED")
 
     # ---------- UI: miniatury ----------
     @admin.display(description="", ordering=None)

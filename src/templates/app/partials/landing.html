@@ -1,14 +1,5 @@
 <section class="landing" x-data="app.landing()" x-init="init()">
 
-  <!-- HERO  -->
-  <div class="relative overflow-hidden rounded-2xl border border-base-300 p-8 md:p-10 mb-10 glass-card">
-    <div class="max-w-3xl relative z-10">
-
-    <!-- Dekoracje -->
-    <div class="hero-blob hero-blob--a"></div>
-    <div class="hero-blob hero-blob--b"></div>
-  </div>
-
   <!-- KATEGORIE -->
   <div class="mb-6 flex items-center justify-between gap-3">
     <h2 class="text-xl font-semibold">Kategorie</h2>
@@ -27,7 +18,9 @@
   <!-- Kafle kategorii -->
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3" x-show="!cats.loading">
     <template x-for="c in cats.items.slice(0,6)" :key="c.path">
-      <a class="cat-card group" :href="c.href" >
+      <a class="cat-card group"
+         :href="c.href"
+         @click="stashOffersPrefill(c.prefill)">
         <div class="cat-card__thumb">
           <img :src="c.img" alt="" loading="lazy">
         </div>
@@ -46,7 +39,9 @@
   <!-- NAJNOWSZE -->
   <div class="mt-10 flex items-center justify-between gap-3">
     <h2 class="text-xl font-semibold">Najnowsze ogłoszenia</h2>
-    <a class="btn btn-outline btn-sm" href="/offers?ordering=-created_at" >Zobacz wszystko</a>
+    <a class="btn btn-outline btn-sm"
+        href="/offers"
+        @click="stashOffersPrefill({ ordering: '-created_at' })">Zobacz wszystko</a>
   </div>
 
   <div class="grid grid-cards grid-autofill-240 mt-3">
@@ -72,7 +67,9 @@
   <!-- KUP TERAZ (online) -->
   <div class="mt-10 flex items-center justify-between gap-3">
     <h2 class="text-xl font-semibold">Kup teraz (online)</h2>
-    <a class="btn btn-outline btn-sm" href="/offers?listing_type=BUY&ordering=-created_at" >Zobacz wszystko</a>
+    <a class="btn btn-outline btn-sm"
+       href="/offers"
+       @click="stashOffersPrefill({ listing_type: 'BUY', ordering: '-created_at' })">Zobacz wszystko</a>
   </div>
 
   <div class="grid grid-cards grid-autofill-240 mt-3">
@@ -101,7 +98,9 @@
     <div>
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-xl font-semibold">Od sprzedawców</h2>
-        <a class="btn btn-outline btn-sm" href="/offers?added_by=STAFF&ordering=-created_at" >Zobacz wszystko</a>
+        <a class="btn btn-outline btn-sm"
+           href="/offers"
+           @click="stashOffersPrefill({ added_by: 'STAFF', ordering: '-created_at' })">Zobacz wszystko</a>
       </div>
       <div class="grid grid-cards grid-autofill-240 mt-3">
         <template x-if="staff.loading && !staff.items.length">
@@ -127,7 +126,9 @@
     <div>
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-xl font-semibold">Od użytkowników</h2>
-        <a class="btn btn-outline btn-sm" href="/offers?added_by=USER&ordering=-created_at" >Zobacz wszystko</a>
+        <a class="btn btn-outline btn-sm"
+           href="/offers"
+           @click="stashOffersPrefill({ added_by: 'USER', ordering: '-created_at' })">Zobacz wszystko</a>
       </div>
       <div class="grid grid-cards grid-autofill-240 mt-3">
         <template x-if="user.loading && !user.items.length">

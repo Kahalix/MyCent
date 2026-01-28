@@ -213,7 +213,7 @@ def _orders_gross(tx: Transaction) -> Money:
     for o in tx.orders.all():
         gt = o.grand_total
         if gt.currency != total.currency:
-            gt = Money(gt.amount, total.currency)  # brak FX
+            gt = Money(gt.amount, total.currency)
         total += gt
     return total
 

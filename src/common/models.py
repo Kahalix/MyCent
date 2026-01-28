@@ -35,7 +35,7 @@ def _next_counter() -> str:
         _counter = (_counter + 1) % _COUNTER_MOD
         return _to_base(_counter).rjust(4, _ALPHABET[0])  # zawsze 4 znaki (padding)
 
-# fingerprint maszyny/processu (stabilny w obrębie procesu)
+# fingerprint maszyny/processu
 def _machine_fingerprint(length: int = 5) -> str:
     host = socket.gethostname()
     pid = os.getpid()
@@ -80,7 +80,6 @@ def cuid2() -> str:
 
     return (ts_part + fp_part + counter_part + rand_part)
 
-# --- przykład użycia w modelu Django ---
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)

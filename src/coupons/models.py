@@ -13,8 +13,8 @@ from identity.models import User
 class Coupon(PublicIdModel):
     """
     Definicja kuponu:
-      - globalny (ma code) — użytkownik podaje kod w transakcji,
-      - sklepik punktowy (bez code) — użytkownik kupuje egzemplarz UserCoupon za punkty.
+      - globalny (ma code) - użytkownik podaje kod w transakcji,
+      - sklepik punktowy (bez code) - użytkownik kupuje egzemplarz UserCoupon za punkty.
     """
     code = models.CharField(max_length=50, unique=True, null=True, blank=True)
 

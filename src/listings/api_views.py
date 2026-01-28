@@ -85,7 +85,7 @@ class PublicItemSetViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
 
     def _inject_is_saved(self, data, user):
         """
-        Dograj per-user flagę is_saved. Wywołuje tylko jedno zapytanie do SavedListing.
+        Dograj per-user flagę is_saved.
         Modyfikuje lokalną kopię.
         """
         if not (user and getattr(user, "is_authenticated", False)):

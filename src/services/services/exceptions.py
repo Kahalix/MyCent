@@ -40,7 +40,7 @@ class Conflict(DomainError):
     default_code = "conflict"
 
 
-# —— domenowe —— #
+# domenowe #
 
 class NoSlotsLeft(Conflict):
     default_detail = "Wyczerpałeś limit ogłoszeń w tej kategorii."

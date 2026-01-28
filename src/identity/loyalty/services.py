@@ -15,7 +15,7 @@ DEFAULT_POINT_VALUE_PLN = Decimal(str(getattr(settings, "LOYALTY_POINT_VALUE_PLN
 
 def calc_points_for_amount(amount: Money) -> int:
     """
-    Liczba punktów za daną kwotę (waluta ignorowana - liczymy po nominale, bez FX).
+    Liczba punktów za daną kwotę (waluta ignorowana - liczymy po nominale).
     Jeśli RATE_BPS=200 (2%), to za 123.45 PLN dostaniesz (123.45 * 0.02) = 2 pkt.
     """
     rate = Decimal(DEFAULT_RATE_BPS) / Decimal("10000")

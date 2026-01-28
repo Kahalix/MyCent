@@ -35,7 +35,7 @@ def UI(labels: dict[str,str] = None, order: list[str] = None, units: dict[str,st
     if groups: out["groups"] = groups
     return out
 
-# ====== DRZEWO (po polsku) ======
+# ====== DRZEWO ======
 TREE: Dict[str, Any] = {
     "Elektronika": {
         "Telefony": {
@@ -417,7 +417,7 @@ def _upsert_type(name: str, parent: ItemType|None) -> ItemType:
     return obj
 
 def _sanitize_schema(schema: dict, ui: dict | None) -> tuple[dict, dict]:
-    """Usuwa z JSON Schema i UI-schema wszystkie pola, które istnieją już w ItemSet."""
+    # Usuwa z JSON Schema i UI-schema wszystkie pola, które istnieją już w ItemSet.
     schema = dict(schema or {})
     ui = dict(ui or {})
     props = dict((schema.get("properties") or {}))
@@ -489,7 +489,7 @@ def _get_or_create_pkg(it: ItemType, listings_free: int = 0, price = None, point
     return pkg
 
 class Command(BaseCommand):
-    help = "Seed: rozbudowane ItemType (po polsku) + UI-schema; do tego przykładowe ListingPackage i wypisanie public_id pakietów FREE."
+    help = "Seed: ItemType + UI-schema; do tego przykładowe ListingPackage i wypisanie public_id pakietów FREE."
 
     @transaction.atomic
     def handle(self, *args, **opts):

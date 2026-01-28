@@ -61,7 +61,6 @@ def validate_and_fill_attributes_for_type(item_type: ItemType, attrs: Dict[str,A
             val = _default_for(spec)
         out[key] = val
 
-    # Jeśli chcesz zabraniać nieznanych pól:
     unknown = set(attrs.keys()) - set(props.keys())
     for u in unknown:
         errors.setdefault(u, []).append("nieznane pole (nie w schemacie)")

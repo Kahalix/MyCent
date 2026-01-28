@@ -36,7 +36,7 @@ def get_catalog_item_by_path_and_slug(type_path: str, item_slug: str) -> Optiona
     return CatalogItem.objects.filter(type=t, slug=item_slug).first()
 
 def public_id_from_catalog_slug(slug: str) -> Optional[str]:
-    # oczekujemy "...-<public_id>" — bierzemy część po OSTATNIM '-'
+    # oczekujemy "...-<public_id>" - bierzemy część po OSTATNIM '-'
     parts = slug.rsplit("-", 1)
     return parts[1] if len(parts) == 2 and parts[1] else None
 

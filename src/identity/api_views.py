@@ -43,7 +43,7 @@ from .services.exceptions import (
 )
 from .permissions import (
     IsAdmin, IsSelf, IsUserRoleOwner, IsSellerOwnerOrAdmin, IsBankAccountOwnerOrAdmin, IsSellerManagerOrOwner,
-    IsMySellerOwnerOrAdmin  # noqa: F401 (część może być użyta później)
+    IsMySellerOwnerOrAdmin  # (część może być użyta później)
 )
 from .filters import UserFilter, UserCandidateFilter, SellerProfileFilter, SellerBankAccountFilter, SellerMembershipFilter
 from .models import SellerProfile, SellerBankAccount

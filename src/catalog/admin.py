@@ -136,7 +136,7 @@ class CatalogItemAdmin(admin.ModelAdmin):
         try:
             return default_storage.url(obj.image_path)
         except Exception:
-            return obj.image_path  # fallback: surowa ścieżka
+            return obj.image_path
 
     # --------- lista: miniaturka ---------
     def thumb(self, obj):

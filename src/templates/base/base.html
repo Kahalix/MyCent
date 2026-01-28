@@ -7,7 +7,7 @@
   <meta name="stripe-pk" content="{{ STRIPE_PUBLISHABLE_KEY }}">
   <title>{% block title %}MyCent{% endblock %}</title>
 
-  <!-- STRIPE (global) -->
+  <!-- STRIPE -->
 
     <script>
       window.STRIPE_PK = "{{ STRIPE_PUBLISHABLE_KEY }}";
@@ -54,6 +54,7 @@
   <script defer src="{% static 'js/shipping/shipping.js' %}"></script>
   <script defer src="{% static 'js/identity/my_seller.js' %}"></script>
   <script defer src="{% static 'js/shared/catalog_common.js' %}"></script>
+  <script defer src="{% static 'js/shared/offers_nav.js' %}"></script>
   <script defer src="{% static 'js/listings/offers_list.js' %}"></script>
   <script defer src="{% static 'js/listings/offer_form.js' %}"></script>
   <script defer src="{% static 'js/listings/user_offers_list.js' %}"></script>

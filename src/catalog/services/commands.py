@@ -76,7 +76,6 @@ def _storage_url(path: str) -> str:
     try:
         return default_storage.url(path)
     except Exception:
-        # fallback, gdy storage nie obsługuje .url()
         return f"/media/{path.lstrip('/')}"
 
 def _save_catalog_image(public_id: str, image) -> str:

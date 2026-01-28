@@ -39,7 +39,6 @@ class ListingPackageAdmin(admin.ModelAdmin):
     action_form = GrantPackageActionForm
 
     def grant_to_user_free(self, request, queryset):
-        """Akcja: przyznaj wybrany pakiet wskazanemu userowi (jako FREE, bez punktów i bez płatności)."""
         user = request.POST.get("user")
         qty_str = request.POST.get("quantity") or "1"
         try:

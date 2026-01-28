@@ -17,9 +17,6 @@ def _ensure_staff_membership(request) -> bool:
 
 # ===== SELLER =====
 class SellerCustomerViewSet(viewsets.ModelViewSet):
-    """
-    /api/sellers/mine/customers/...
-    """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = CustomerResponse
     lookup_field = "public_id"
