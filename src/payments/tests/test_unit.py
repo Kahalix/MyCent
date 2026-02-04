@@ -59,6 +59,7 @@ class PaymentsUnitTests(SimpleTestCase):
             pk=10,
             public_id="P1",
             transaction=tx,
+            transaction_id=getattr(tx, "id", None),
             status=status,
             amount=amount or Money(tx.expected_total_amount or 0, tx.expected_total_currency or "PLN"),
             metadata=metadata or {},
@@ -275,6 +276,10 @@ class PaymentsUnitTests(SimpleTestCase):
             )
         self.assertEqual(str(cm.exception.detail), "Istnieje już aktywna płatność dla tej transakcji.")
 
+    @override_settings(LOYALTY_RATE_BPS=200)
+    @patch("orders.services.commands.sync_orders_with_transaction")
+    @patch("payments.services.commands._ensure_purchase_tx_stock_available_and_reserve")
+    @patch("payments.services.commands.Transaction")
     @patch("payments.services.commands.Payment")
     @patch("payments.services.commands.set_transaction_status")
     @patch("payments.services.commands.loyalty_add_points")
@@ -285,26 +290,40 @@ class PaymentsUnitTests(SimpleTestCase):
         add_points_mock,
         set_status_mock,
         PaymentModel,
+        TxModel,
+        ensure_mock,
+        sync_mock,
     ):
         tx = self._mk_tx(status="PENDING", type="PURCHASE", expected_total_amount=Decimal("100.00"))
         main = self._mk_payment(tx=tx, status="REQUIRES_CONFIRMATION", metadata={})
         other1 = self._mk_payment(tx=tx, status="PROCESSING", metadata={})
         other2 = self._mk_payment(tx=tx, status="REQUIRES_ACTION", metadata={})
 
-        qs = MagicMock()
-        qs.filter.return_value.exclude.return_value = [other1, other2]
-        PaymentModel.objects.select_for_update.return_value = qs
+        TxModel.objects.select_for_update.return_value.get.return_value = tx
+
+        base_qs = MagicMock()
+        PaymentModel.objects.select_for_update.return_value = base_qs
+
+        base_qs.select_related.return_value.get.return_value = main
+
+        active_qs = MagicMock()
+        base_qs.filter.return_value = active_qs
+        active_qs.exclude.return_value = [other1, other2]
 
         out = commands.mark_payment_succeeded.__wrapped__(payment=main, reason="ok")
+
         self.assertIs(out, main)
         self.assertEqual(main.status, "SUCCEEDED")
         self.assertEqual(other1.status, "CANCELLED")
         self.assertTrue(other1.metadata.get("auto_cancelled_due_to_success"))
         self.assertEqual(other2.status, "CANCELLED")
         self.assertTrue(other2.metadata.get("auto_cancelled_due_to_success"))
+
         set_status_mock.assert_called_once()
         add_points_mock.assert_called_once()
         notify_mock.assert_called_once()
+        ensure_mock.assert_called_once()
+        sync_mock.assert_called_once()
 
     @patch("payments.services.commands.Payment")
     def test_cancel_active_payments_for_tx_cancels_all_active_statuses(self, PaymentModel):

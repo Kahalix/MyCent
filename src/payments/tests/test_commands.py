@@ -21,6 +21,8 @@ from .factories import (
     create_coupon,
     create_user_coupon,
     create_user,
+    create_itemset,
+    create_seller_profile,
 )
 from orders.models import OrderShipping
 
@@ -329,15 +331,29 @@ class MarkPaymentSucceededTests(TestCase):
     @patch("payments.services.commands._notify_order_confirmed")
     @patch("payments.services.commands.set_transaction_status")
     def test_mark_payment_succeeded_completes_tx_and_awards_points(
-        self,
-        set_status_mock,
-        notify_mock,
-        add_points_mock,
+            self,
+            set_status_mock,
+            notify_mock,
+            add_points_mock,
     ):
         user = create_user(email="buyer@example.com")
         tx = create_transaction(user=user, type="PURCHASE", amount=Decimal("100.00"), status="PENDING")
-        main = create_payment(tx=tx, amount=Money(100, "PLN"), status="REQUIRES_CONFIRMATION")
-        other_final = create_payment(tx=tx, amount=Money(100, "PLN"), status="FAILED")
+
+        seller = create_seller_profile(owner=user)
+        item = create_itemset(seller_profile=seller)
+        order = create_order(tx=tx, seller_profile=seller)
+        line = create_order_line(order=order, item_set=item)
+        create_order_shipping(order=order, order_line=line)
+
+        order.recalc_totals(save=True)
+        tx.expected_total_amount = order.purchase_cost.amount
+        tx.expected_total_currency = str(order.purchase_cost.currency)
+        tx.save(update_fields=["expected_total_amount", "expected_total_currency", "updated_at"])
+
+        main = create_payment(tx=tx, amount=Money(tx.expected_total_amount, tx.expected_total_currency),
+                              status="REQUIRES_CONFIRMATION")
+        other_final = create_payment(tx=tx, amount=Money(tx.expected_total_amount, tx.expected_total_currency),
+                                     status="FAILED")
 
         result = commands.mark_payment_succeeded(payment=main, reason="ok")
 

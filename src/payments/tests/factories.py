@@ -11,6 +11,7 @@ from orders.models import Order, OrderLine, OrderShipping
 from shipping.models import PackageType
 from coupons.models import Coupon, UserCoupon
 from payments.models import Payment
+from listings.models import ItemSet
 
 
 def create_user(email: str | None = None, password: str = "pass1234", **extra) -> User:
@@ -18,6 +19,47 @@ def create_user(email: str | None = None, password: str = "pass1234", **extra) -
         email = f"user-{uuid4().hex[:8]}@example.com"
     return User.objects.create_user(email=email, password=password, **extra)
 
+def create_itemset(
+    seller_profile,
+    item_type=None,
+    set_name: str = "Item",
+    price=None,
+    stock_quantity: int = 10,
+    status: str = "AVAILABLE",
+    listing_type: str = "BUY",
+    allow_online_checkout: bool = True,
+):
+    from djmoney.money import Money
+    try:
+        from catalog.models import ItemType
+    except Exception:
+        ItemType = None
+
+    if price is None:
+        cur = "PLN"
+        price = Money(100, cur)
+
+    if item_type is None and ItemType is not None:
+        item_type = ItemType.objects.create(name="TestCategory")
+
+    try:
+        from listings.models import ItemSet as _ItemSet
+    except Exception:
+        _ItemSet = ItemSet
+
+    return _ItemSet.objects.create(
+        set_name=set_name,
+        description="",
+        price=price,
+        stock_quantity=stock_quantity,
+        condition="NEW",
+        status=status,
+        listing_type=listing_type,
+        allow_online_checkout=allow_online_checkout,
+        seller_profile=seller_profile,
+        owner_user=None,
+        type=item_type,
+    )
 
 def create_seller_profile(owner: User | None = None, slug: str | None = None, **extra) -> SellerProfile:
     owner = owner or create_user()
@@ -111,7 +153,7 @@ def create_order_line(
 ) -> OrderLine:
     cur = order.items_total.currency if order.items_total is not None else "PLN"
     if unit_price is None:
-        unit_price = Money(Decimal("10.00"), cur)
+        unit_price = Money(Decimal("100.00"), cur)
     data = {
         "quantity": quantity,
         "unit_price": unit_price,
