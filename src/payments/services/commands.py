@@ -397,37 +397,56 @@ def create_payment_for_transaction(
 
 @dbtx.atomic
 def mark_payment_succeeded(*, payment: Payment, reason: str = "") -> Payment:
+    payment = (
+        Payment.objects
+        .select_for_update()
+        .select_related("transaction")
+        .get(pk=payment.pk)
+    )
+    tx = Transaction.objects.select_for_update().get(pk=payment.transaction_id)
+
+    if getattr(tx, "type", "") == "PURCHASE":
+        _ensure_purchase_tx_stock_available_and_reserve(tx=tx)
+
     if payment.status != "SUCCEEDED":
         payment.status = "SUCCEEDED"
-        payment.save(update_fields=["status","updated_at"])
-    active_others = (Payment.objects
-                     .select_for_update()
-                     .filter(transaction=payment.transaction, status__in=("REQUIRES_CONFIRMATION","REQUIRES_ACTION","PROCESSING"))
-                     .exclude(pk=payment.pk))
+        payment.save(update_fields=["status", "updated_at"])
+
+    active_others = (
+        Payment.objects
+        .select_for_update()
+        .filter(transaction_id=tx.id, status__in=("REQUIRES_CONFIRMATION", "REQUIRES_ACTION", "PROCESSING"))
+        .exclude(pk=payment.pk)
+    )
     for p in active_others:
         md = dict(p.metadata or {})
         md["auto_cancelled_due_to_success"] = True
         p.metadata = md
         p.status = "CANCELLED"
-        p.save(update_fields=["status","metadata","updated_at"])
-    if payment.transaction.status != "COMPLETED":
-        set_transaction_status(tx=payment.transaction, to_status="COMPLETED", reason=reason or "Payment succeeded")
-    tx_type = getattr(payment.transaction, "type", "")
+        p.save(update_fields=["status", "metadata", "updated_at"])
+
+    if tx.status != "COMPLETED":
+        set_transaction_status(tx=tx, to_status="COMPLETED", reason=reason or "Payment succeeded")
+
+    if getattr(tx, "type", "") == "PURCHASE":
+        from orders.services.commands import sync_orders_with_transaction
+        sync_orders_with_transaction(tx=tx)
+
+    tx_type = getattr(tx, "type", "")
     if tx_type == "PAWN_EXTENSION":
-        try:
-            from pawns.services.commands import finalize_extension_after_payment
-            finalize_extension_after_payment(tx=payment.transaction)
-        except Exception:
-            pass
-    pts = _calc_points_for_amount(payment.amount) if getattr(payment.transaction, "type", "") == "PURCHASE" else 0
-    if getattr(payment.transaction, "type", "") == "PURCHASE":
-        if pts > 0:
-            loyalty_add_points(payment.transaction.user, pts, reason=f"Zakup: {payment.public_id}")
+        from pawns.services.commands import finalize_extension_after_payment
+        finalize_extension_after_payment(tx=tx)
+
+    if getattr(tx, "type", "") == "PURCHASE":
+        pts = _calc_points_for_amount(payment.amount)
+        if pts > 0 and tx.user:
+            loyalty_add_points(tx.user, pts, reason=f"Zakup: {payment.public_id}")
             md = dict(payment.metadata or {})
             md["loyalty_points_awarded"] = pts
             payment.metadata = md
-            payment.save(update_fields=["metadata","updated_at"])
+            payment.save(update_fields=["metadata", "updated_at"])
         _notify_order_confirmed(payment)
+
     return payment
 
 @dbtx.atomic

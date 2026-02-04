@@ -426,7 +426,6 @@ class UserTokenAdmin(admin.ModelAdmin):
 # Ograniczenia:
 # - Nikt poza superuserem nie może edytować/usuwać członkostwa OWNERA.
 # - Nie można dodać/ustawić roli OWNER (z wyjątkiem superusera ale i tak zwykle nie robimy tego w adminie).
-# - (Pozostałe reguły biznesowe wymuszasz też w API, tutaj to twarde zabezpieczenie na panelu)
 
 @admin.register(SellerMembership)
 class SellerMembershipAdmin(admin.ModelAdmin):

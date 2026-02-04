@@ -252,17 +252,17 @@
                       :disabled="confirming || payment.status==='SUCCEEDED' || payment.status==='FAILED'"
                       @click="cancel()">Anuluj</button>
             </div>
-            <p class="text-xs opacity-70">Karta testowa: <span class="font-mono">4242 4242 4242 4242</span> (dowolna data/CVC).</p>
+<!--            <p class="text-xs opacity-70">Karta testowa: <span class="font-mono">4242 4242 4242 4242</span> (dowolna data/CVC).</p>-->
           </div>
 
-          <details class="mt-2">
-            <summary class="cursor-pointer text-sm opacity-70">Szczegóły (debug)</summary>
-            <div class="mt-2 text-xs font-mono whitespace-pre-wrap">
-              Dostawca: <span x-text="labelProvider(payment.provider)"></span><br>
-              provider_payment_id: <span x-text="payment.provider_payment_id || '—'"></span><br>
-              client_secret: <span x-text="payment.client_secret || '—'"></span>
-            </div>
-          </details>
+<!--          <details class="mt-2">-->
+<!--            <summary class="cursor-pointer text-sm opacity-70">Szczegóły (debug)</summary>-->
+<!--            <div class="mt-2 text-xs font-mono whitespace-pre-wrap">-->
+<!--              Dostawca: <span x-text="labelProvider(payment.provider)"></span><br>-->
+<!--              provider_payment_id: <span x-text="payment.provider_payment_id || '—'"></span><br>-->
+<!--              client_secret: <span x-text="payment.client_secret || '—'"></span>-->
+<!--            </div>-->
+<!--          </details>-->
         </div>
       </template>
 
@@ -279,14 +279,14 @@
             </div>
           </div>
 
-          <details class="mt-2">
-            <summary class="cursor-pointer text-sm opacity-70">Szczegóły (debug)</summary>
-            <div class="mt-2 text-xs font-mono whitespace-pre-wrap">
-              Dostawca: <span x-text="labelProvider(payment.provider)"></span><br>
-              provider_payment_id: <span x-text="payment.provider_payment_id || '—'"></span><br>
-              client_secret: <span x-text="payment.client_secret || '—'"></span>
-            </div>
-          </details>
+<!--          <details class="mt-2">-->
+<!--            <summary class="cursor-pointer text-sm opacity-70">Szczegóły (debug)</summary>-->
+<!--            <div class="mt-2 text-xs font-mono whitespace-pre-wrap">-->
+<!--              Dostawca: <span x-text="labelProvider(payment.provider)"></span><br>-->
+<!--              provider_payment_id: <span x-text="payment.provider_payment_id || '—'"></span><br>-->
+<!--              client_secret: <span x-text="payment.client_secret || '—'"></span>-->
+<!--            </div>-->
+<!--          </details>-->
 
           <div class="mt-3 flex flex-wrap gap-2">
             <button class="btn btn-success"
