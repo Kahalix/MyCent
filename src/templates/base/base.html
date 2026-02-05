@@ -179,7 +179,7 @@
         <template x-if="authed">
           <div class="relative isolate user-menu"
                x-data="app.userMenu()"
-               x-init="$nextTick(() => setAnchor($refs.btn))"
+               x-init="$nextTick(() => { setAnchor($refs.btn); if (window.htmx) htmx.process($el); })"
                @mouseenter="enter()" @mouseleave="leave()"
                @resize.window="open && _place()"
                @scroll.window.passive="open && _place()">
