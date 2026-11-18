@@ -1,0 +1,215 @@
+[
+  {
+    "figure": 1,
+    "thesis_page": 19,
+    "path": "docs/architecture/use-cases.png",
+    "caption": "System use-case diagram",
+    "width": 1853,
+    "height": 1317
+  },
+  {
+    "figure": 2,
+    "thesis_page": 24,
+    "path": "docs/workflows/online-payment-activity.png",
+    "caption": "Online payment activity diagram",
+    "width": 1436,
+    "height": 1531
+  },
+  {
+    "figure": 3,
+    "thesis_page": 25,
+    "path": "docs/workflows/offline-sale-activity.png",
+    "caption": "In-store sale activity diagram",
+    "width": 1116,
+    "height": 1159
+  },
+  {
+    "figure": 4,
+    "thesis_page": 26,
+    "path": "docs/workflows/pawn-creation-activity.png",
+    "caption": "Pawn agreement creation activity diagram",
+    "width": 1120,
+    "height": 1152
+  },
+  {
+    "figure": 5,
+    "thesis_page": 27,
+    "path": "docs/workflows/online-payment-sequence.png",
+    "caption": "Online payment sequence diagram",
+    "width": 1107,
+    "height": 680
+  },
+  {
+    "figure": 6,
+    "thesis_page": 27,
+    "path": "docs/workflows/offline-sale-sequence.png",
+    "caption": "In-store sale sequence diagram",
+    "width": 1481,
+    "height": 949
+  },
+  {
+    "figure": 7,
+    "thesis_page": 28,
+    "path": "docs/workflows/pawn-creation-sequence.png",
+    "caption": "Pawn agreement creation sequence diagram",
+    "width": 1258,
+    "height": 1027
+  },
+  {
+    "figure": 8,
+    "thesis_page": 29,
+    "path": "docs/workflows/user-states.png",
+    "caption": "User state diagram",
+    "width": 563,
+    "height": 422
+  },
+  {
+    "figure": 9,
+    "thesis_page": 30,
+    "path": "docs/workflows/listing-states.png",
+    "caption": "Listing state diagram",
+    "width": 1031,
+    "height": 678
+  },
+  {
+    "figure": 10,
+    "thesis_page": 30,
+    "path": "docs/workflows/order-states.png",
+    "caption": "Order state diagram",
+    "width": 689,
+    "height": 409
+  },
+  {
+    "figure": 11,
+    "thesis_page": 31,
+    "path": "docs/workflows/pawn-states.png",
+    "caption": "Pawn agreement state diagram",
+    "width": 832,
+    "height": 407
+  },
+  {
+    "figure": 12,
+    "thesis_page": 33,
+    "path": "docs/architecture/module-dependencies.png",
+    "caption": "Django module dependencies",
+    "width": 1083,
+    "height": 529
+  },
+  {
+    "figure": 13,
+    "thesis_page": 34,
+    "path": "docs/architecture/identity-classes.png",
+    "caption": "Identity module class diagram",
+    "width": 905,
+    "height": 588
+  },
+  {
+    "figure": 14,
+    "thesis_page": 35,
+    "path": "docs/architecture/listings-catalog-shipping-classes.png",
+    "caption": "Listings, catalog and shipping class diagram",
+    "width": 1977,
+    "height": 666
+  },
+  {
+    "figure": 15,
+    "thesis_page": 38,
+    "path": "docs/screenshots/home.png",
+    "caption": "Home page and global navigation",
+    "width": 1920,
+    "height": 1080,
+    "source": "supplemental archive, privacy-redacted replacement (not the original thesis image)"
+  },
+  {
+    "figure": 16,
+    "thesis_page": 39,
+    "path": "docs/screenshots/listings.png",
+    "caption": "Public listings and filters",
+    "width": 1920,
+    "height": 1080,
+    "source": "supplemental archive, privacy-redacted replacement (not the original thesis image)"
+  },
+  {
+    "figure": 17,
+    "thesis_page": 39,
+    "path": "docs/screenshots/listing-details.png",
+    "caption": "Listing details",
+    "width": 1640,
+    "height": 952,
+    "source": "supplemental archive, privacy-redacted replacement (not the original thesis image)"
+  },
+  {
+    "figure": 18,
+    "thesis_page": 40,
+    "path": "docs/screenshots/payment.png",
+    "caption": "Payment and order checkout",
+    "width": 1920,
+    "height": 1080,
+    "source": "supplemental archive, privacy-redacted replacement (not the original thesis image)"
+  },
+  {
+    "figure": 19,
+    "thesis_page": 41,
+    "path": "docs/screenshots/pawn-details.png",
+    "caption": "Pawn agreement details",
+    "width": 1920,
+    "height": 1080,
+    "source": "supplemental archive, privacy-redacted replacement (not the original thesis image)"
+  },
+  {
+    "figure": 20,
+    "thesis_page": 70,
+    "path": "docs/workflows/online-payment-sequence-detailed.png",
+    "caption": "Detailed online payment sequence diagram",
+    "width": 1561,
+    "height": 1505
+  },
+  {
+    "figure": 21,
+    "thesis_page": 71,
+    "path": "docs/architecture/business-domain-classes.png",
+    "caption": "Business domain class diagram",
+    "width": 2276,
+    "height": 1575
+  },
+  {
+    "figure": 22,
+    "thesis_page": 72,
+    "path": "docs/architecture/erd-part-1.png",
+    "caption": "Entity-relationship diagram, part 1",
+    "width": 2201,
+    "height": 2327
+  },
+  {
+    "figure": 23,
+    "thesis_page": 73,
+    "path": "docs/architecture/erd-part-2.png",
+    "caption": "Entity-relationship diagram, part 2",
+    "width": 2192,
+    "height": 3342
+  },
+  {
+    "figure": 24,
+    "thesis_page": 74,
+    "path": "docs/gallery/performance/locust-rps.png",
+    "caption": "Locust requests per second",
+    "width": 4515,
+    "height": 841
+  },
+  {
+    "figure": 25,
+    "thesis_page": 74,
+    "path": "docs/gallery/performance/locust-response-times.png",
+    "caption": "Locust response time percentiles",
+    "width": 4471,
+    "height": 825
+  },
+  {
+    "figure": 26,
+    "thesis_page": 74,
+    "path": "docs/gallery/performance/locust-users.png",
+    "caption": "Locust concurrent users",
+    "width": 4461,
+    "height": 831
+  }
+]
